@@ -1,0 +1,37 @@
+import 'package:hive/hive.dart';
+
+part 'user_settings.g.dart';
+
+@HiveType(typeId: 5)
+class UserSettings extends HiveObject {
+  @HiveField(0)
+  String? defaultLanguage; // null = auto-detect
+
+  @HiveField(1)
+  String audioQuality; // 'standard' or 'high'
+
+  @HiveField(2)
+  bool notificationsEnabled;
+
+  @HiveField(3)
+  int? quietHoursStartMinutes; // stored as minutes from midnight
+
+  @HiveField(4)
+  int? quietHoursEndMinutes; // stored as minutes from midnight
+
+  @HiveField(5)
+  String themeMode; // 'system', 'light', 'dark'
+
+  @HiveField(6)
+  bool onboardingCompleted;
+
+  UserSettings({
+    this.defaultLanguage,
+    this.audioQuality = 'standard',
+    this.notificationsEnabled = true,
+    this.quietHoursStartMinutes,
+    this.quietHoursEndMinutes,
+    this.themeMode = 'system',
+    this.onboardingCompleted = false,
+  });
+}

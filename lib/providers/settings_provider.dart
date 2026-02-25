@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/settings_repository.dart';
 
-/// User settings state.
-/// Will be persisted to Hive in Step 3.
+/// Provider for the SettingsRepository singleton.
+final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
+  return SettingsRepository();
+});
+
+/// User settings state (derived from Hive UserSettings model).
 class SettingsState {
   final String? defaultLanguage; // null = auto-detect
   final String audioQuality; // 'standard' or 'high'
@@ -10,6 +15,7 @@ class SettingsState {
   final TimeOfDay? quietHoursStart;
   final TimeOfDay? quietHoursEnd;
   final ThemeMode themeMode;
+  final bool onboardingCompleted;
 
   const SettingsState({
     this.defaultLanguage,
@@ -18,6 +24,7 @@ class SettingsState {
     this.quietHoursStart,
     this.quietHoursEnd,
     this.themeMode = ThemeMode.system,
+    this.onboardingCompleted = false,
   });
 
   SettingsState copyWith({
@@ -27,6 +34,7 @@ class SettingsState {
     TimeOfDay? Function()? quietHoursStart,
     TimeOfDay? Function()? quietHoursEnd,
     ThemeMode? themeMode,
+    bool? onboardingCompleted,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -38,36 +46,107 @@ class SettingsState {
       quietHoursEnd:
           quietHoursEnd != null ? quietHoursEnd() : this.quietHoursEnd,
       themeMode: themeMode ?? this.themeMode,
+      onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
     );
+  }
+
+  static ThemeMode parseThemeMode(String mode) {
+    switch (mode) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  static String themeModeToString(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'light';
+      case ThemeMode.dark:
+        return 'dark';
+      case ThemeMode.system:
+        return 'system';
+    }
   }
 }
 
-/// Notifier for user settings.
+/// Notifier for user settings, backed by Hive.
 class SettingsNotifier extends Notifier<SettingsState> {
   @override
-  SettingsState build() => const SettingsState();
+  SettingsState build() {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
 
-  void setDefaultLanguage(String? language) {
+    TimeOfDay? quietStart;
+    if (settings.quietHoursStartMinutes != null) {
+      quietStart = TimeOfDay(
+        hour: settings.quietHoursStartMinutes! ~/ 60,
+        minute: settings.quietHoursStartMinutes! % 60,
+      );
+    }
+    TimeOfDay? quietEnd;
+    if (settings.quietHoursEndMinutes != null) {
+      quietEnd = TimeOfDay(
+        hour: settings.quietHoursEndMinutes! ~/ 60,
+        minute: settings.quietHoursEndMinutes! % 60,
+      );
+    }
+
+    return SettingsState(
+      defaultLanguage: settings.defaultLanguage,
+      audioQuality: settings.audioQuality,
+      notificationsEnabled: settings.notificationsEnabled,
+      quietHoursStart: quietStart,
+      quietHoursEnd: quietEnd,
+      themeMode: SettingsState.parseThemeMode(settings.themeMode),
+      onboardingCompleted: settings.onboardingCompleted,
+    );
+  }
+
+  Future<void> setDefaultLanguage(String? language) async {
+    await ref.read(settingsRepositoryProvider).setDefaultLanguage(language);
     state = state.copyWith(defaultLanguage: () => language);
   }
 
-  void setAudioQuality(String quality) {
+  Future<void> setAudioQuality(String quality) async {
+    await ref.read(settingsRepositoryProvider).setAudioQuality(quality);
     state = state.copyWith(audioQuality: quality);
   }
 
-  void setNotificationsEnabled(bool enabled) {
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setNotificationsEnabled(enabled);
     state = state.copyWith(notificationsEnabled: enabled);
   }
 
-  void setQuietHours(TimeOfDay? start, TimeOfDay? end) {
+  Future<void> setQuietHours(TimeOfDay? start, TimeOfDay? end) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.quietHoursStartMinutes =
+        start != null ? start.hour * 60 + start.minute : null;
+    settings.quietHoursEndMinutes =
+        end != null ? end.hour * 60 + end.minute : null;
+    await repo.saveSettings(settings);
     state = state.copyWith(
       quietHoursStart: () => start,
       quietHoursEnd: () => end,
     );
   }
 
-  void setThemeMode(ThemeMode mode) {
+  Future<void> setThemeMode(ThemeMode mode) async {
+    await ref
+        .read(settingsRepositoryProvider)
+        .setThemeMode(SettingsState.themeModeToString(mode));
     state = state.copyWith(themeMode: mode);
+  }
+
+  Future<void> setOnboardingCompleted(bool completed) async {
+    await ref
+        .read(settingsRepositoryProvider)
+        .setOnboardingCompleted(completed);
+    state = state.copyWith(onboardingCompleted: completed);
   }
 }
 

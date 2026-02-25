@@ -1,0 +1,89 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'note.dart';
+
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
+class NoteAdapter extends TypeAdapter<Note> {
+  @override
+  final int typeId = 0;
+
+  @override
+  Note read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return Note(
+      id: fields[0] as String,
+      title: fields[1] as String,
+      rawTranscription: fields[2] as String,
+      detectedLanguage: fields[3] as String,
+      audioFilePath: fields[4] as String,
+      audioDurationSeconds: fields[5] as int,
+      createdAt: fields[6] as DateTime?,
+      updatedAt: fields[7] as DateTime?,
+      folderId: fields[8] as String?,
+      topics: (fields[9] as List?)?.cast<String>(),
+      actions: (fields[10] as List?)?.cast<ActionItem>(),
+      todos: (fields[11] as List?)?.cast<TodoItem>(),
+      reminders: (fields[12] as List?)?.cast<ReminderItem>(),
+      generalNotes: (fields[13] as List?)?.cast<String>(),
+      followUpQuestions: (fields[14] as List?)?.cast<String>(),
+      isProcessed: fields[15] as bool,
+      hasFollowUpTrigger: fields[16] as bool,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, Note obj) {
+    writer
+      ..writeByte(17)
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.title)
+      ..writeByte(2)
+      ..write(obj.rawTranscription)
+      ..writeByte(3)
+      ..write(obj.detectedLanguage)
+      ..writeByte(4)
+      ..write(obj.audioFilePath)
+      ..writeByte(5)
+      ..write(obj.audioDurationSeconds)
+      ..writeByte(6)
+      ..write(obj.createdAt)
+      ..writeByte(7)
+      ..write(obj.updatedAt)
+      ..writeByte(8)
+      ..write(obj.folderId)
+      ..writeByte(9)
+      ..write(obj.topics)
+      ..writeByte(10)
+      ..write(obj.actions)
+      ..writeByte(11)
+      ..write(obj.todos)
+      ..writeByte(12)
+      ..write(obj.reminders)
+      ..writeByte(13)
+      ..write(obj.generalNotes)
+      ..writeByte(14)
+      ..write(obj.followUpQuestions)
+      ..writeByte(15)
+      ..write(obj.isProcessed)
+      ..writeByte(16)
+      ..write(obj.hasFollowUpTrigger);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NoteAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}

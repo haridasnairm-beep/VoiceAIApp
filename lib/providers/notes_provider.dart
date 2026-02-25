@@ -1,81 +1,52 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/note.dart';
+import '../services/notes_repository.dart';
 
-/// State for a single note's structured data.
-/// Will be replaced with Hive model in Step 3.
-class NoteState {
-  final String id;
-  final String title;
-  final String rawTranscription;
-  final String detectedLanguage;
-  final String audioFilePath;
-  final int audioDurationSeconds;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final String? folderId;
-  final List<String> topics;
-  final bool isProcessed;
+/// Provider for the NotesRepository singleton.
+final notesRepositoryProvider = Provider<NotesRepository>((ref) {
+  return NotesRepository();
+});
 
-  const NoteState({
-    required this.id,
-    required this.title,
-    required this.rawTranscription,
-    required this.detectedLanguage,
-    required this.audioFilePath,
-    this.audioDurationSeconds = 0,
-    required this.createdAt,
-    required this.updatedAt,
-    this.folderId,
-    this.topics = const [],
-    this.isProcessed = false,
-  });
+/// Notifier that manages the list of all notes, backed by Hive.
+class NotesNotifier extends Notifier<List<Note>> {
+  @override
+  List<Note> build() {
+    return ref.read(notesRepositoryProvider).getAllNotes();
+  }
 
-  NoteState copyWith({
-    String? title,
-    String? rawTranscription,
-    String? detectedLanguage,
-    String? folderId,
-    List<String>? topics,
-    bool? isProcessed,
-    DateTime? updatedAt,
-  }) {
-    return NoteState(
-      id: id,
-      title: title ?? this.title,
-      rawTranscription: rawTranscription ?? this.rawTranscription,
-      detectedLanguage: detectedLanguage ?? this.detectedLanguage,
+  void refresh() {
+    state = ref.read(notesRepositoryProvider).getAllNotes();
+  }
+
+  Future<Note> addNote({
+    required String audioFilePath,
+    int audioDurationSeconds = 0,
+    String title = 'Untitled Note',
+  }) async {
+    final repo = ref.read(notesRepositoryProvider);
+    final note = await repo.createNote(
       audioFilePath: audioFilePath,
       audioDurationSeconds: audioDurationSeconds,
-      createdAt: createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
-      folderId: folderId ?? this.folderId,
-      topics: topics ?? this.topics,
-      isProcessed: isProcessed ?? this.isProcessed,
+      title: title,
     );
-  }
-}
-
-/// Notifier that manages the list of all notes.
-/// In Step 3, this will read/write from Hive.
-class NotesNotifier extends Notifier<List<NoteState>> {
-  @override
-  List<NoteState> build() => [];
-
-  void addNote(NoteState note) {
     state = [note, ...state];
+    return note;
   }
 
-  void updateNote(NoteState updated) {
+  Future<void> updateNote(Note note) async {
+    await ref.read(notesRepositoryProvider).updateNote(note);
     state = [
-      for (final note in state)
-        if (note.id == updated.id) updated else note,
+      for (final n in state)
+        if (n.id == note.id) note else n,
     ];
   }
 
-  void deleteNote(String id) {
+  Future<void> deleteNote(String id) async {
+    await ref.read(notesRepositoryProvider).deleteNote(id);
     state = state.where((n) => n.id != id).toList();
   }
 
-  NoteState? getNoteById(String id) {
+  Note? getNoteById(String id) {
     try {
       return state.firstWhere((n) => n.id == id);
     } catch (_) {
@@ -83,7 +54,7 @@ class NotesNotifier extends Notifier<List<NoteState>> {
     }
   }
 
-  List<NoteState> searchNotes(String query) {
+  List<Note> searchNotes(String query) {
     if (query.isEmpty) return state;
     final lower = query.toLowerCase();
     return state.where((n) {
@@ -93,11 +64,11 @@ class NotesNotifier extends Notifier<List<NoteState>> {
     }).toList();
   }
 
-  List<NoteState> getUnprocessedNotes() {
+  List<Note> getUnprocessedNotes() {
     return state.where((n) => !n.isProcessed).toList();
   }
 }
 
 /// Provider for the notes list.
 final notesProvider =
-    NotifierProvider<NotesNotifier, List<NoteState>>(NotesNotifier.new);
+    NotifierProvider<NotesNotifier, List<Note>>(NotesNotifier.new);

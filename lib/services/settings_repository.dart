@@ -1,0 +1,54 @@
+import '../models/user_settings.dart';
+import 'hive_service.dart';
+
+/// Repository for UserSettings operations against Hive.
+class SettingsRepository {
+  static const String _settingsKey = 'user_settings';
+
+  /// Get current settings, or create defaults if none exist.
+  UserSettings getSettings() {
+    final settings = HiveService.settingsBox.get(_settingsKey);
+    if (settings != null) return settings;
+
+    // Create default settings
+    final defaults = UserSettings();
+    HiveService.settingsBox.put(_settingsKey, defaults);
+    return defaults;
+  }
+
+  /// Save settings.
+  Future<void> saveSettings(UserSettings settings) async {
+    await HiveService.settingsBox.put(_settingsKey, settings);
+  }
+
+  /// Update a single setting field.
+  Future<void> setDefaultLanguage(String? language) async {
+    final settings = getSettings();
+    settings.defaultLanguage = language;
+    await saveSettings(settings);
+  }
+
+  Future<void> setAudioQuality(String quality) async {
+    final settings = getSettings();
+    settings.audioQuality = quality;
+    await saveSettings(settings);
+  }
+
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    final settings = getSettings();
+    settings.notificationsEnabled = enabled;
+    await saveSettings(settings);
+  }
+
+  Future<void> setThemeMode(String mode) async {
+    final settings = getSettings();
+    settings.themeMode = mode;
+    await saveSettings(settings);
+  }
+
+  Future<void> setOnboardingCompleted(bool completed) async {
+    final settings = getSettings();
+    settings.onboardingCompleted = completed;
+    await saveSettings(settings);
+  }
+}
