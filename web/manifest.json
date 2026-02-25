@@ -1,11 +1,11 @@
 {
-    "name": "dreamflow_counter",
-    "short_name": "dreamflow_counter",
+    "name": "VoiceNotes AI",
+    "short_name": "VoiceNotes",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FAFAFA",
+    "theme_color": "#4A90D9",
+    "description": "Privacy-first voice note-taking and task management app.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

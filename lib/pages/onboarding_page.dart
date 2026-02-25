@@ -200,37 +200,22 @@ class OnboardingPage extends StatelessWidget {
               const SizedBox(height: 24),
               const _PageIndicator(active: 0),
               const SizedBox(height: 24),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ElevatedButton(
-                    onPressed: () => context.go(AppRoutes.login),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                      ),
-                      textStyle:
-                          Theme.of(context).textTheme.labelLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                    ),
-                    child: const Text("Get Started"),
+              ElevatedButton(
+                onPressed: () => context.go(AppRoutes.home),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () => context.go(AppRoutes.login),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.secondary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      textStyle: const TextStyle(fontSize: 16),
-                    ),
-                    child: const Text("Sign in to existing account"),
-                  ),
-                ],
+                  textStyle:
+                      Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                ),
+                child: const Text("Get Started"),
               ),
               const SizedBox(height: 16),
             ],

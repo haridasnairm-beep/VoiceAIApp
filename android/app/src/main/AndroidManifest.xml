@@ -3,7 +3,7 @@
     <!-- Microphone access for voice note recording -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application
-        android:label="dreamflow"
+        android:label="VoiceNotes AI"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

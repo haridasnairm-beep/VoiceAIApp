@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>LinkShare</string>
+	<string>VoiceNotes AI</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>LinkShare</string>
+	<string>VoiceNotes AI</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -46,32 +46,8 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 
-	<!-- Camera permission (QR code scanner) -->
-	<key>NSCameraUsageDescription</key>
-	<string>LinkShare needs camera access to scan QR codes for group invitations.</string>
-
-	<!-- Photo library permission (profile photo, group banner) -->
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>LinkShare needs photo library access to set your profile photo or group banner image.</string>
-
-	<!-- Deep link URL scheme for group invitations -->
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>linkshare</string>
-			</array>
-			<key>CFBundleURLName</key>
-			<string>com.linkshare.app</string>
-		</dict>
-	</array>
-
-	<!-- Background fetch for push notifications -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>fetch</string>
-		<string>remote-notification</string>
-	</array>
+	<!-- Microphone permission for voice recording -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VoiceNotes AI needs microphone access to record voice notes.</string>
 </dict>
 </plist>
