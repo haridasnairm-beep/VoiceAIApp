@@ -3,6 +3,7 @@
 **Last Updated:** 2026-02-25
 **Current Version:** 0.1.0 (Initial Scaffolding)
 **Overall Progress:** ~15% of MVP (Phase 1)
+**Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
 ---

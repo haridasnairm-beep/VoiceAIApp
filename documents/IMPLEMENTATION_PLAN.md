@@ -3,6 +3,7 @@
 **Version:** 1.0
 **Last Updated:** 2026-02-25
 **Scope:** MVP (Phase 1) — Full implementation roadmap
+**Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md)
 
 ---

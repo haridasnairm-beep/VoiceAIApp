@@ -4,6 +4,7 @@
 **Last Updated:** 2026-02-25
 **Platform:** Cross-platform (iOS + Android) via Flutter
 **Dart SDK:** ^3.6.0
+**Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [VoiceNotes AI Concept Document](voicenotes-ai-concept.md)
 
 ---

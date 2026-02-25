@@ -2,6 +2,9 @@
 
 This file provides context for AI agents (Claude Code, Copilot, etc.) working on this project.
 
+**Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
+**Branch:** main
+
 ---
 
 ## Project Summary
