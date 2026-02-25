@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme.dart';
 import 'nav.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const VoiceNotesApp());
+  runApp(const ProviderScope(child: VoiceNotesApp()));
 }
 
 class VoiceNotesApp extends StatelessWidget {
