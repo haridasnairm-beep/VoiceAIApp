@@ -30,6 +30,7 @@ class NotesRepository {
     String title = 'Untitled Note',
     String rawTranscription = '',
     String detectedLanguage = 'en',
+    String? folderId,
   }) async {
     final note = Note(
       id: _uuid.v4(),
@@ -38,6 +39,8 @@ class NotesRepository {
       detectedLanguage: detectedLanguage,
       audioFilePath: audioFilePath,
       audioDurationSeconds: audioDurationSeconds,
+      folderId: folderId,
+      isProcessed: true,
     );
     await HiveService.notesBox.put(note.id, note);
     return note;

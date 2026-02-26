@@ -25,6 +25,12 @@ class UserSettings extends HiveObject {
   @HiveField(6)
   bool onboardingCompleted;
 
+  @HiveField(7)
+  String transcriptionMode; // 'live' or 'whisper'
+
+  @HiveField(8)
+  String speakerName; // User's display name for transcription timestamps
+
   UserSettings({
     this.defaultLanguage,
     this.audioQuality = 'standard',
@@ -33,5 +39,7 @@ class UserSettings extends HiveObject {
     this.quietHoursEndMinutes,
     this.themeMode = 'system',
     this.onboardingCompleted = false,
+    this.transcriptionMode = 'live',
+    this.speakerName = 'Speaker 1',
   });
 }

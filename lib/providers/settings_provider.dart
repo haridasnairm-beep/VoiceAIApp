@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/notification_service.dart';
 import '../services/settings_repository.dart';
 
 /// Provider for the SettingsRepository singleton.
@@ -16,6 +17,8 @@ class SettingsState {
   final TimeOfDay? quietHoursEnd;
   final ThemeMode themeMode;
   final bool onboardingCompleted;
+  final String transcriptionMode; // 'live' or 'whisper'
+  final String speakerName; // User's display name for transcription timestamps
 
   const SettingsState({
     this.defaultLanguage,
@@ -25,6 +28,8 @@ class SettingsState {
     this.quietHoursEnd,
     this.themeMode = ThemeMode.system,
     this.onboardingCompleted = false,
+    this.transcriptionMode = 'live',
+    this.speakerName = 'Speaker 1',
   });
 
   SettingsState copyWith({
@@ -35,6 +40,8 @@ class SettingsState {
     TimeOfDay? Function()? quietHoursEnd,
     ThemeMode? themeMode,
     bool? onboardingCompleted,
+    String? transcriptionMode,
+    String? speakerName,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -47,6 +54,8 @@ class SettingsState {
           quietHoursEnd != null ? quietHoursEnd() : this.quietHoursEnd,
       themeMode: themeMode ?? this.themeMode,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      transcriptionMode: transcriptionMode ?? this.transcriptionMode,
+      speakerName: speakerName ?? this.speakerName,
     );
   }
 
@@ -103,6 +112,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
       quietHoursEnd: quietEnd,
       themeMode: SettingsState.parseThemeMode(settings.themeMode),
       onboardingCompleted: settings.onboardingCompleted,
+      transcriptionMode: settings.transcriptionMode,
+      speakerName: settings.speakerName,
     );
   }
 
@@ -119,6 +130,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setNotificationsEnabled(bool enabled) async {
     await ref.read(settingsRepositoryProvider).setNotificationsEnabled(enabled);
     state = state.copyWith(notificationsEnabled: enabled);
+    if (!enabled) {
+      await NotificationService.instance.cancelAll();
+    }
   }
 
   Future<void> setQuietHours(TimeOfDay? start, TimeOfDay? end) async {
@@ -147,6 +161,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
         .read(settingsRepositoryProvider)
         .setOnboardingCompleted(completed);
     state = state.copyWith(onboardingCompleted: completed);
+  }
+
+  Future<void> setTranscriptionMode(String mode) async {
+    await ref.read(settingsRepositoryProvider).setTranscriptionMode(mode);
+    state = state.copyWith(transcriptionMode: mode);
+  }
+
+  Future<void> setSpeakerName(String name) async {
+    await ref.read(settingsRepositoryProvider).setSpeakerName(name);
+    state = state.copyWith(speakerName: name);
   }
 }
 

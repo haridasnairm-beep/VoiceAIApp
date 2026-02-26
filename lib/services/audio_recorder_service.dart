@@ -26,13 +26,52 @@ class AudioRecorderService {
     }
   }
 
-  Future<String> _buildPath() async {
+  Future<String> _buildPath({String extension = 'm4a'}) async {
     final dir = await getApplicationDocumentsDirectory();
     final recordingsDir = Directory('${dir.path}/recordings');
     if (!await recordingsDir.exists())
       await recordingsDir.create(recursive: true);
     final ts = DateTime.now().toIso8601String().replaceAll(':', '-');
-    return '${recordingsDir.path}/voicenote_$ts.m4a';
+    return '${recordingsDir.path}/voicenote_$ts.$extension';
+  }
+
+  /// Start recording with voiceRecognition audio source (compatible with STT).
+  Future<String?> startWithSource() async {
+    try {
+      final ok = await ensurePermission();
+      if (!ok) return null;
+
+      final path = await _buildPath();
+      _activePath = path;
+
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+          androidConfig: AndroidRecordConfig(
+            audioSource: AndroidAudioSource.voiceRecognition,
+            manageBluetooth: false,
+          ),
+        ),
+        path: path,
+      );
+
+      await _amplitudeSub?.cancel();
+      _amplitudeSub = _recorder
+          .onAmplitudeChanged(const Duration(milliseconds: 120))
+          .listen((amp) {
+        final normalized = ((amp.current + 60) / 60).clamp(0.0, 1.0);
+        level.value = normalized;
+      }, onError: (e) {
+        debugPrint('Amplitude stream error: $e');
+      });
+
+      return path;
+    } catch (e) {
+      debugPrint('AudioRecorderService.startWithSource failed: $e');
+      return null;
+    }
   }
 
   Future<String?> start() async {
@@ -66,6 +105,41 @@ class AudioRecorderService {
       return path;
     } catch (e) {
       debugPrint('AudioRecorderService.start failed: $e');
+      return null;
+    }
+  }
+
+  /// Start recording in 16kHz mono WAV format (for Whisper transcription).
+  Future<String?> startWav() async {
+    try {
+      final ok = await ensurePermission();
+      if (!ok) return null;
+
+      final path = await _buildPath(extension: 'wav');
+      _activePath = path;
+
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+
+      await _amplitudeSub?.cancel();
+      _amplitudeSub = _recorder
+          .onAmplitudeChanged(const Duration(milliseconds: 120))
+          .listen((amp) {
+        final normalized = ((amp.current + 60) / 60).clamp(0.0, 1.0);
+        level.value = normalized;
+      }, onError: (e) {
+        debugPrint('Amplitude stream error: $e');
+      });
+
+      return path;
+    } catch (e) {
+      debugPrint('AudioRecorderService.startWav failed: $e');
       return null;
     }
   }

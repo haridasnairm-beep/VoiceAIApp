@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'notification_service.dart';
 import '../models/note.dart';
 import '../models/action_item.dart';
 import '../models/todo_item.dart';
@@ -80,8 +83,50 @@ class HiveService {
     _initialized = false;
   }
 
+  /// Calculate total storage used by the app (Hive data + recordings).
+  static Future<String> getStorageUsage() async {
+    try {
+      int totalBytes = 0;
+
+      // Hive box files
+      final appDir = await getApplicationDocumentsDirectory();
+      final hiveDir = Directory(appDir.path);
+      if (await hiveDir.exists()) {
+        await for (final entity in hiveDir.list()) {
+          if (entity is File && entity.path.endsWith('.hive')) {
+            totalBytes += await entity.length();
+          }
+        }
+      }
+
+      // Recordings directory
+      final recordingsDir = Directory('${appDir.path}/recordings');
+      if (await recordingsDir.exists()) {
+        await for (final entity in recordingsDir.list()) {
+          if (entity is File) {
+            totalBytes += await entity.length();
+          }
+        }
+      }
+
+      // Format
+      if (totalBytes < 1024) return '$totalBytes B';
+      if (totalBytes < 1024 * 1024) {
+        return '${(totalBytes / 1024).toStringAsFixed(1)} KB';
+      }
+      if (totalBytes < 1024 * 1024 * 1024) {
+        return '${(totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+      }
+      return '${(totalBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    } catch (e) {
+      debugPrint('HiveService.getStorageUsage failed: $e');
+      return 'Unknown';
+    }
+  }
+
   /// Delete all data (privacy: one-tap delete).
   static Future<void> deleteAllData() async {
+    await NotificationService.instance.cancelAll();
     await notesBox.clear();
     await foldersBox.clear();
     await settingsBox.clear();

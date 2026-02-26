@@ -4,6 +4,67 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.0.3] - 2026-02-26 - Whisper Fix, Timestamps, Conditional UI
+
+### Added
+- **Speaker name setting** — "Your Name" field in Settings (default: "Speaker 1"), persisted via Hive
+- **Transcription timestamp header** — Each note shows speaker name + date/time above transcription text (e.g., "Haridas — Feb 26, 2026 at 12:05 PM")
+- **Whisper error feedback** — SnackBar warning when Whisper transcription returns empty, allows manual editing
+- **Whisper debug logging** — File existence/size validation, detailed error stack traces for troubleshooting
+
+### Changed
+- **Audio player hidden for live transcription notes** — Notes without audio files no longer show the player section (previously showed disabled player with "Transcription-only note" message)
+- **Reminders section conditionally visible** — Hidden when reminders/notifications disabled in Settings, reappears when re-enabled
+
+### Fixed
+- Whisper transcription silently returning empty text with no user feedback
+
+---
+
+## [1.0.2] - 2026-02-26 - UI Polish & Compact Headers
+
+### Changed
+- Replaced manual header Rows with proper AppBar widgets on Home, Folders, and Folder Detail pages
+- Home page: AppBar with "My Notes" title, "VoiceNotes AI" subtitle, settings icon action
+- Folders page: AppBar with "Library" title, "Your folders" subtitle, back button, search action
+- Folder Detail page: AppBar with folder name title, note count subtitle, back button, search + popup menu actions
+- Reduced top spacing across pages — AppBar handles SafeArea automatically for more compact headers
+- Home page body padding reduced from `(20, 20, 20, 120)` to `(20, 8, 20, 120)`
+- Stat chips (Total Audio, Notes) in Folder Detail moved below AppBar in body
+
+### Fixed
+- Folders page missing back button — now navigates back or to home
+- Excessive empty space between page headers and Android status bar
+
+---
+
+## [1.0.1] - 2026-02-26 - Settings Overhaul, Splash Screen & Quick Guide
+
+### Added
+- **Splash screen** (`lib/pages/splash_page.dart`) — Animated logo + tagline, 5-second timer, navigates to onboarding (first launch) or home (returning user)
+- **Multi-page Quick Guide** — 4-page swipeable onboarding: Welcome, Record & Transcribe, Organize Your Way, Privacy First
+  - Skip button on first-run, dot indicators, "Get Started" / "Got It" buttons
+  - Accessible from Settings as "Quick Guide" (shows "Got It" instead of "Get Started")
+- **Language Detection picker** in Settings — 13 languages + Automatic (auto-detect) option
+- **Audio Quality picker** in Settings — Standard ("Smaller file size, good quality") and High Quality ("Lossless audio, larger files")
+- **Storage utilization display** — Shows actual disk usage (Hive data + recordings) via `HiveService.getStorageUsage()`
+- **Danger Zone section** in Settings — Red-titled group for "Delete All Data" with room for future destructive options
+- **HDMPixels branding** — Splash screen shows "by HDMPixels"
+
+### Changed
+- Renamed branding from "HariAppBuilders" to "HDMPixels" on splash screen
+- Onboarding rewritten from single-page to 4-page `PageView` with `ConsumerStatefulWidget`
+- Splash page converted to `ConsumerStatefulWidget` to check onboarding completion status
+- Settings page: removed Help Center (not implemented) and Terms of Service (deferred)
+- Settings page: "SUPPORT" group now only contains Quick Guide
+- Navigation updated: `/` route = SplashPage, `/onboarding` = OnboardingPage
+
+### Fixed
+- `flutter install` installing stale release APK — resolved with `flutter clean` before build
+- Language and Audio Quality settings now interactive (previously display-only)
+
+---
+
 ## [0.1.1] - 2026-02-25 - Concept Alignment & Documentation
 
 ### Changed
@@ -87,35 +148,10 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - Planned for MVP
+## [Unreleased] - Planned
 
-### Step 1: Project Alignment & Branding
-- Fix app label, title, and icon branding
-- Update onboarding → Home flow (remove login gate)
-
-### Step 2: State Management
-- Replace Provider with Riverpod (or Bloc)
-
-### Step 3: Data Models & Hive
-- Create Hive models with encryption
-- Repository layer for CRUD
-
-### Step 4: Wire UI to Data
-- Connect all screens to Hive through providers
-
-### Step 5: Speech-to-Text
-- Whisper API or Google STT integration
-- Offline queue for pending transcriptions
-
-### Step 6: AI Categorization
-- OpenAI/Anthropic API for structuring notes
-- Contextual grouping and follow-up questions
-
-### Step 7: Waveform, Playback & Notifications
-- Real-time waveform visualizer
-- Audio playback on note detail
-- Reminder notifications
-
-### Step 8: Testing & Release
+### Phase 2
+- Whisper API transcription (cloud-based, higher accuracy)
+- AI Categorization & Structuring (auto-extract actions/todos/reminders)
+- n8n Integration & Advanced Features
 - Unit, widget, and integration tests
-- Store submission preparation

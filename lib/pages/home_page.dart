@@ -1,68 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../nav.dart';
 import '../theme.dart';
+import '../providers/notes_provider.dart';
+import '../providers/folders_provider.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notes = ref.watch(notesProvider);
+    final folders = ref.watch(foldersProvider);
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'My Notes',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+            ),
+            Text(
+              'VoiceNotes AI',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: () => context.push(AppRoutes.settings),
+            icon: Icon(
+              Icons.settings_outlined,
+              color: Theme.of(context).colorScheme.onSurface,
+              size: 24,
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
+        top: false,
         child: Stack(
           children: [
             SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "My Notes",
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color:
-                                      Theme.of(context).colorScheme.onSurface,
-                                ),
-                          ),
-                          Text(
-                            "VoiceNotes AI",
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color:
-                                      Theme.of(context).colorScheme.secondary,
-                                ),
-                          ),
-                        ],
-                      ),
-                      GestureDetector(
-                        onTap: () => context.push(AppRoutes.settings),
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
-                          child: const Text("JD"),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
                   // Search Bar
                   GestureDetector(
                     onTap: () => context.push(AppRoutes.search),
@@ -104,7 +96,7 @@ class HomePage extends StatelessWidget {
                         _CategoryCard(
                           icon: Icons.description,
                           title: "All Notes",
-                          subtitle: "24 items",
+                          subtitle: "${notes.length} items",
                           backgroundColor:
                               Theme.of(context).colorScheme.primary,
                           textColor: Theme.of(context).colorScheme.onPrimary,
@@ -112,20 +104,9 @@ class HomePage extends StatelessWidget {
                         ),
                         const SizedBox(width: 16),
                         _CategoryCard(
-                          icon: Icons.star_rounded,
-                          title: "Favorites",
-                          subtitle: "5 items",
-                          backgroundColor:
-                              Theme.of(context).colorScheme.surface,
-                          textColor: Theme.of(context).colorScheme.onSurface,
-                          iconColor: Theme.of(context).colorScheme.tertiary,
-                          hasBorder: true,
-                        ),
-                        const SizedBox(width: 16),
-                        _CategoryCard(
                           icon: Icons.folder_rounded,
-                          title: "Projects",
-                          subtitle: "12 items",
+                          title: "Folders",
+                          subtitle: "${folders.length} items",
                           backgroundColor:
                               Theme.of(context).colorScheme.surface,
                           textColor: Theme.of(context).colorScheme.onSurface,
@@ -153,7 +134,7 @@ class HomePage extends StatelessWidget {
                             ),
                       ),
                       TextButton(
-                        onPressed: () {}, // Maybe go to list view
+                        onPressed: () => context.push(AppRoutes.search),
                         child: Text(
                           "See All",
                           style: Theme.of(context)
@@ -168,63 +149,29 @@ class HomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Recent Notes List
-                  _NoteCard(
-                    title: "Project Alpha Sync",
-                    timestamp: "Today, 10:30 AM",
-                    lang: "English",
-                    icon: Icons.business_center,
-                    iconBg: const Color(0xFFE3F2FD),
-                    iconColor: const Color(0xFF1E88E5),
-                    preview:
-                        "Discussed the new milestones for the Q4 roadmap. Need to finalize the design system by Friday.",
-                    hasTodo: true,
-                    hasAction: true,
-                    hasReminder: false,
-                    onTap: () => context.push(AppRoutes.noteDetail),
-                  ),
-                  _NoteCard(
-                    title: "Grocery List",
-                    timestamp: "Yesterday, 6:45 PM",
-                    lang: "Spanish",
-                    icon: Icons.shopping_cart,
-                    iconBg: const Color(0xFFF1F8E9),
-                    iconColor: const Color(0xFF43A047),
-                    preview:
-                        "Comprar leche, huevos, pan y frutas para la semana. No olvidar las bolsas reutilizables.",
-                    hasTodo: true,
-                    hasAction: false,
-                    hasReminder: true,
-                    onTap: () => context.push(AppRoutes.noteDetail),
-                  ),
-                  _NoteCard(
-                    title: "Ideas for Blog",
-                    timestamp: "Oct 24, 2:15 PM",
-                    lang: "English",
-                    icon: Icons.lightbulb,
-                    iconBg: const Color(0xFFFFF3E0),
-                    iconColor: const Color(0xFFFB8C00),
-                    preview:
-                        "Write about the benefits of voice-first interfaces and how AI is changing productivity tools.",
-                    hasTodo: false,
-                    hasAction: false,
-                    hasReminder: false,
-                    onTap: () => context.push(AppRoutes.noteDetail),
-                  ),
-                  _NoteCard(
-                    title: "Meeting with Sarah",
-                    timestamp: "Oct 23, 11:00 AM",
-                    lang: "French",
-                    icon: Icons.person,
-                    iconBg: const Color(0xFFF3E5F5),
-                    iconColor: const Color(0xFF8E24AA),
-                    preview:
-                        "Réunion pour discuter du budget marketing. Elle a suggéré d'augmenter les dépenses sur les réseaux sociaux.",
-                    hasTodo: true,
-                    hasAction: true,
-                    hasReminder: false,
-                    onTap: () => context.push(AppRoutes.noteDetail),
-                  ),
+                  // Notes List or Empty State
+                  if (notes.isEmpty)
+                    _buildEmptyState(context)
+                  else
+                    ...notes.map((note) => _NoteCard(
+                          title: note.title,
+                          timestamp: _formatDate(note.createdAt),
+                          lang: note.detectedLanguage,
+                          icon: Icons.mic_rounded,
+                          iconBg: const Color(0xFFE3F2FD),
+                          iconColor: const Color(0xFF1E88E5),
+                          preview: note.rawTranscription.length > 100
+                              ? note.rawTranscription.substring(0, 100)
+                              : note.rawTranscription,
+                          hasTodo: note.todos.isNotEmpty,
+                          hasAction: note.actions.isNotEmpty,
+                          hasReminder: note.reminders.isNotEmpty,
+                          onTap: () => context.push(
+                            AppRoutes.noteDetail,
+                            extra: {'noteId': note.id},
+                          ),
+                        )),
+
                   const SizedBox(height: 40),
                 ],
               ),
@@ -248,7 +195,7 @@ class HomePage extends StatelessWidget {
                           color: Theme.of(context)
                               .colorScheme
                               .primary
-                              .withOpacity(0.2),
+                              .withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -263,7 +210,7 @@ class HomePage extends StatelessWidget {
                               color: Theme.of(context)
                                   .colorScheme
                                   .primary
-                                  .withOpacity(0.4),
+                                  .withValues(alpha: 0.4),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -286,6 +233,73 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.mic_rounded,
+                size: 40,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "No notes yet",
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Tap the record button to create\nyour first voice note",
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final noteDay = DateTime(date.year, date.month, date.day);
+
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    final time = '$hour:$minute';
+
+    if (noteDay == today) {
+      return 'Today, $time';
+    } else if (noteDay == yesterday) {
+      return 'Yesterday, $time';
+    } else {
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      ];
+      final month = months[date.month - 1];
+      final day = date.day.toString().padLeft(2, '0');
+      return '$month $day';
+    }
   }
 }
 
@@ -339,7 +353,7 @@ class _CategoryCard extends StatelessWidget {
             Text(
               subtitle,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: textColor.withOpacity(0.8),
+                    color: textColor.withValues(alpha: 0.8),
                   ),
             ),
           ],
@@ -388,7 +402,7 @@ class _NoteCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.xl),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -419,7 +433,7 @@ class _NoteCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(
-                          width: 150, // Constrain width for ellipsis
+                          width: 150,
                           child: Text(
                             title,
                             style: Theme.of(context)

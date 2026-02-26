@@ -1,7 +1,7 @@
 # VoiceNotes AI - Project Specification
 
-**Version:** 2.0
-**Last Updated:** 2026-02-25
+**Version:** 2.1
+**Last Updated:** 2026-02-26
 **Platform:** Cross-platform (iOS + Android) via Flutter
 **Dart SDK:** ^3.6.0
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
@@ -112,6 +112,34 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Privacy dashboard** — view what data exists, delete all data, view AI processing policy
 - **About / Help** — app version, FAQ, support contact
 
+### 4.10 Project Documents List Screen
+- **"New Project" button** — prominent FAB or top button
+- **Project document cards** — title, description preview, linked note count, last updated timestamp
+- **Empty state** — illustration + "Create your first project document" prompt
+- **Search** — filter project documents by title/description keyword
+- **Access:** From Home page (navigation alongside Folders)
+
+### 4.11 Project Document Detail Screen
+- **Scrollable canvas** displaying all blocks (note references, free text, section headers) in user-defined order
+- **Header area:** editable title, description, metadata (created, updated, block count), action buttons
+- **Note Reference Block:** mic icon, original recording timestamp, language badge, linked note title, full editable transcript, audio duration, overflow menu (remove, view original, version history)
+- **Free-Text Block:** editable text area with pen icon, overflow menu (remove)
+- **Section Header Block:** large/bold editable text with optional divider, overflow menu (remove)
+- **Add Block action sheet:** Add Voice Note (opens note picker), Add Free Text, Add Section Header
+- **Reorder Mode:** drag handles on each block, "Done" button to exit
+- **Bi-directional editing:** editing a transcript within a project document creates a new version on the original note and updates it everywhere
+
+### 4.12 Note Picker Screen
+- **Multi-select** from all existing notes (reverse chronological)
+- **Search bar** to filter by keyword
+- **"Already linked" indicator** on notes already in the project
+- **"Add Selected" button** to confirm and append as note_reference blocks
+
+### 4.13 Transcript Version History Screen
+- **Version list** showing: version number, date, edit source (e.g., "Note Detail", "Project: Kitchen Renovation")
+- **Full text** per version
+- **"Restore this version"** action — creates a new version with restored text (non-destructive)
+
 ---
 
 ## 5. Key Behaviors (MVP)
@@ -184,7 +212,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 Note
 ├── id: String (UUID)
 ├── title: String (auto-generated from content)
-├── rawTranscription: String
+├── rawTranscription: String (always reflects latest version text)
 ├── detectedLanguage: String
 ├── audioFilePath: String
 ├── audioDurationSeconds: int
@@ -198,7 +226,9 @@ Note
 ├── generalNotes: List<String>
 ├── followUpQuestions: List<String>?
 ├── isProcessed: bool (false if in offline queue)
-└── hasFollowUpTrigger: bool (user said "any suggestions?" etc.)
+├── hasFollowUpTrigger: bool (user said "any suggestions?" etc.)
+├── transcriptVersions: List<TranscriptVersion> (full version history)
+└── projectDocumentIds: List<String> (reverse lookup for linked projects)
 
 ActionItem
 ├── id: String
@@ -237,6 +267,31 @@ UserSettings
 ├── quietHoursStart: TimeOfDay?
 ├── quietHoursEnd: TimeOfDay?
 └── themeMode: String (system / light / dark)
+
+ProjectDocument
+├── id: String (UUID)
+├── title: String
+├── description: String? (optional subtitle)
+├── blocks: List<ProjectBlock> (ordered list — order = display order)
+├── createdAt: DateTime
+└── updatedAt: DateTime
+
+ProjectBlock
+├── id: String (UUID)
+├── type: BlockType (note_reference | free_text | section_header)
+├── sortOrder: int (position in the document)
+├── noteId: String? (required when type = note_reference)
+├── content: String? (required when type = free_text or section_header)
+├── createdAt: DateTime
+└── updatedAt: DateTime
+
+TranscriptVersion
+├── id: String (UUID)
+├── text: String (transcript text at this version)
+├── versionNumber: int (1, 2, 3...)
+├── editSource: String (where the edit was made)
+├── createdAt: DateTime
+└── isOriginal: bool (true only for the first version from STT)
 ```
 
 ---
@@ -252,7 +307,21 @@ UserSettings
 
 ---
 
-## 9. Out of Scope (Phase 2+)
+## 9. Project Documents — Relationship to Folders
+
+| Aspect | Folders | Project Documents |
+|---|---|---|
+| **Purpose** | Organize / group notes | Compose / build a document from notes |
+| **Note relationship** | A note belongs to one folder | A note can appear in many project documents |
+| **Content** | Container of note references | Rich canvas: note transcripts + free text + headers |
+| **Editing** | No editing within folder view | Full inline editing with version history |
+| **Structure** | Flat list of notes | Ordered, user-arranged blocks |
+
+Both coexist — folders organize, projects compose.
+
+---
+
+## 10. Out of Scope (Phase 2+)
 
 | Feature | Phase |
 |---|---|
@@ -266,6 +335,10 @@ UserSettings
 | Voice search | Phase 2 |
 | Quick capture widget | Phase 2 |
 | Export (Markdown, PDF, plain text) | Phase 2 |
+| AI-generated Project Document summary | Phase 2 |
+| AI-suggested note additions for projects | Phase 2 |
+| Voice command to add note to project | Phase 2 |
+| Project Document export (Markdown/PDF) | Phase 2 |
 | Music note capture | Phase 3 |
 | Smart automations | Phase 3 |
 | Ambient listening mode | Phase 3 |
@@ -275,7 +348,7 @@ UserSettings
 
 ---
 
-## 10. MVP Tech Stack
+## 11. MVP Tech Stack
 
 | Component | Technology |
 |---|---|
@@ -291,7 +364,7 @@ UserSettings
 
 ---
 
-## 11. Dependencies
+## 12. Dependencies
 
 ### Current (in pubspec.yaml)
 | Package | Version | Purpose | MVP Status |

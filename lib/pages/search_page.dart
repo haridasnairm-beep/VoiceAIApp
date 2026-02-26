@@ -1,13 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../nav.dart';
 import '../theme.dart';
+import '../providers/notes_provider.dart';
+import '../models/note.dart';
 
-class SearchPage extends StatelessWidget {
+class SearchPage extends ConsumerStatefulWidget {
   const SearchPage({super.key});
 
   @override
+  ConsumerState<SearchPage> createState() => _SearchPageState();
+}
+
+class _SearchPageState extends ConsumerState<SearchPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final noteDate = DateTime(date.year, date.month, date.day);
+
+    if (noteDate == today) {
+      return 'Today, ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } else if (noteDate == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday, ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    }
+
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final allNotes = ref.watch(notesProvider);
+    final results = _query.isEmpty
+        ? allNotes
+        : ref.read(notesProvider.notifier).searchNotes(_query);
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -55,11 +95,11 @@ class SearchPage extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(AppRadius.xl),
-                          border:
-                              Border.all(color: Theme.of(context).dividerColor),
+                          border: Border.all(
+                              color: Theme.of(context).dividerColor),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha:0.05),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -73,6 +113,12 @@ class SearchPage extends StatelessWidget {
                             const SizedBox(width: 16),
                             Expanded(
                               child: TextField(
+                                controller: _searchController,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _query = _searchController.text;
+                                  });
+                                },
                                 decoration: InputDecoration(
                                   hintText:
                                       "Search keywords, topics, or people...",
@@ -82,17 +128,40 @@ class SearchPage extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color:
-                                    Theme.of(context).scaffoldBackgroundColor,
-                                shape: BoxShape.circle,
+                            if (_query.isNotEmpty)
+                              GestureDetector(
+                                onTap: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _query = '';
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .scaffoldBackgroundColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(Icons.close_rounded,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                      size: 22),
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color:
+                                      Theme.of(context).scaffoldBackgroundColor,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.mic_rounded,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                    size: 22),
                               ),
-                              child: Icon(Icons.mic_rounded,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 22),
-                            ),
                           ],
                         ),
                       ),
@@ -107,38 +176,10 @@ class SearchPage extends StatelessWidget {
                   child: Row(
                     children: const [
                       _FilterChip(
-                        label: "All Results",
+                        label: "All",
                         selected: true,
                         hasIcon: false,
-                        icon: Icons.check, // Dummy
-                      ),
-                      SizedBox(width: 8),
-                      _FilterChip(
-                        label: "Tasks",
-                        selected: false,
-                        hasIcon: true,
-                        icon: Icons.check_circle_outline_rounded,
-                      ),
-                      SizedBox(width: 8),
-                      _FilterChip(
-                        label: "English",
-                        selected: false,
-                        hasIcon: true,
-                        icon: Icons.translate_rounded,
-                      ),
-                      SizedBox(width: 8),
-                      _FilterChip(
-                        label: "Last 7 Days",
-                        selected: false,
-                        hasIcon: true,
-                        icon: Icons.calendar_today_rounded,
-                      ),
-                      SizedBox(width: 8),
-                      _FilterChip(
-                        label: "Project Alpha",
-                        selected: false,
-                        hasIcon: true,
-                        icon: Icons.folder_open_rounded,
+                        icon: Icons.check,
                       ),
                     ],
                   ),
@@ -148,89 +189,7 @@ class SearchPage extends StatelessWidget {
 
                 // Results List
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      Text(
-                        "Found 12 notes matching 'Project'",
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelMedium
-                            ?.copyWith(
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
-                      ),
-                      const SizedBox(height: 16),
-                      _SearchResultCard(
-                        title: "Project Alpha: Kickoff Meeting",
-                        lang: "English",
-                        preview:
-                            "We discussed the main milestones for Q4. Sarah is responsible for the UI mockups while Jim handles the backend...",
-                        catLabel: "MEETING",
-                        catIcon: Icons.groups_rounded,
-                        catBg: const Color(0xFFE3F2FD),
-                        catColor: const Color(0xFF1976D2),
-                        date: "Oct 24, 10:30 AM",
-                        onTap: () => context.push(AppRoutes.noteDetail),
-                      ),
-                      _SearchResultCard(
-                        title: "Ideas for Project Website",
-                        lang: "Spanish",
-                        preview:
-                            "Necesitamos un diseño más limpio y minimalista. Considerar el uso de animaciones Lottie para el hero section...",
-                        catLabel: "GENERAL",
-                        catIcon: Icons.lightbulb_outline_rounded,
-                        catBg: const Color(0xFFF3E5F5),
-                        catColor: const Color(0xFF7B1FA2),
-                        date: "Oct 22, 4:15 PM",
-                        onTap: () => context.push(AppRoutes.noteDetail),
-                      ),
-                      _SearchResultCard(
-                        title: "Project Alpha: Task List",
-                        lang: "English",
-                        preview:
-                            "1. Update the dependency list. 2. Schedule the demo with stakeholders. 3. Review the budget for 2024...",
-                        catLabel: "TODO",
-                        catIcon: Icons.task_alt_rounded,
-                        catBg: const Color(0xFFE8F5E9),
-                        catColor: const Color(0xFF388E3C),
-                        date: "Oct 21, 9:00 AM",
-                        onTap: () => context.push(AppRoutes.noteDetail),
-                      ),
-                      _SearchResultCard(
-                        title: "Project Budget Discussion",
-                        lang: "German",
-                        preview:
-                            "Das Budget für das nächste Quartal wurde genehmigt. Wir müssen die Hardware-Kosten bis Freitag einreichen...",
-                        catLabel: "ACTION",
-                        catIcon: Icons.flash_on_rounded,
-                        catBg: const Color(0xFFFFF3E0),
-                        catColor: const Color(0xFFF57C00),
-                        date: "Oct 19, 2:45 PM",
-                        onTap: () => context.push(AppRoutes.noteDetail),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(32.0),
-                        child: Column(
-                          children: [
-                            Icon(Icons.auto_awesome_rounded,
-                                color: Theme.of(context).hintColor, size: 32),
-                            const SizedBox(height: 8),
-                            Text(
-                              "End of search results",
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(context).hintColor,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 80),
-                    ],
-                  ),
+                  child: _buildResultsBody(context, allNotes, results),
                 ),
               ],
             ),
@@ -247,7 +206,7 @@ class SearchPage extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha:0.2),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -263,6 +222,110 @@ class SearchPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildResultsBody(
+      BuildContext context, List<Note> allNotes, List<Note> results) {
+    // No notes at all
+    if (allNotes.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(48.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.mic_none_rounded,
+                  color: Theme.of(context).hintColor, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                "No notes yet. Record your first voice note!",
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).hintColor,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Query entered but no matches
+    if (results.isEmpty && _query.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(48.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off_rounded,
+                  color: Theme.of(context).hintColor, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                "No notes found for '$_query'",
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).hintColor,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show results
+    final countLabel = _query.isEmpty
+        ? "Found ${results.length} notes"
+        : "Found ${results.length} notes matching '$_query'";
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Text(
+          countLabel,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+        ),
+        const SizedBox(height: 16),
+        ...results.map((note) {
+          final preview = note.rawTranscription.length > 100
+              ? note.rawTranscription.substring(0, 100)
+              : note.rawTranscription;
+          return _SearchResultCard(
+            title: note.title,
+            lang: note.detectedLanguage,
+            preview: preview,
+            catLabel: "NOTE",
+            catIcon: Icons.description_rounded,
+            catBg: const Color(0xFFE3F2FD),
+            catColor: const Color(0xFF1976D2),
+            date: _formatDate(note.createdAt),
+            onTap: () =>
+                context.push(AppRoutes.noteDetail, extra: {'noteId': note.id}),
+          );
+        }),
+        if (results.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              children: [
+                Icon(Icons.check_circle_outline_rounded,
+                    color: Theme.of(context).hintColor, size: 32),
+                const SizedBox(height: 8),
+                Text(
+                  "End of search results",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).hintColor,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 80),
+      ],
     );
   }
 }
@@ -354,7 +417,7 @@ class _SearchResultCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha:0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -395,9 +458,11 @@ class _SearchResultCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         lang,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.secondary,
+                                ),
                       ),
                     ],
                   ),

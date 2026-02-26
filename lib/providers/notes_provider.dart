@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../models/note.dart';
+import '../models/reminder_item.dart';
 import '../services/notes_repository.dart';
+import '../services/notification_service.dart';
 
 /// Provider for the NotesRepository singleton.
 final notesRepositoryProvider = Provider<NotesRepository>((ref) {
@@ -22,12 +25,18 @@ class NotesNotifier extends Notifier<List<Note>> {
     required String audioFilePath,
     int audioDurationSeconds = 0,
     String title = 'Untitled Note',
+    String rawTranscription = '',
+    String detectedLanguage = 'en',
+    String? folderId,
   }) async {
     final repo = ref.read(notesRepositoryProvider);
     final note = await repo.createNote(
       audioFilePath: audioFilePath,
       audioDurationSeconds: audioDurationSeconds,
       title: title,
+      rawTranscription: rawTranscription,
+      detectedLanguage: detectedLanguage,
+      folderId: folderId,
     );
     state = [note, ...state];
     return note;
@@ -66,6 +75,85 @@ class NotesNotifier extends Notifier<List<Note>> {
 
   List<Note> getUnprocessedNotes() {
     return state.where((n) => !n.isProcessed).toList();
+  }
+
+  static const _uuid = Uuid();
+
+  /// Add a manual reminder to a note and schedule a notification.
+  Future<void> addReminder({
+    required String noteId,
+    required String text,
+    required DateTime reminderTime,
+    required bool notificationsEnabled,
+  }) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+
+    final reminderId = _uuid.v4();
+    final notificationId = reminderId.hashCode & 0x7FFFFFFF;
+
+    final reminder = ReminderItem(
+      id: reminderId,
+      text: text,
+      reminderTime: reminderTime,
+      notificationId: notificationId,
+    );
+
+    note.reminders = [...note.reminders, reminder];
+    note.updatedAt = DateTime.now();
+    await updateNote(note);
+
+    if (notificationsEnabled && reminderTime.isAfter(DateTime.now())) {
+      await NotificationService.instance.scheduleReminder(
+        notificationId: notificationId,
+        title: 'Reminder: ${note.title}',
+        body: text,
+        scheduledTime: reminderTime,
+        noteId: noteId,
+      );
+    }
+  }
+
+  /// Toggle a reminder's completed state and cancel its notification.
+  Future<void> toggleReminderCompleted({
+    required String noteId,
+    required String reminderId,
+  }) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+
+    final idx = note.reminders.indexWhere((r) => r.id == reminderId);
+    if (idx == -1) return;
+
+    note.reminders[idx].isCompleted = !note.reminders[idx].isCompleted;
+    note.updatedAt = DateTime.now();
+
+    if (note.reminders[idx].isCompleted &&
+        note.reminders[idx].notificationId != null) {
+      await NotificationService.instance
+          .cancelNotification(note.reminders[idx].notificationId!);
+    }
+
+    await updateNote(note);
+  }
+
+  /// Delete a reminder from a note and cancel its notification.
+  Future<void> deleteReminder({
+    required String noteId,
+    required String reminderId,
+  }) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+
+    final reminder = note.reminders.where((r) => r.id == reminderId).firstOrNull;
+    if (reminder?.notificationId != null) {
+      await NotificationService.instance
+          .cancelNotification(reminder!.notificationId!);
+    }
+
+    note.reminders = note.reminders.where((r) => r.id != reminderId).toList();
+    note.updatedAt = DateTime.now();
+    await updateNote(note);
   }
 }
 

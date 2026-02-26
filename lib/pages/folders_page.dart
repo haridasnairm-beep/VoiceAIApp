@@ -1,244 +1,215 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../nav.dart';
 import '../theme.dart';
+import '../providers/folders_provider.dart';
 
-class FoldersPage extends StatelessWidget {
+class FoldersPage extends ConsumerWidget {
   const FoldersPage({super.key});
 
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    if (dateOnly == today) return 'Today';
+    if (dateOnly == today.subtract(const Duration(days: 1))) return 'Yesterday';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final month = months[date.month - 1];
+    final day = date.day.toString().padLeft(2, '0');
+    return '$month $day';
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final folders = ref.watch(foldersProvider);
+
+    // Extract unique topics from all folders
+    final allTopics = <String>{};
+    for (final folder in folders) {
+      allTopics.addAll(folder.topics);
+    }
+    final topicsList = allTopics.toList();
+
+    // Topic chip colors cycle
+    const topicColors = [
+      AppColors.lightAccent,
+      AppColors.lightSuccess,
+      AppColors.lightPrimary,
+      Color(0xFFFF9800),
+      Color(0xFF9C27B0),
+    ];
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Stack(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Library",
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color:
-                                      Theme.of(context).colorScheme.onSurface,
-                                ),
-                          ),
-                          Text(
-                            "Smart organized by AI",
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color:
-                                      Theme.of(context).colorScheme.secondary,
-                                ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          shape: BoxShape.circle,
-                          border:
-                              Border.all(color: Theme.of(context).dividerColor),
-                        ),
-                        child: Center(
-                          child: Icon(Icons.search_rounded,
-                              color: Theme.of(context).colorScheme.onSurface,
-                              size: 24),
-                        ),
-                      ),
-                    ],
+            Text(
+              'Library',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
-                  const SizedBox(height: 24),
-
-                  // Smart Topics
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            ),
+            Text(
+              'Your folders',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: () => context.push(AppRoutes.search),
+            icon: Icon(Icons.search_rounded,
+                color: Theme.of(context).colorScheme.onSurface),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          folders.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      Icon(
+                        Icons.folder_rounded,
+                        size: 64,
+                        color: Theme.of(context).hintColor,
+                      ),
+                      const SizedBox(height: 16),
                       Text(
-                        "Smart Topics",
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        'No folders yet',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.secondary,
+                              color:
+                                  Theme.of(context).colorScheme.onSurface,
                             ),
                       ),
-                      TextButton(
-                        onPressed: () {},
-                        child: Text(
-                          "See All",
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                        ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap + to create your first folder',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(
+                              color:
+                                  Theme.of(context).colorScheme.secondary,
+                            ),
                       ),
                     ],
                   ),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: const [
-                        _TopicChip(
-                            label: "Project Alpha",
-                            dotColor: AppColors.lightAccent),
-                        SizedBox(width: 8),
-                        _TopicChip(
-                            label: "Grocery Lists",
-                            dotColor: AppColors.lightSuccess),
-                        SizedBox(width: 8),
-                        _TopicChip(
-                            label: "Client Meetings",
-                            dotColor: AppColors.lightPrimary),
-                        SizedBox(width: 8),
-                        _TopicChip(
-                            label: "Personal Ideas",
-                            dotColor: Color(0xFFFF9800)),
-                        SizedBox(width: 8),
-                        _TopicChip(
-                            label: "Study Notes", dotColor: Color(0xFF9C27B0)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Folders List
-                  Text(
-                    "Folders",
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  _FolderCard(
-                    title: "Work Brainstorming",
-                    count: 12,
-                    lastActive: "2h ago",
-                    hasUpdate: true,
-                    icon: Icons.folder_rounded,
-                    iconBg: const Color(0xFFE3F2FD),
-                    iconColor: const Color(0xFF1E88E5),
-                    onTap: () => context.push(AppRoutes.folderDetail),
-                  ),
-                  _FolderCard(
-                    title: "Daily Reflections",
-                    count: 45,
-                    lastActive: "Yesterday",
-                    hasUpdate: true,
-                    icon: Icons.auto_awesome_rounded,
-                    iconBg: const Color(0xFFF1F8E9),
-                    iconColor: const Color(0xFF43A047),
-                    onTap: () => context.push(AppRoutes.folderDetail),
-                  ),
-                  _FolderCard(
-                    title: "Language Practice",
-                    count: 8,
-                    lastActive: "3 days ago",
-                    hasUpdate: false,
-                    icon: Icons.translate_rounded,
-                    iconBg: const Color(0xFFFFF3E0),
-                    iconColor: const Color(0xFFFB8C00),
-                    onTap: () => context.push(AppRoutes.folderDetail),
-                  ),
-                  _FolderCard(
-                    title: "Uncategorized",
-                    count: 4,
-                    lastActive: "",
-                    hasUpdate: false,
-                    icon: Icons.inventory_2_rounded,
-                    iconBg: const Color(0xFFF5F5F5),
-                    iconColor: const Color(0xFF757575),
-                    onTap: () => context.push(AppRoutes.folderDetail),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // AI Tip
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(AppRadius.xl),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Icon(Icons.lightbulb_rounded,
-                                color: Theme.of(context).colorScheme.onPrimary,
-                                size: 24),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Topics section — only if there are topics
+                        if (topicsList.isNotEmpty) ...[
+                          Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                "AI Organization Tip",
+                                'Topics',
                                 style: Theme.of(context)
                                     .textTheme
-                                    .labelLarge
+                                    .titleSmall
                                     ?.copyWith(
+                                      fontWeight: FontWeight.bold,
                                       color: Theme.of(context)
                                           .colorScheme
-                                          .onPrimary,
-                                      fontWeight: FontWeight.bold,
+                                          .secondary,
                                     ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "You can ask 'Group all notes about the garden project' to create a new folder instantly.",
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onPrimary
-                                          .withOpacity(0.9),
-                                    ),
+                              TextButton(
+                                onPressed: () => context.push(AppRoutes.search),
+                                child: Text(
+                                  'See All',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      ),
+                                ),
                               ),
                             ],
                           ),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (int i = 0;
+                                    i < topicsList.length;
+                                    i++) ...[
+                                  if (i > 0) const SizedBox(width: 8),
+                                  _TopicChip(
+                                    label: topicsList[i],
+                                    dotColor: topicColors[
+                                        i % topicColors.length],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+
+                        // Folders List
+                        Text(
+                          'Folders',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondary,
+                              ),
                         ),
+                        const SizedBox(height: 16),
+                        ...folders.map((folder) => _FolderCard(
+                              title: folder.name,
+                              count: folder.noteIds.length,
+                              lastActive: _formatDate(folder.updatedAt),
+                              hasUpdate: true,
+                              icon: Icons.folder_rounded,
+                              iconBg: const Color(0xFFE3F2FD),
+                              iconColor: const Color(0xFF1E88E5),
+                              onTap: () => context.push(
+                                AppRoutes.folderDetail,
+                                extra: {'folderId': folder.id},
+                              ),
+                            )),
+                        const SizedBox(height: 80),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 80),
-                ],
-              ),
-            ),
 
             // FAB
             Align(
@@ -246,18 +217,54 @@ class FoldersPage extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: FloatingActionButton.extended(
-                  onPressed: () {},
+                  onPressed: () {
+                    _showNewFolderDialog(context, ref);
+                  },
                   icon: Icon(Icons.create_new_folder_rounded,
                       color: Theme.of(context).colorScheme.onSurface),
-                  label: Text("New Folder",
+                  label: Text('New Folder',
                       style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface)),
-                  backgroundColor: Theme.of(context).colorScheme.surface,
+                          color:
+                              Theme.of(context).colorScheme.onSurface)),
+                  backgroundColor:
+                      Theme.of(context).colorScheme.surface,
                 ),
               ),
             ),
           ],
         ),
+    );
+  }
+
+  void _showNewFolderDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Folder'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Folder name',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                ref.read(foldersProvider.notifier).addFolder(name: name);
+                Navigator.of(ctx).pop();
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
       ),
     );
   }
@@ -336,7 +343,7 @@ class _FolderCard extends StatelessWidget {
           border: Border.all(color: Theme.of(context).dividerColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -371,12 +378,12 @@ class _FolderCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        "$count notes",
+                        '$count notes',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.secondary,
                             ),
                       ),
-                      if (hasUpdate) ...[
+                      if (hasUpdate && lastActive.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Container(
                           width: 4,

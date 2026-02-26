@@ -51,4 +51,16 @@ class SettingsRepository {
     settings.onboardingCompleted = completed;
     await saveSettings(settings);
   }
+
+  Future<void> setTranscriptionMode(String mode) async {
+    final settings = getSettings();
+    settings.transcriptionMode = mode;
+    await saveSettings(settings);
+  }
+
+  Future<void> setSpeakerName(String name) async {
+    final settings = getSettings();
+    settings.speakerName = name;
+    await saveSettings(settings);
+  }
 }

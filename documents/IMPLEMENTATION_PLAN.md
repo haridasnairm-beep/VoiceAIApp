@@ -1,148 +1,74 @@
 # VoiceNotes AI - Implementation Plan
 
-**Version:** 1.0
-**Last Updated:** 2026-02-25
-**Scope:** MVP (Phase 1) — Full implementation roadmap
+**Version:** 2.2
+**Last Updated:** 2026-02-26
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md)
+**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md)
 
 ---
 
 ## Overview
 
-This plan covers the complete implementation path from the current UI-only scaffold to a fully functional MVP. Work is organized into 8 sequential steps. Each step builds on the previous one.
+This plan is split into two phases:
 
-**Current state:** UI shells for all screens + working audio recorder.
-**Target state:** Privacy-first voice note app with transcription, AI categorization, local Hive storage, offline support, and reminder notifications.
+- **Phase 1 (On-Device):** A fully functional voice note-taking app with recording, on-device transcription, local storage, folders, search, playback, and notifications — all without any AI/cloud dependency.
+- **Phase 2 (AI-Powered):** Adds AI categorization, smart structuring, Whisper API transcription, auto-folder assignment, and n8n integration.
+
+**Current state:** Phase 1 core complete (all 7 steps done + bonus features). Step 4.5 (Project Documents) approved for development.
+**Phase 1 target:** Privacy-first voice note app with on-device transcription, local Hive storage, audio playback, reminder notifications, and project documents. **Core achieved; Project Documents pending.**
 
 ---
 
-## Step 1: Project Alignment & Branding Fixes
+# PHASE 1 — On-Device Features (No AI Required)
 
-**Goal:** Align the codebase with the concept document before building new features.
+---
+
+## Step 1: Project Alignment & Branding Fixes ✅ COMPLETED
+
+**Goal:** Align the codebase with the concept document.
 
 ### Tasks:
-1. **Update Android app label** — Change "dreamflow" to "VoiceNotes AI" in `android/app/src/main/AndroidManifest.xml`
-2. **Update iOS app name** — Update display name in `ios/Runner/Info.plist`
-3. **Fix app title** — Set `title: 'VoiceNotes AI'` in `lib/main.dart`
-4. **Rename app icon** — Rename `dreamflow_icon.jpg` to `voicenotes_ai_icon.jpg` (or replace with proper icon) and update all references
-5. **Mark login_page.dart as Not In Use** — Add header comment indicating it's a Phase 2 feature
-6. **Update onboarding flow** — Onboarding should navigate to Home, not Login
-7. **Update initial route** — Consider whether to keep onboarding or go directly to Home after first launch
-8. **Clean up pubspec.yaml** — Update description, verify all dependency versions
-
-### Deliverables:
-- App displays "VoiceNotes AI" everywhere
-- Login page clearly marked as not in use
-- Onboarding → Home flow (no login gate)
-
-### Estimated effort: Small
+1. ~~Update Android app label — "VoiceNotes AI"~~
+2. ~~Update iOS app name~~
+3. ~~Fix app title in main.dart~~
+4. ~~Mark login_page.dart as Not In Use~~
+5. ~~Update onboarding flow → Home (no login gate)~~
+6. ~~Clean up pubspec.yaml~~
 
 ---
 
-## Step 2: State Management Migration
+## Step 2: State Management Migration (Riverpod) ✅ COMPLETED
 
-**Goal:** Replace Provider with Riverpod (or Bloc) as specified in the concept document.
-
-### Decision Required: Riverpod vs Bloc
-| Criteria | Riverpod | Bloc |
-|---|---|---|
-| Boilerplate | Less | More |
-| Learning curve | Moderate | Steeper |
-| Testability | Excellent | Excellent |
-| Community | Growing fast | Well-established |
-| Compile-safe | Yes | Yes |
-| **Recommendation** | **Riverpod** | — |
+**Goal:** Replace Provider with Riverpod.
 
 ### Tasks:
-1. **Add riverpod dependencies** — `flutter_riverpod`, `riverpod_annotation`, `riverpod_generator` (dev)
-2. **Remove provider dependency** from pubspec.yaml
-3. **Wrap app with ProviderScope** in `main.dart`
-4. **Create initial providers:**
-   - `settingsProvider` — user preferences (language, audio quality, theme)
-   - `notesProvider` — CRUD for notes (will connect to Hive in Step 3)
-   - `foldersProvider` — folder management
-   - `recordingStateProvider` — recording session state
-   - `connectivityProvider` — network status
-5. **Update all pages** to use `ConsumerWidget` / `ConsumerStatefulWidget`
-
-### Deliverables:
-- Riverpod fully wired across all active pages
-- Provider dependency removed
-- All state reactive and testable
-
-### Estimated effort: Medium
+1. ~~Add flutter_riverpod, wrap app with ProviderScope~~
+2. ~~Create providers: settings, notes, folders, recording, connectivity~~
+3. ~~Use Notifier/NotifierProvider (Riverpod 3.x API)~~
 
 ---
 
-## Step 3: Data Models & Hive Database
+## Step 3: Data Models & Hive Database ✅ COMPLETED
 
-**Goal:** Implement persistent local storage with encrypted Hive.
+**Goal:** Implement encrypted local storage with Hive.
 
 ### Tasks:
-1. **Add dependencies:**
-   - `hive: ^2.2.3`, `hive_flutter: ^1.1.0`
-   - `hive_generator` (dev), `build_runner` (dev)
-   - `uuid` for unique IDs
-2. **Create Hive model classes** in `lib/models/`:
-   - `note.dart` — Note with HiveType annotation
-   - `action_item.dart` — ActionItem
-   - `todo_item.dart` — TodoItem
-   - `reminder_item.dart` — ReminderItem
-   - `folder.dart` — Folder
-   - `user_settings.dart` — UserSettings
-3. **Generate Hive adapters** — Run `build_runner` to generate `.g.dart` files
-4. **Initialize Hive in main.dart:**
-   - Call `Hive.initFlutter()` before `runApp`
-   - Register all type adapters
-   - Open encrypted boxes (generate encryption key from device)
-5. **Create repository layer** in `lib/services/`:
-   - `notes_repository.dart` — CRUD operations for notes
-   - `folders_repository.dart` — CRUD for folders
-   - `settings_repository.dart` — Read/write settings
-6. **Connect repositories to Riverpod providers** from Step 2
-7. **Implement Hive box integrity check** on app start (corruption guard)
-
-### File structure after this step:
-```
-lib/
-├── models/
-│   ├── note.dart
-│   ├── note.g.dart (generated)
-│   ├── action_item.dart
-│   ├── action_item.g.dart (generated)
-│   ├── todo_item.dart
-│   ├── todo_item.g.dart (generated)
-│   ├── reminder_item.dart
-│   ├── reminder_item.g.dart (generated)
-│   ├── folder.dart
-│   ├── folder.g.dart (generated)
-│   └── user_settings.dart
-├── services/
-│   ├── audio_recorder_service.dart (existing)
-│   ├── notes_repository.dart
-│   ├── folders_repository.dart
-│   └── settings_repository.dart
-```
-
-### Deliverables:
-- All data models defined with Hive annotations
-- Encrypted Hive boxes for notes, folders, settings
-- CRUD operations working through repository layer
-- Data persists across app restarts
-
-### Estimated effort: Medium
+1. ~~Create 6 Hive models (Note, ActionItem, TodoItem, ReminderItem, Folder, UserSettings)~~
+2. ~~Generate type adapters with build_runner~~
+3. ~~AES-256 encrypted boxes for notes, folders, settings~~
+4. ~~Repository layer (notes, folders, settings)~~
+5. ~~Connect repositories to Riverpod providers~~
 
 ---
 
-## Step 4: Wire UI to Data Layer
+## Step 4: Wire UI to Data Layer ✅ COMPLETED
 
 **Goal:** Connect all screen UIs to real Hive data through Riverpod providers.
 
 ### Tasks:
 1. **Home Page:**
    - Display notes from Hive via `notesProvider`
-   - Note cards show: title, date, language tag, category icons, preview text
+   - Note cards show: title, date, language tag, preview text
    - Filter chips (All, Actions, Todos, Reminders, Notes) filter the note list
    - Search bar queries notes by keyword
    - Record button navigates to recording screen
@@ -150,34 +76,35 @@ lib/
 
 2. **Note Detail Page:**
    - Display full transcription from Hive note
-   - Render structured sections (actions, todos, reminders, general notes)
+   - Render sections (actions, todos, reminders, general notes) — manually added for now
    - Checkboxes toggle `isCompleted` and persist to Hive
    - Edit button allows editing transcription text
-   - Delete button with confirmation dialog removes note from Hive
+   - Delete button with confirmation dialog
    - Show detected language label
 
 3. **Folders Page:**
    - List all folders from `foldersProvider`
    - Show note count per folder
    - Create new folder dialog
-   - Auto-generated folders labeled differently from manual ones
+   - Rename / delete folder
 
 4. **Folder Detail Page:**
    - Display notes belonging to selected folder
    - Chronological timeline view
-   - Folder rename/delete
+   - Remove note from folder
 
 5. **Settings Page:**
    - Read/write settings from Hive via `settingsProvider`
    - Language preference toggle (auto-detect vs specific)
    - Audio quality selector
    - Notification toggle
-   - Storage usage display (calculate Hive box sizes + recording files)
+   - Storage usage display (Hive box sizes + audio files)
    - Privacy dashboard (data summary, delete all data button)
+   - Theme mode toggle (light/dark/system)
 
 6. **Search Page:**
-   - Query notes by keyword (search rawTranscription, title, topics)
-   - Filter by date range, language, category
+   - Query notes by keyword (rawTranscription, title)
+   - Filter by date range, language
    - Display results as note cards
 
 ### Deliverables:
@@ -189,129 +116,145 @@ lib/
 
 ---
 
-## Step 5: Speech-to-Text Integration
+## Step 4.5: Project Documents ⏳ APPROVED — NOT YET STARTED
 
-**Goal:** Add real-time transcription to the recording flow.
+**Goal:** Implement the Project Documents feature — rich, composite documents assembled from individual voice notes with free-text blocks, section headers, drag-and-drop reordering, bi-directional transcript editing, and version history. All on-device, no AI.
 
-### Decision Required: Whisper API vs Google Speech-to-Text
-| Criteria | Whisper API (OpenAI) | Google Cloud STT |
-|---|---|---|
-| Language support | 99+ languages | 125+ languages |
-| Auto language detection | Yes | Yes |
-| Streaming support | No (batch only) | Yes (streaming) |
-| Privacy | Stateless, no retention (with policy) | Configurable data logging |
-| Cost | ~$0.006/min | ~$0.006-0.024/min |
-| **Recommendation** | **For batch processing** | **For live preview** |
+**Feature Spec:** [FEATURE_PROJECT_DOCUMENTS.md](FEATURE_PROJECT_DOCUMENTS.md)
 
-### Possible approach: Hybrid
-- **Live preview:** Use on-device speech recognition (speech_to_text package) for rough real-time text
-- **Final transcription:** Send completed recording to Whisper API for accurate, language-detected transcription
+### Sub-step A: Data Model & Storage
+
+1. Create `ProjectDocument` Hive model (typeId: 6) — id, title, description, blocks, createdAt, updatedAt
+2. Create `ProjectBlock` Hive model (typeId: 7) — id, type, sortOrder, noteId, content, createdAt, updatedAt
+3. Create `TranscriptVersion` Hive model (typeId: 8) — id, text, versionNumber, editSource, createdAt, isOriginal
+4. Create `BlockType` enum (note_reference, free_text, section_header)
+5. Add `projectDocumentsBox` to HiveService initialization (AES-256 encrypted)
+6. Modify existing `Note` model:
+   - Add `transcriptVersions: List<TranscriptVersion>` field
+   - Add `projectDocumentIds: List<String>` field
+7. Write data migration: on app start, if a Note has no transcriptVersions, create v1 from rawTranscription
+8. Run `build_runner` to regenerate type adapters
+
+### Sub-step B: Repository & Provider Layer
+
+1. Create `ProjectDocumentsRepository` — CRUD for project documents and blocks
+2. Add transcript versioning methods to `NotesRepository` (addTranscriptVersion, getTranscriptVersions, restoreTranscriptVersion)
+3. Add projectDocumentIds management methods to `NotesRepository`
+4. Create `projectDocumentsProvider` (Notifier/NotifierProvider)
+5. Wire provider to repository with proper state management
+
+### Sub-step C: UI — Project Documents List Screen
+
+1. Create `/project-documents` route and `project_documents_page.dart`
+2. Implement project document card widget (title, description, block count, last updated)
+3. Implement "New Project" creation dialog (title + optional description)
+4. Implement rename and delete actions with confirmation
+5. Implement search/filter within project documents
+6. Implement empty state
+7. Add "Projects" navigation entry from Home page
+
+### Sub-step D: UI — Project Document Detail Screen
+
+1. Create `/project-documents/:id` route and `project_document_detail_page.dart`
+2. Implement block rendering engine (switch on block type → render card)
+3. Implement Note Reference Block widget (transcript, timestamp, language badge, in-place editing, overflow menu)
+4. Implement Free-Text Block widget (editable text area, overflow menu)
+5. Implement Section Header Block widget (large/bold editable text, optional divider)
+6. Implement "Add Block" action sheet (Add Voice Note / Add Free Text / Add Section Header)
+7. Implement reorder mode with drag handles
+8. Wire all edit/save/delete actions to provider
+
+### Sub-step E: UI — Note Picker & Supporting Screens
+
+1. Create note picker screen with search and multi-select
+2. Show "already linked" indicator on notes in picker
+3. Implement "Add to Project" action on Note Detail page
+4. Implement "Linked Projects" section on Note Detail page
+5. Implement optional "Add to Project?" prompt after saving a new recording
+6. Create Version History screen/bottom sheet (list versions, "Restore this version" action)
+
+### Sub-step F: Integration & Polish
+
+1. Handle note deletion — update project document blocks to show "Note deleted" placeholder
+2. Handle project document deletion — clean up note references (remove documentId from all linked notes)
+3. Ensure search indexes include project document titles
+4. Test with large documents (50+ blocks) — use ListView.builder for lazy rendering
+5. Accessibility: screen reader labels, drag-and-drop alternatives (move up/down buttons)
+6. Empty states for all new screens
+
+### New Files:
+| File | Purpose |
+|---|---|
+| `lib/models/project_document.dart` | ProjectDocument Hive model |
+| `lib/models/project_block.dart` | ProjectBlock Hive model |
+| `lib/models/transcript_version.dart` | TranscriptVersion Hive model |
+| `lib/services/project_documents_repository.dart` | CRUD for project documents |
+| `lib/providers/project_documents_provider.dart` | Riverpod provider |
+| `lib/pages/project_documents_page.dart` | List screen |
+| `lib/pages/project_document_detail_page.dart` | Detail / canvas screen |
+| `lib/pages/note_picker_page.dart` | Multi-select note picker |
+| `lib/pages/version_history_page.dart` | Transcript version history |
+| `lib/widgets/note_reference_block.dart` | Block widget |
+| `lib/widgets/free_text_block.dart` | Block widget |
+| `lib/widgets/section_header_block.dart` | Block widget |
+| `lib/widgets/project_document_card.dart` | Card for list screen |
+
+### Modified Files:
+| File | Change |
+|---|---|
+| `lib/models/note.dart` | Add `transcriptVersions` and `projectDocumentIds` fields |
+| `lib/services/hive_service.dart` | Add `projectDocumentsBox` initialization |
+| `lib/services/notes_repository.dart` | Add versioning and project reference methods |
+| `lib/providers/notes_provider.dart` | Expose new repository methods |
+| `lib/nav.dart` | Add 4 new routes |
+| `lib/pages/home_page.dart` | Add Projects navigation entry |
+| `lib/pages/note_detail_page.dart` | Add "Linked Projects" section and "Add to Project" button |
+| `lib/pages/recording_page.dart` | Add optional "Add to Project" prompt post-save |
+
+### Estimated effort: Large
+
+---
+
+## Step 5: Speech-to-Text Integration (On-Device) ✅ COMPLETED
+
+**Goal:** Add on-device transcription to the recording flow using `speech_to_text` package (free, no API key needed).
+
+### How it works:
+- Uses Google STT engine on Android and Apple Speech on iOS — both run on-device
+- Supports 50+ languages with auto-detection
+- Real-time text display while speaking
+- No cloud API calls, no cost, fully private
 
 ### Tasks:
-1. **Add dependencies:**
-   - `http` or `dio` for API calls
-   - `speech_to_text` for on-device live preview (optional)
-   - `connectivity_plus` for network status
+1. **Add dependency:** `speech_to_text` package
 2. **Create transcription service** — `lib/services/transcription_service.dart`
-   - Method: `transcribe(String audioFilePath)` → returns `TranscriptionResult` (text + detected language)
-   - Stateless API call — send audio, get text, done
-   - Handle API errors gracefully
-   - Support for Whisper API format (multipart file upload)
-3. **Integrate live preview** (optional/stretch):
-   - Use `speech_to_text` package for on-device recognition during recording
-   - Display rough text in recording screen below waveform
-   - This is an approximation — final transcription comes from Whisper
+   - Initialize speech recognizer
+   - Start/stop listening tied to recording state
+   - Capture interim and final transcription results
+   - Detect language from recognition result
+3. **Update Recording Page:**
+   - Display live transcription text below waveform while recording
+   - Show detected language indicator
+   - Visual feedback when speech is detected vs silence
 4. **Update recording flow:**
-   - User taps "Save & Process"
-   - Show processing indicator
-   - Send audio to Whisper API
-   - Receive transcription + language
-   - Save to Hive note
-   - Navigate to Note Detail
-5. **Handle no-internet scenario:**
-   - Save note with `isProcessed: false`
-   - Add to offline queue
-   - Show queue indicator on Home
-
-### API Configuration:
-- API key stored securely (flutter_secure_storage or dart env)
-- Endpoint configurable for future n8n integration (Phase 2)
-- No user-identifying data sent beyond the audio itself
+   - User records → speech is transcribed in real-time
+   - User taps "Save" → transcription + audio saved to Hive note
+   - Navigate to Note Detail to view saved note
+5. **Handle edge cases:**
+   - Microphone permission denied → show permission dialog
+   - No speech detected → save note with empty transcription, allow manual entry
+   - Long recordings → handle speech_to_text session timeouts by auto-restarting listener
 
 ### Deliverables:
-- Recording → Transcription → Saved Note flow works end-to-end
+- Recording → On-device transcription → Saved Note flow works end-to-end
 - Language auto-detected
-- Offline recordings queued for later processing
+- No API key or internet connection required
 
-### Estimated effort: Large
-
----
-
-## Step 6: AI Categorization & Structuring
-
-**Goal:** Parse transcriptions into actions, todos, reminders, and general notes using AI.
-
-### Tasks:
-1. **Create AI service** — `lib/services/ai_structuring_service.dart`
-   - Method: `structureNote(String transcription)` → returns structured JSON
-   - Stateless API call to OpenAI or Anthropic
-   - Prompt engineering for accurate extraction:
-     - Actions: "I need to...", "we should...", "action item:..."
-     - Todos: "by Friday...", "before the meeting...", task-like statements
-     - Reminders: "remind me to...", "don't forget...", "remember to..."
-     - General notes: everything else
-   - Extract topics for contextual grouping
-   - Detect follow-up trigger phrases ("any suggestions?", "what should I consider?")
-   - Generate follow-up questions only if trigger detected
-
-2. **Design the AI prompt** — Critical for quality:
-   ```
-   You are a note structuring assistant. Given a voice note transcription,
-   extract and categorize the content into:
-   1. Actions — specific things to do
-   2. Todos — task items (include due dates if mentioned)
-   3. Reminders — time-based reminders
-   4. General Notes — everything else
-   5. Topics — key subjects/projects/people mentioned
-   6. Follow-up Questions — only if the user asked for suggestions
-
-   Return as structured JSON. Be precise. Do not invent items not present
-   in the transcription.
-   ```
-
-3. **Integrate with recording flow:**
-   - After transcription (Step 5), send text to AI service
-   - Parse JSON response into Hive model objects
-   - Save structured note to Hive
-   - Display on Note Detail screen
-
-4. **Contextual grouping logic:**
-   - After AI returns topics, compare against existing folder topics
-   - If match found (fuzzy matching), auto-assign note to that folder
-   - If new topic, create auto-generated folder
-   - Store topic associations in folder model
-
-5. **Follow-up questions:**
-   - Check `hasFollowUpTrigger` flag
-   - If true, display AI-generated questions in Note Detail
-   - If false, hide the section entirely
-
-### API Configuration:
-- Same security practices as Step 5
-- Stateless — no conversation memory, no data retention
-- Configurable model (gpt-4o-mini for cost efficiency, or Claude Haiku)
-
-### Deliverables:
-- Transcriptions automatically categorized into actions/todos/reminders/notes
-- Notes auto-filed into topic-based folders
-- Follow-up questions shown when voice-triggered
-- Complete recording → transcription → structuring → display pipeline
-
-### Estimated effort: Large
+### Estimated effort: Medium
 
 ---
 
-## Step 7: Waveform, Audio Playback & Notifications
+## Step 6: Waveform, Audio Playback & Notifications ✅ COMPLETED
 
 **Goal:** Polish the recording experience and add reminder notifications.
 
@@ -326,40 +269,33 @@ lib/
    - Add `just_audio` package
    - Play/pause/seek controls on Note Detail screen
    - Show playback progress bar
-   - Playback position synced with transcription (stretch goal)
+   - Display recording duration
 
 3. **Reminder notifications:**
    - Add `flutter_local_notifications` package
-   - When AI extracts a reminder with a time, schedule a local notification
+   - Manual reminder creation — user picks date/time from Note Detail
    - Notification taps open the relevant note
    - Respect quiet hours from settings
    - Cancel notifications when reminder marked complete
 
-4. **Offline queue indicator:**
-   - Show badge/indicator on Home when notes are pending processing
-   - Auto-process queue when connectivity detected
-   - Visual feedback when processing completes
-
 ### Deliverables:
 - Rich waveform visualization during recording
 - Audio playback from note detail screen
-- Reminders trigger device notifications at scheduled times
-- Offline queue visible and auto-processes
+- Manual reminders trigger device notifications at scheduled times
 
 ### Estimated effort: Medium
 
 ---
 
-## Step 8: Testing, Polish & Release Prep
+## Step 7: Testing, Polish & Release Prep ✅ COMPLETED
 
 **Goal:** Ensure quality, fix edge cases, prepare for release.
 
 ### Tasks:
 1. **Unit tests:**
    - Test Hive repository CRUD operations
-   - Test AI response parsing
-   - Test transcription service error handling
-   - Test offline queue logic
+   - Test transcription service
+   - Test provider state management
 
 2. **Widget tests:**
    - Test key UI flows (record → save → view note)
@@ -367,14 +303,12 @@ lib/
    - Test settings persistence
 
 3. **Integration tests:**
-   - End-to-end: record → transcribe → categorize → display → search
-   - Offline → online queue processing
+   - End-to-end: record → transcribe (on-device) → save → search
    - Reminder notification scheduling
 
 4. **Edge cases & error handling:**
    - Very long recordings (>30 min)
    - Empty recordings (user records silence)
-   - API failures (graceful fallback, retry logic)
    - Mixed-language edge cases
    - Hive corruption recovery
    - Low storage scenarios
@@ -390,7 +324,7 @@ lib/
    - Semantic labels on icons and buttons
 
 7. **Release preparation:**
-   - Create proper app icon (replace dreamflow icon)
+   - Create proper app icon
    - Write App Store / Play Store descriptions
    - Take screenshots for store listings
    - Set up signing configs (Android keystore, iOS provisioning)
@@ -406,49 +340,138 @@ lib/
 
 ---
 
-## Implementation Order Summary
+# PHASE 2 — AI-Powered Features (Requires n8n / Cloud APIs)
+
+---
+
+## Step 8: AI Transcription (Whisper API)
+
+**Goal:** Add high-accuracy cloud transcription as an upgrade over on-device STT.
+
+### Tasks:
+1. Integrate Whisper API (OpenAI) for batch transcription after recording
+2. Hybrid approach: on-device STT for live preview, Whisper for final accurate text
+3. Offline queue — save unprocessed notes, transcribe when internet available
+4. Queue indicator on Home screen
+5. Auto-process queue when connectivity detected
+
+### API Configuration:
+- API key stored securely (flutter_secure_storage or dart_define env)
+- Stateless — no user-identifying data sent beyond the audio
+- Configurable endpoint for future n8n integration
+
+---
+
+## Step 9: AI Categorization & Structuring
+
+**Goal:** Parse transcriptions into actions, todos, reminders, and general notes using AI.
+
+### Tasks:
+1. **Create AI service** — `lib/services/ai_structuring_service.dart`
+   - Stateless API call to OpenAI or Anthropic
+   - Prompt engineering for extraction of actions, todos, reminders, general notes
+   - Extract topics for contextual grouping
+   - Detect follow-up trigger phrases
+   - Generate follow-up questions only if trigger detected
+
+2. **AI prompt design:**
+   ```
+   You are a note structuring assistant. Given a voice note transcription,
+   extract and categorize into:
+   1. Actions — specific things to do
+   2. Todos — task items (include due dates if mentioned)
+   3. Reminders — time-based reminders
+   4. General Notes — everything else
+   5. Topics — key subjects/projects/people mentioned
+   6. Follow-up Questions — only if the user asked for suggestions
+
+   Return as structured JSON. Be precise. Do not invent items.
+   ```
+
+3. **Auto-folder assignment:**
+   - After AI returns topics, compare against existing folder topics
+   - If match found (fuzzy matching), auto-assign note to folder
+   - If new topic, create auto-generated folder
+
+4. **Auto-reminder extraction:**
+   - When AI detects "remind me to..." or time-based phrases
+   - Auto-schedule local notification from extracted date/time
+
+5. **Follow-up questions:**
+   - Check `hasFollowUpTrigger` flag
+   - Display AI-generated questions in Note Detail
+
+---
+
+## Step 10: n8n Integration & Advanced Features
+
+**Goal:** Connect to n8n workflows for extensibility.
+
+### Tasks:
+1. n8n webhook integration for transcription + structuring pipeline
+2. AI-generated folder summaries
+3. Smart search (semantic search across notes)
+4. Export capabilities (PDF, text, email)
+5. Multi-device sync considerations
+
+---
+
+## Phase Summary
 
 ```
-Step 1: Project Alignment & Branding ──────────── [Small]  ← START HERE
-   │
-Step 2: State Management Migration (Riverpod) ─── [Medium]
-   │
-Step 3: Data Models & Hive Database ───────────── [Medium]
-   │
-Step 4: Wire UI to Data Layer ─────────────────── [Large]
-   │
-Step 5: Speech-to-Text Integration ────────────── [Large]
-   │
-Step 6: AI Categorization & Structuring ───────── [Large]
-   │
-Step 7: Waveform, Playback & Notifications ────── [Medium]
-   │
-Step 8: Testing, Polish & Release Prep ────────── [Large]
-                                                      │
-                                                  MVP READY
+PHASE 1 — On-Device (No AI)
+├── Step 1: Project Alignment & Branding ────── [Small]  ✅ DONE
+├── Step 2: State Management (Riverpod) ─────── [Medium] ✅ DONE
+├── Step 3: Data Models & Hive Database ─────── [Medium] ✅ DONE
+├── Step 4: Wire UI to Data Layer ───────────── [Large]  ✅ DONE
+├── Step 4.5: Project Documents ─────────────── [Large]  ⏳ APPROVED
+│   ├── A: Data Model & Storage
+│   ├── B: Repository & Provider Layer
+│   ├── C: UI — Project Documents List
+│   ├── D: UI — Project Document Detail
+│   ├── E: UI — Note Picker & Supporting Screens
+│   └── F: Integration & Polish
+├── Step 5: On-Device Speech-to-Text ────────── [Medium] ✅ DONE
+├── Step 6: Waveform, Playback & Notifications ─ [Medium] ✅ DONE
+└── Step 7: Testing, Polish & Release ────────── [Large]  ✅ DONE
+    + Bonus: Splash Screen & Multi-page Quick Guide
+    + Bonus: Settings Overhaul (pickers, storage, danger zone)
+    + Bonus: Compact AppBar Headers across all pages
+                                                    │
+                                             PHASE 1 RELEASE (after Step 4.5)
+
+PHASE 2 — AI-Powered
+├── Step 8: Whisper API Transcription ────────── [Medium]
+├── Step 9: AI Categorization & Structuring ──── [Large]
+└── Step 10: n8n Integration & Advanced ──────── [Large]
+    + Project Documents Phase 2: AI summary, export, voice commands
+                                                    │
+                                             PHASE 2 RELEASE
 ```
 
 ---
 
-## Decisions to Make Before Starting
+## Decisions to Make
 
-| # | Decision | Options | Impact |
-|---|---|---|---|
-| 1 | State management | Riverpod vs Bloc | Affects all providers and page widgets |
-| 2 | STT provider | Whisper API vs Google STT vs hybrid | Affects transcription quality and live preview |
-| 3 | AI provider | OpenAI vs Anthropic | Affects structuring quality and cost |
-| 4 | API key management | flutter_secure_storage vs dart_define env | Affects security approach |
-| 5 | Live transcription | On-device (speech_to_text) vs skip for MVP | Affects recording UX complexity |
+| # | Decision | Phase | Options | Impact |
+|---|---|---|---|---|
+| 1 | ~~State management~~ | 1 | ~~Riverpod~~ | ✅ Decided |
+| 2 | On-device STT language scope | 1 | All supported vs top 10 | Affects recording UX |
+| 3 | Whisper API vs Google Cloud STT | 2 | Whisper (batch) vs Google (streaming) | Affects transcription quality |
+| 4 | AI provider | 2 | OpenAI vs Anthropic | Affects structuring quality and cost |
+| 5 | API key management | 2 | flutter_secure_storage vs dart_define env | Affects security approach |
 
 ---
 
 ## Risk Register
 
-| Risk | Mitigation |
-|---|---|
-| Whisper API doesn't support streaming → no live preview | Use on-device speech_to_text for rough preview, Whisper for final |
-| AI categorization quality varies | Invest in prompt engineering, allow manual re-categorization |
-| Hive database corruption | Implement integrity checks, local backup mechanism |
-| API costs escalate with usage | Monitor per-note cost, consider on-device models long-term |
-| Large recordings fail API upload | Implement chunked uploads, set max recording duration |
-| Mixed-language detection unreliable for short phrases | Default to user-preferred language for ambiguous segments |
+| Risk | Phase | Mitigation |
+|---|---|---|
+| On-device STT accuracy varies by language | 1 | Allow manual editing of transcription |
+| speech_to_text session timeout on long recordings | 1 | Auto-restart listener, stitch results |
+| Hive database corruption | 1 | Implement integrity checks, backup mechanism |
+| Large note lists slow down UI | 1 | Lazy loading, pagination |
+| Whisper API costs escalate with usage | 2 | Monitor per-note cost, keep on-device as default |
+| AI categorization quality varies | 2 | Invest in prompt engineering, allow manual override |
+| Large recordings fail API upload | 2 | Chunked uploads, max recording duration |
+| Mixed-language detection unreliable | 2 | Default to user-preferred language for ambiguous segments |

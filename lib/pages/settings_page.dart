@@ -1,148 +1,233 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../nav.dart';
 import '../theme.dart';
+import '../providers/notes_provider.dart';
+import '../providers/folders_provider.dart';
+import '../providers/settings_provider.dart';
+import '../services/hive_service.dart';
+import '../services/whisper_service.dart';
 
-class SettingsPage extends StatelessWidget {
+const _languageOptions = <String?, String>{
+  null: 'Automatic',
+  'en': 'English',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+  'hi': 'Hindi',
+  'ar': 'Arabic',
+  'pt': 'Portuguese',
+  'zh': 'Chinese',
+  'ja': 'Japanese',
+  'ko': 'Korean',
+  'ru': 'Russian',
+  'it': 'Italian',
+};
+
+class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notes = ref.watch(notesProvider);
+    final folders = ref.watch(foldersProvider);
+
+    // Derive display strings from state
+    final languageDisplay =
+        _languageOptions[settings.defaultLanguage] ?? 'Automatic';
+    final languageSublabel = settings.defaultLanguage == null
+        ? 'Auto-detect is active'
+        : languageDisplay;
+    final audioQualityDisplay =
+        settings.audioQuality == 'high' ? 'High Quality' : 'Standard';
+
+    String themeModeDisplay;
+    switch (settings.themeMode) {
+      case ThemeMode.light:
+        themeModeDisplay = 'Light';
+        break;
+      case ThemeMode.dark:
+        themeModeDisplay = 'Dark';
+        break;
+      case ThemeMode.system:
+        themeModeDisplay = 'System';
+        break;
+    }
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Settings",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+            ),
+            Text(
+              "Personalize your experience",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.asset(
+                'assets/icons/logo.png',
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Settings",
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                      ),
-                      Text(
-                        "Personalize your recording experience",
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
-                      ),
-                    ],
-                  ),
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    child: Icon(Icons.person,
-                        color: Theme.of(context).colorScheme.primary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-
-              // Profile Card
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                  border: Border.all(color: Theme.of(context).dividerColor),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Theme.of(context).colorScheme.tertiary,
-                      foregroundColor: Theme.of(context).colorScheme.onSurface,
-                      child: const Text("JD"),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Jane Doe",
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color:
-                                      Theme.of(context).colorScheme.onSurface,
-                                ),
-                          ),
-                          Text(
-                            "jane.doe@example.com",
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color:
-                                      Theme.of(context).colorScheme.secondary,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.primary,
-                        side: BorderSide(
-                            color: Theme.of(context).colorScheme.primary),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
-                      ),
-                      child: const Text("Edit"),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-
               // Preferences Group
               _SettingsGroup(
                 title: "PREFERENCES",
                 children: [
                   _SettingsItem(
+                    icon: Icons.person_outline_rounded,
+                    iconBg: const Color(0xFFFCE4EC),
+                    iconColor: const Color(0xFFC62828),
+                    label: "Your Name",
+                    sublabel: "Used as speaker label in transcriptions",
+                    type: _SettingsType.value,
+                    valueText: settings.speakerName,
+                    hasSublabel: true,
+                    onTap: () async {
+                      final controller = TextEditingController(
+                          text: settings.speakerName);
+                      final result = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Your Name'),
+                          content: TextField(
+                            controller: controller,
+                            autofocus: true,
+                            decoration: const InputDecoration(
+                              hintText: 'Enter your name',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () =>
+                                  Navigator.pop(ctx, controller.text.trim()),
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (result != null && result.isNotEmpty) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setSpeakerName(result);
+                      }
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _SettingsItem(
                     icon: Icons.language_rounded,
                     iconBg: const Color(0xFFE3F2FD),
                     iconColor: const Color(0xFF1976D2),
                     label: "Detection Language",
-                    sublabel: "Auto-detect is active",
+                    sublabel: languageSublabel,
                     type: _SettingsType.value,
-                    valueText: "Automatic",
+                    valueText: languageDisplay,
                     hasSublabel: true,
+                    onTap: () async {
+                      final picked = await showDialog<_LanguageChoice>(
+                        context: context,
+                        builder: (ctx) {
+                          return SimpleDialog(
+                            title: const Text('Detection Language'),
+                            children: _languageOptions.entries.map((e) {
+                              final isSelected =
+                                  settings.defaultLanguage == e.key;
+                              return SimpleDialogOption(
+                                onPressed: () => Navigator.pop(
+                                    ctx, _LanguageChoice(e.key)),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        e.value,
+                                        style: TextStyle(
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          color: isSelected
+                                              ? Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      Icon(Icons.check_rounded,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                          size: 20),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setDefaultLanguage(picked.code);
+                      }
+                    },
                   ),
                   const Divider(height: 1, indent: 56),
                   _SettingsItem(
                     icon: Icons.notifications_active_rounded,
                     iconBg: const Color(0xFFF1F8E9),
                     iconColor: const Color(0xFF388E3C),
-                    label: "Smart Reminders",
+                    label: "Reminders",
                     type: _SettingsType.toggle,
-                    switchValue: true,
+                    switchValue: settings.notificationsEnabled,
+                    onChanged: (val) {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setNotificationsEnabled(val);
+                    },
                   ),
                   const Divider(height: 1, indent: 56),
                   _SettingsItem(
@@ -151,44 +236,210 @@ class SettingsPage extends StatelessWidget {
                     iconColor: const Color(0xFF7B1FA2),
                     label: "Appearance",
                     type: _SettingsType.value,
-                    valueText: "System",
+                    valueText: themeModeDisplay,
+                    onTap: () async {
+                      final picked = await showDialog<ThemeMode>(
+                        context: context,
+                        builder: (ctx) {
+                          return SimpleDialog(
+                            title: const Text('Choose Theme'),
+                            children: [
+                              SimpleDialogOption(
+                                onPressed: () =>
+                                    Navigator.pop(ctx, ThemeMode.system),
+                                child: const Text('System'),
+                              ),
+                              SimpleDialogOption(
+                                onPressed: () =>
+                                    Navigator.pop(ctx, ThemeMode.light),
+                                child: const Text('Light'),
+                              ),
+                              SimpleDialogOption(
+                                onPressed: () =>
+                                    Navigator.pop(ctx, ThemeMode.dark),
+                                child: const Text('Dark'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setThemeMode(picked);
+                      }
+                    },
                   ),
                 ],
               ),
 
-              // Audio & AI Group
+              // Audio Group
               _SettingsGroup(
-                title: "AUDIO & AI",
+                title: "AUDIO",
                 children: [
                   _SettingsItem(
                     icon: Icons.high_quality_rounded,
                     iconBg: const Color(0xFFFFF3E0),
                     iconColor: const Color(0xFFF57C00),
                     label: "Audio Quality",
-                    sublabel: "Higher quality uses more space",
+                    sublabel: settings.audioQuality == 'high'
+                        ? "Lossless audio, larger files"
+                        : "Smaller file size, good quality",
                     type: _SettingsType.value,
-                    valueText: "HD",
+                    valueText: audioQualityDisplay,
                     hasSublabel: true,
+                    onTap: () async {
+                      final picked = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) {
+                          return SimpleDialog(
+                            title: const Text('Audio Quality'),
+                            children: [
+                              SimpleDialogOption(
+                                onPressed: () =>
+                                    Navigator.pop(ctx, 'standard'),
+                                child: const ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.sd_rounded),
+                                  title: Text('Standard'),
+                                  subtitle: Text(
+                                      'Smaller file size, good quality'),
+                                ),
+                              ),
+                              SimpleDialogOption(
+                                onPressed: () =>
+                                    Navigator.pop(ctx, 'high'),
+                                child: const ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.hd_rounded),
+                                  title: Text('High Quality'),
+                                  subtitle: Text(
+                                      'Lossless audio, larger files'),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setAudioQuality(picked);
+                      }
+                    },
                   ),
                   const Divider(height: 1, indent: 56),
                   _SettingsItem(
-                    icon: Icons.psychology_rounded,
-                    iconBg: const Color(0xFFE0F2F1),
-                    iconColor: const Color(0xFF00796B),
-                    label: "AI Follow-up",
-                    sublabel: "Generate smart suggestions",
-                    type: _SettingsType.toggle,
-                    switchValue: true,
+                    icon: Icons.record_voice_over_rounded,
+                    iconBg: const Color(0xFFE8F5E9),
+                    iconColor: const Color(0xFF2E7D32),
+                    label: "Transcription",
+                    sublabel: settings.transcriptionMode == 'live'
+                        ? "Live text, no audio file"
+                        : "Audio + text after recording",
+                    type: _SettingsType.value,
+                    valueText: settings.transcriptionMode == 'live'
+                        ? 'Live'
+                        : 'Whisper',
                     hasSublabel: true,
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _SettingsItem(
-                    icon: Icons.cloud_done_rounded,
-                    iconBg: const Color(0xFFE8EAF6),
-                    iconColor: const Color(0xFF3F51B5),
-                    label: "Cloud Sync",
-                    type: _SettingsType.toggle,
-                    switchValue: true,
+                    onTap: () async {
+                      final picked = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) {
+                          return SimpleDialog(
+                            title: const Text('Transcription Mode'),
+                            children: [
+                              SimpleDialogOption(
+                                onPressed: () =>
+                                    Navigator.pop(ctx, 'live'),
+                                child: const ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.subtitles_rounded),
+                                  title: Text('Live Transcription'),
+                                  subtitle: Text(
+                                      'Real-time text while recording. No audio file saved.'),
+                                ),
+                              ),
+                              SimpleDialogOption(
+                                onPressed: () =>
+                                    Navigator.pop(ctx, 'whisper'),
+                                child: const ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.mic_rounded),
+                                  title: Text('Record & Transcribe'),
+                                  subtitle: Text(
+                                      'Records audio first, then transcribes. Supports playback.'),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                      if (picked == null || !context.mounted) return;
+
+                      if (picked == 'live') {
+                        ref.read(settingsProvider.notifier).setTranscriptionMode('live');
+                        return;
+                      }
+
+                      // Whisper selected — check if model is downloaded
+                      final modelReady = await WhisperService.instance.isModelDownloaded();
+                      if (modelReady) {
+                        if (!context.mounted) return;
+                        ref.read(settingsProvider.notifier).setTranscriptionMode('whisper');
+                        return;
+                      }
+
+                      // Model not downloaded — ask user to download
+                      if (!context.mounted) return;
+                      final confirmDownload = await showDialog<bool>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Download Whisper Model'),
+                          content: const Text(
+                            'Whisper AI requires a one-time model download (~140 MB).\n\n'
+                            'Make sure you are connected to WiFi before proceeding.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Download'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirmDownload != true || !context.mounted) return;
+
+                      // Show download progress dialog
+                      final success = await showDialog<bool>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => _WhisperDownloadDialog(),
+                      );
+
+                      if (success == true && context.mounted) {
+                        ref.read(settingsProvider.notifier).setTranscriptionMode('whisper');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Whisper model downloaded. Record & Transcribe mode is active.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      } else if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Download failed. Please check your connection and try again.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
@@ -219,7 +470,7 @@ class SettingsPage extends StatelessWidget {
                               ),
                         ),
                         Text(
-                          "1.2 GB of 5 GB",
+                          "${notes.length} notes · ${folders.length} folders",
                           style: Theme.of(context)
                               .textTheme
                               .labelSmall
@@ -229,31 +480,50 @@ class SettingsPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: 0.24,
-                        minHeight: 8,
-                        backgroundColor:
-                            Theme.of(context).scaffoldBackgroundColor,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                    const SizedBox(height: 12),
+                    FutureBuilder<String>(
+                      future: HiveService.getStorageUsage(),
+                      builder: (context, snapshot) {
+                        final usage = snapshot.data ?? 'Calculating...';
+                        return Row(
+                          children: [
+                            Icon(Icons.storage_rounded,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Storage used: $usage",
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Icon(Icons.info_outline_rounded,
                             color: Theme.of(context).hintColor, size: 16),
                         const SizedBox(width: 8),
-                        Text(
-                          "Your voice notes are backed up to the cloud.",
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.secondary,
-                              ),
+                        Expanded(
+                          child: Text(
+                            "Your voice notes are stored locally on this device.",
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.secondary,
+                                ),
+                          ),
                         ),
                       ],
                     ),
@@ -266,41 +536,91 @@ class SettingsPage extends StatelessWidget {
                 title: "SUPPORT",
                 children: [
                   _SettingsItem(
-                    icon: Icons.help_outline_rounded,
-                    iconBg: Theme.of(context).scaffoldBackgroundColor,
-                    iconColor: Theme.of(context).colorScheme.secondary,
-                    label: "Help Center",
+                    icon: Icons.menu_book_rounded,
+                    iconBg: const Color(0xFFE3F2FD),
+                    iconColor: const Color(0xFF1565C0),
+                    label: "Quick Guide",
+                    sublabel: "Learn how VoiceNotes AI works",
                     type: _SettingsType.chevron,
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _SettingsItem(
-                    icon: Icons.description_outlined,
-                    iconBg: Theme.of(context).scaffoldBackgroundColor,
-                    iconColor: Theme.of(context).colorScheme.secondary,
-                    label: "Terms of Service",
-                    type: _SettingsType.chevron,
+                    hasSublabel: true,
+                    onTap: () {
+                      context.push(AppRoutes.onboarding);
+                    },
                   ),
                 ],
               ),
 
-              // Log Out
-              TextButton(
-                onPressed: () => context.go(AppRoutes.login),
-                child: Text(
-                  "Log Out",
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                ),
+              // Danger Zone
+              _SettingsGroup(
+                title: "DANGER ZONE",
+                titleColor: Theme.of(context).colorScheme.error,
+                children: [
+                  _SettingsItem(
+                    icon: Icons.delete_forever_rounded,
+                    iconBg: const Color(0xFFFFEBEE),
+                    iconColor: const Color(0xFFD32F2F),
+                    label: "Delete All Data",
+                    sublabel: "Permanently remove all notes and settings",
+                    type: _SettingsType.chevron,
+                    hasSublabel: true,
+                    onTap: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) {
+                          return AlertDialog(
+                            title: const Text('Delete All Data'),
+                            content: const Text(
+                              'This will permanently delete all your voice notes, folders, and settings. This action cannot be undone.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                style: TextButton.styleFrom(
+                                  foregroundColor:
+                                      Theme.of(context).colorScheme.error,
+                                ),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                      if (confirmed == true && context.mounted) {
+                        await HiveService.deleteAllData();
+                        if (context.mounted) {
+                          context.go(AppRoutes.home);
+                        }
+                      }
+                    },
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
               Center(
-                child: Text(
-                  "VoiceNotes AI v2.4.0",
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).hintColor,
+                child: Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(
+                        'assets/icons/logo.png',
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "VoiceNotes AI v1.0.0",
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(context).hintColor,
+                          ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 32),
@@ -312,11 +632,22 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
+/// Wrapper to distinguish null (Automatic) from dialog dismissal.
+class _LanguageChoice {
+  final String? code;
+  const _LanguageChoice(this.code);
+}
+
 class _SettingsGroup extends StatelessWidget {
   final String title;
+  final Color? titleColor;
   final List<Widget> children;
 
-  const _SettingsGroup({required this.title, required this.children});
+  const _SettingsGroup({
+    required this.title,
+    this.titleColor,
+    required this.children,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -328,7 +659,7 @@ class _SettingsGroup extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: titleColor ?? Theme.of(context).colorScheme.secondary,
                   fontWeight: FontWeight.bold,
                 ),
           ),
@@ -362,6 +693,8 @@ class _SettingsItem extends StatelessWidget {
   final bool switchValue;
   final String? valueText;
   final bool hasSublabel;
+  final ValueChanged<bool>? onChanged;
+  final VoidCallback? onTap;
 
   const _SettingsItem({
     required this.icon,
@@ -373,11 +706,13 @@ class _SettingsItem extends StatelessWidget {
     this.switchValue = false,
     this.valueText,
     this.hasSublabel = false,
+    this.onChanged,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
         children: [
@@ -417,7 +752,7 @@ class _SettingsItem extends StatelessWidget {
           if (type == _SettingsType.toggle)
             Switch(
               value: switchValue,
-              onChanged: (val) {},
+              onChanged: onChanged ?? (val) {},
               activeColor: Theme.of(context).colorScheme.primary,
             )
           else if (type == _SettingsType.chevron)
@@ -439,6 +774,85 @@ class _SettingsItem extends StatelessWidget {
               ],
             ),
         ],
+      ),
+    );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: content,
+      );
+    }
+
+    return content;
+  }
+}
+
+/// Dialog that downloads the Whisper model with a progress indicator.
+class _WhisperDownloadDialog extends StatefulWidget {
+  @override
+  State<_WhisperDownloadDialog> createState() => _WhisperDownloadDialogState();
+}
+
+class _WhisperDownloadDialogState extends State<_WhisperDownloadDialog> {
+  double _progress = 0.0;
+  bool _downloading = true;
+  String _statusText = 'Connecting...';
+
+  @override
+  void initState() {
+    super.initState();
+    _startDownload();
+  }
+
+  Future<void> _startDownload() async {
+    final success = await WhisperService.instance.downloadModel(
+      onProgress: (progress) {
+        if (!mounted) return;
+        setState(() {
+          _progress = progress;
+          final percent = (progress * 100).toInt();
+          _statusText = 'Downloading... $percent%';
+        });
+      },
+    );
+
+    if (!mounted) return;
+    setState(() => _downloading = false);
+    Navigator.of(context).pop(success);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: const Text('Downloading Whisper Model'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LinearProgressIndicator(
+              value: _downloading ? (_progress > 0 ? _progress : null) : 1.0,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _statusText,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '~140 MB',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).hintColor,
+                  ),
+            ),
+          ],
+        ),
       ),
     );
   }

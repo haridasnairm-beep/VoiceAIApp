@@ -1,4 +1,4 @@
-package com.mycompany.CounterApp
+package com.hariappbuilders.voicenotesai
 
 import io.flutter.embedding.android.FlutterActivity
 

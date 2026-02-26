@@ -24,13 +24,15 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       quietHoursEndMinutes: fields[4] as int?,
       themeMode: fields[5] as String,
       onboardingCompleted: fields[6] as bool,
+      transcriptionMode: fields[7] as String,
+      speakerName: fields[8] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -44,7 +46,11 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(5)
       ..write(obj.themeMode)
       ..writeByte(6)
-      ..write(obj.onboardingCompleted);
+      ..write(obj.onboardingCompleted)
+      ..writeByte(7)
+      ..write(obj.transcriptionMode)
+      ..writeByte(8)
+      ..write(obj.speakerName);
   }
 
   @override
