@@ -19,6 +19,9 @@ class SettingsState {
   final bool onboardingCompleted;
   final String transcriptionMode; // 'live' or 'whisper'
   final String speakerName; // User's display name for transcription timestamps
+  final String notePrefix; // Prefix for auto-generated note names
+  final String? defaultFolderId; // ID of the default folder for new recordings
+  final bool voiceCommandsEnabled; // Parse voice commands in whisper mode
 
   const SettingsState({
     this.defaultLanguage,
@@ -28,8 +31,11 @@ class SettingsState {
     this.quietHoursEnd,
     this.themeMode = ThemeMode.system,
     this.onboardingCompleted = false,
-    this.transcriptionMode = 'live',
+    this.transcriptionMode = 'whisper',
     this.speakerName = 'Speaker 1',
+    this.notePrefix = 'VOICE',
+    this.defaultFolderId,
+    this.voiceCommandsEnabled = true,
   });
 
   SettingsState copyWith({
@@ -42,6 +48,9 @@ class SettingsState {
     bool? onboardingCompleted,
     String? transcriptionMode,
     String? speakerName,
+    String? notePrefix,
+    String? Function()? defaultFolderId,
+    bool? voiceCommandsEnabled,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -56,6 +65,9 @@ class SettingsState {
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
       transcriptionMode: transcriptionMode ?? this.transcriptionMode,
       speakerName: speakerName ?? this.speakerName,
+      notePrefix: notePrefix ?? this.notePrefix,
+      defaultFolderId: defaultFolderId != null ? defaultFolderId() : this.defaultFolderId,
+      voiceCommandsEnabled: voiceCommandsEnabled ?? this.voiceCommandsEnabled,
     );
   }
 
@@ -114,6 +126,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
       onboardingCompleted: settings.onboardingCompleted,
       transcriptionMode: settings.transcriptionMode,
       speakerName: settings.speakerName,
+      notePrefix: settings.notePrefix,
+      defaultFolderId: settings.defaultFolderId,
+      voiceCommandsEnabled: settings.voiceCommandsEnabled,
     );
   }
 
@@ -171,6 +186,21 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setSpeakerName(String name) async {
     await ref.read(settingsRepositoryProvider).setSpeakerName(name);
     state = state.copyWith(speakerName: name);
+  }
+
+  Future<void> setNotePrefix(String prefix) async {
+    await ref.read(settingsRepositoryProvider).setNotePrefix(prefix);
+    state = state.copyWith(notePrefix: prefix);
+  }
+
+  Future<void> setDefaultFolderId(String? folderId) async {
+    await ref.read(settingsRepositoryProvider).setDefaultFolderId(folderId);
+    state = state.copyWith(defaultFolderId: () => folderId);
+  }
+
+  Future<void> setVoiceCommandsEnabled(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setVoiceCommandsEnabled(enabled);
+    state = state.copyWith(voiceCommandsEnabled: enabled);
   }
 }
 

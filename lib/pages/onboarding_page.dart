@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../providers/settings_provider.dart';
+import '../services/whisper_service.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -191,7 +192,15 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             'however you like. Search across all your notes instantly.',
       ),
 
-      // Page 4: Privacy First
+      // Page 4: Prepare Your App
+      _WhisperSetupPage(
+        onSetupTap: () {
+          // Navigate to settings with highlight
+          context.push(AppRoutes.settings, extra: {'highlightWhisper': true});
+        },
+      ),
+
+      // Page 5: Privacy First
       _GuidePage(
         icon: Icons.shield_rounded,
         iconBg: const Color(0xFFE3F2FD),
@@ -307,6 +316,135 @@ class _GuidePage extends StatelessWidget {
                   height: 1.6,
                 ),
           ),
+          const Spacer(flex: 3),
+        ],
+      ),
+    );
+  }
+}
+
+/// Onboarding page that explains whisper model setup and offers a button
+/// to navigate to Settings for download.
+class _WhisperSetupPage extends StatefulWidget {
+  final VoidCallback onSetupTap;
+
+  const _WhisperSetupPage({required this.onSetupTap});
+
+  @override
+  State<_WhisperSetupPage> createState() => _WhisperSetupPageState();
+}
+
+class _WhisperSetupPageState extends State<_WhisperSetupPage> {
+  bool _isDownloaded = false;
+  bool _isChecking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkModel();
+  }
+
+  Future<void> _checkModel() async {
+    final downloaded = await WhisperService.instance.isModelDownloaded();
+    if (!mounted) return;
+    setState(() {
+      _isDownloaded = downloaded;
+      _isChecking = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Spacer(flex: 2),
+          // Icon
+          Container(
+            width: 120,
+            height: 120,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFF3E0),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.downloading_rounded,
+                color: Color(0xFFE65100),
+                size: 56,
+              ),
+            ),
+          ),
+          const SizedBox(height: 40),
+          // Title
+          Text(
+            'Prepare Your App',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 8),
+          // Subtitle
+          Text(
+            'One-time setup for best results.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+          const SizedBox(height: 20),
+          // Description
+          Text(
+            'VoiceNotes AI uses an on-device Whisper model for high-quality '
+            'transcription. Download it once (~140 MB) and all transcription '
+            'happens privately on your phone — no internet needed.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                  height: 1.6,
+                ),
+          ),
+          const SizedBox(height: 28),
+          // Action button
+          if (!_isChecking && !_isDownloaded)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: widget.onSetupTap,
+                icon: const Icon(Icons.settings_rounded),
+                label: const Text("Let's Set It Up"),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ),
+                  textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                ),
+              ),
+            )
+          else if (_isDownloaded)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: Color(0xFF2E7D32), size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  "You're all set!",
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: const Color(0xFF2E7D32),
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
           const Spacer(flex: 3),
         ],
       ),

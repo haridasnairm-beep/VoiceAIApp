@@ -26,13 +26,16 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       onboardingCompleted: fields[6] as bool,
       transcriptionMode: fields[7] as String,
       speakerName: fields[8] as String,
+      notePrefix: fields[9] as String,
+      defaultFolderId: fields[10] as String?,
+      voiceCommandsEnabled: fields[11] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -50,7 +53,13 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(7)
       ..write(obj.transcriptionMode)
       ..writeByte(8)
-      ..write(obj.speakerName);
+      ..write(obj.speakerName)
+      ..writeByte(9)
+      ..write(obj.notePrefix)
+      ..writeByte(10)
+      ..write(obj.defaultFolderId)
+      ..writeByte(11)
+      ..write(obj.voiceCommandsEnabled);
   }
 
   @override

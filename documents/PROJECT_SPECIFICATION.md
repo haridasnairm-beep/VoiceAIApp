@@ -1,7 +1,7 @@
 # VoiceNotes AI - Project Specification
 
-**Version:** 2.1
-**Last Updated:** 2026-02-26
+**Version:** 2.2
+**Last Updated:** 2026-02-27
 **Platform:** Cross-platform (iOS + Android) via Flutter
 **Dart SDK:** ^3.6.0
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
@@ -51,8 +51,11 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 
 > **No login required.** App is fully functional without account creation.
 
-### 4.1 Onboarding Screen
-- Welcome flow introducing key features (voice recording, AI structuring, privacy)
+### 4.1 Onboarding Screen (Quick Guide)
+- 5-page swipeable Quick Guide: Welcome, Record & Transcribe, Organize Your Way, Prepare Your App (Whisper setup), Privacy First
+- Skip button on first run, dot page indicators
+- Accessible again from Settings
+- "Prepare Your App" page checks Whisper model status and offers a "Let's Set It Up" button that navigates to Settings with auto-scroll + highlight on the download section
 - Navigation directly to Home (no login gate)
 
 ### 4.2 Login Screen
@@ -71,12 +74,18 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Filter chips** — below search bar: All, Actions, Todos, Reminders, Notes
 
 ### 4.4 Recording Screen
-- **Waveform visualizer** — real-time audio waveform showing input levels
-- **Live transcription preview** — text appears below waveform as user speaks
+- **Two transcription modes:**
+  - **Live Transcription** — real-time text as user speaks via on-device `speech_to_text`; no audio file saved
+  - **Whisper (Record & Transcribe)** — records WAV audio, then transcribes via on-device Whisper model; supports playback
+- **Waveform visualizer** — real-time amplitude waveform during recording
 - **Pause / Resume button** — pause without ending session
 - **Cancel button** — discard recording entirely
-- **"Save & Process" button** — end recording, trigger AI processing
+- **"Save" button** — end recording, save note (and trigger background Whisper transcription if applicable)
 - **Recording timer** — elapsed time display
+- **Folder & Project dropdowns** (Whisper mode) — assign to folder/project before saving, with "+ New Folder" / "+ New Project" inline creation
+- **Default folder** — pre-selected from Settings (default: "General")
+- **Whisper model check** — if model not downloaded, shows popup that navigates to Settings with auto-scroll + highlight on the download section
+- **Voice Command auto-linking** (Whisper mode) — say "Folder \<name\> Project \<name\> Start \<content\>" to auto-assign folder/project and strip the command from saved transcription
 
 ### 4.5 Note Detail Screen
 - **Full transcription** with detected language label
@@ -90,14 +99,15 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Audio playback** — replay original recording from this screen
 - **Delete note** — with confirmation prompt
 
-### 4.6 Conversations / Folders View
-- **Auto-grouped conversations** — AI groups notes referencing same topic/project/person
-- **Manual folders/tags** — user-created organizational folders
-- **Auto-filing** — new notes matching existing topics auto-added to conversations
-- **Conversation timeline** — chronological display within each conversation
+### 4.6 Library (Folders & Projects)
+- **Unified view** — folders and projects shown on one page with collapsible section headers (arrow toggle + count badge)
+- **Folders section** — user-created folders with note count, last updated timestamp
+- **Projects section** — project documents with note count, block count, last updated, description preview
+- **SpeedDialFab** — Record Note, New Folder, New Project actions
+- **Topics chips** — horizontally scrollable topic tags extracted from folders
 
 ### 4.7 Folder Detail Screen
-- View all notes within a folder/conversation
+- View all notes within a folder
 - Folder management (rename, delete)
 
 ### 4.8 Search Screen
@@ -105,12 +115,24 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - Filter by keyword, date, language, category, conversation/topic
 
 ### 4.9 Settings Screen
-- **Language preferences** — default language or auto-detect
-- **Audio quality** — standard vs high quality (affects storage)
-- **Notification settings** — enable/disable reminders, quiet hours
-- **Storage management** — view usage, clear old recordings (keep transcriptions), export data
-- **Privacy dashboard** — view what data exists, delete all data, view AI processing policy
-- **About / Help** — app version, FAQ, support contact
+- **PREFERENCES section:**
+  - Your Name — speaker label for transcription timestamps
+  - Note Prefix — prefix for auto-generated note names (e.g., "VOICE" → VOICE001)
+  - Language Detection — 13 languages + Automatic (auto-detect)
+  - Theme — System / Light / Dark with live switching
+- **AUDIO section:**
+  - Audio Quality — Standard / High Quality picker
+  - Transcription Mode — Live Transcription or Record & Transcribe (Whisper)
+  - Whisper Model Status — download status/progress (visible only when Whisper mode selected); supports auto-scroll + flash highlight when navigated from recording popup or onboarding
+  - Default Folder — picker to choose default folder for new recordings
+  - Voice Commands — toggle for "Folder/Project \<name\> Start" voice command parsing (Whisper mode only)
+- **NOTIFICATIONS section:**
+  - Enable/disable reminders
+- **STORAGE section:**
+  - Storage utilization showing actual disk usage (Hive data + recordings)
+- **DANGER ZONE section:**
+  - Delete All Data — with confirmation dialog, clears all notes, folders, projects, settings, and cancels notifications
+- **Quick Guide** — button to re-open onboarding pages
 
 ### 4.10 Project Documents List Screen
 - **"New Project" button** — prominent FAB or top button
@@ -142,17 +164,21 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 
 ---
 
-## 5. Key Behaviors (MVP)
+## 5. Key Behaviors (Phase 1 MVP)
 
 | Behavior | Details |
 |---|---|
-| Auto language detection | Detects spoken language without user selection. Mixed-language notes transcribed per-segment. |
-| Smart categorization | AI parses natural language cues to tag content as actions, todos, reminders, or general notes. No manual sorting. |
-| Contextual grouping | AI compares new note content against existing notes and auto-links related topics into conversations. |
-| Follow-up intelligence | Only activated by voice trigger. AI generates relevant follow-up questions based on note content. |
-| Offline recording | Recording works without internet. Queue indicator shows pending items. Processing happens on reconnect. |
-| Local-only storage | All data in Hive on-device. No cloud sync in MVP. |
+| Auto language detection | Detects spoken language without user selection (both live STT and Whisper modes). |
+| Manual organization | Users create folders and projects manually. Voice commands can auto-assign. |
+| Voice command linking | In Whisper mode, speak "Folder/Project \<name\> Start \<content\>" to auto-organize recordings into folders/projects. |
+| On-device transcription | All transcription happens locally — `speech_to_text` for live mode, Whisper model for record & transcribe mode. |
+| Offline recording | Recording and transcription work without internet (both modes are on-device). |
+| Local-only storage | All data in encrypted Hive on-device. No cloud sync. |
 | No login required | App fully functional without account creation or sign-in. |
+| Default folder | New recordings automatically assigned to default folder (configurable in Settings). |
+| Project documents | Compose rich documents from voice notes with free text and section headers. |
+
+**Phase 2 behaviors (not yet implemented):** AI smart categorization, contextual grouping, follow-up intelligence, auto-folder assignment.
 
 ---
 
@@ -163,13 +189,15 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - Material Design 3 with custom theme (Plus Jakarta Sans, Inter fonts)
 
 ### 6.2 State Management
-- **Riverpod** or **Bloc** (to be decided — concept doc recommends either)
-- Current codebase has Provider dependency — will need migration
+- **Riverpod 3.x** — Notifier/NotifierProvider pattern (migration from Provider completed in Step 2)
+- 6 providers: notes, folders, settings, recording, connectivity, project_documents
+- All providers backed by Hive repositories
 
 ### 6.3 Navigation
-- **go_router** for declarative routing
-- MVP active routes: onboarding, home, recording, note_detail, folders, folder_detail, settings, search
+- **go_router** for declarative routing with extras for data passing
+- Active routes: splash, onboarding, home, recording, note_detail, folders, folder_detail, settings, search, project_documents, project_document_detail, note_picker, version_history
 - Inactive route (Phase 2): login
+- Settings route accepts `highlightWhisper` extra for auto-scroll + flash highlight
 
 ### 6.4 Audio Recording
 - **record** package (>=5.1.2) for audio capture
@@ -183,22 +211,33 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - Hive boxes for: notes, folders, settings, offline queue
 - No cloud persistence in MVP
 
-### 6.6 Speech-to-Text
-- **Whisper API** (stateless, transactional calls) or **Google Speech-to-Text API**
-- Must support streaming transcription for live preview
-- Must support auto language detection
-- All interactions stateless — no data retention on server
+### 6.6 Speech-to-Text (Phase 1 — On-Device)
+- **Live mode:** `speech_to_text` package — on-device, free, no API key needed, real-time transcription while recording
+- **Whisper mode:** `whisper_flutter_new` package — on-device Whisper model (ggml-base.bin, ~140 MB one-time download), transcribes WAV files after recording
+- Both modes are fully on-device — no cloud API calls, no data leaves the phone
+- Auto language detection supported in both modes
 
-### 6.7 AI Structuring
-- **OpenAI API** or **Anthropic API** (stateless, no memory, no data retention)
+### 6.7 AI Structuring (Phase 2 — Not Implemented)
+- **Phase 2 only** — OpenAI API or Anthropic API (stateless, no memory, no data retention)
 - Entity extraction: actions, todos (with dates), reminders (with times), general notes
 - Topic extraction for contextual grouping
 - Follow-up question generation (voice-triggered only)
 
-### 6.8 Notifications
-- **flutter_local_notifications** for reminder alerts
+### 6.8 Voice Command Parsing (Phase 1)
+- **`VoiceCommandParser`** — keyword extraction from transcription text
+- Supported format: "Folder \<name\> Project \<name\> Start \<content\>"
+- "Start" is required delimiter — everything after it is the note content
+- Keywords are case-insensitive; trailing punctuation stripped (Whisper adds periods)
+- **`VoiceCommandProcessor`** — looks up or auto-creates folders/projects by name (case-insensitive match)
+- Manual dropdown selections take priority over voice command results
+- Controlled by `voiceCommandsEnabled` setting (default: true)
 
-### 6.9 Offline Support
+### 6.9 Notifications
+- **flutter_local_notifications** for reminder alerts
+- Manual reminder creation with date/time picker
+- Scheduled notifications with deep-link to specific note on tap
+
+### 6.10 Offline Support
 - Recording works without internet
 - Offline queue stores pending items for processing
 - Queue indicator visible to user
@@ -264,9 +303,15 @@ UserSettings
 ├── defaultLanguage: String? (null = auto-detect)
 ├── audioQuality: String (standard / high)
 ├── notificationsEnabled: bool
-├── quietHoursStart: TimeOfDay?
-├── quietHoursEnd: TimeOfDay?
-└── themeMode: String (system / light / dark)
+├── quietHoursStartMinutes: int? (stored as minutes from midnight)
+├── quietHoursEndMinutes: int? (stored as minutes from midnight)
+├── themeMode: String (system / light / dark)
+├── onboardingCompleted: bool
+├── transcriptionMode: String (live / whisper)
+├── speakerName: String (default: "Speaker 1")
+├── notePrefix: String (default: "VOICE" → VOICE001, VOICE002...)
+├── defaultFolderId: String? (ID of default folder for new recordings)
+└── voiceCommandsEnabled: bool (parse voice commands in Whisper mode)
 
 ProjectDocument
 ├── id: String (UUID)
@@ -337,7 +382,7 @@ Both coexist — folders organize, projects compose.
 | Export (Markdown, PDF, plain text) | Phase 2 |
 | AI-generated Project Document summary | Phase 2 |
 | AI-suggested note additions for projects | Phase 2 |
-| Voice command to add note to project | Phase 2 |
+| ~~Voice command to add note to project~~ | ~~Phase 2~~ → **Implemented in Phase 1** (v1.3.0) |
 | Project Document export (Markdown/PDF) | Phase 2 |
 | Music note capture | Phase 3 |
 | Smart automations | Phase 3 |
@@ -348,46 +393,40 @@ Both coexist — folders organize, projects compose.
 
 ---
 
-## 11. MVP Tech Stack
+## 11. MVP Tech Stack (Phase 1 — Actual)
 
 | Component | Technology |
 |---|---|
-| Framework | Flutter (cross-platform iOS + Android) |
-| Local database | Hive (encrypted with AES-256) |
-| Audio recording | record package |
-| Speech-to-text | Whisper API or Google Speech-to-Text (stateless) |
-| AI structuring | OpenAI API or Anthropic API (stateless) |
-| State management | Riverpod or Bloc |
+| Framework | Flutter (Dart SDK ^3.6.0) |
+| Local database | Hive (AES-256 encrypted) |
+| State management | Riverpod 3.x (Notifier/NotifierProvider) |
 | Navigation | go_router |
+| Audio recording | record package |
+| Audio playback | just_audio |
+| Speech-to-text (live) | speech_to_text (on-device, free) |
+| Speech-to-text (whisper) | whisper_flutter_new (on-device, ggml-base model) |
 | Notifications | flutter_local_notifications |
 | Typography | Google Fonts (Plus Jakarta Sans, Inter) |
+| App icon | assets/icons/logo.png (launcher + in-app branding) |
 
 ---
 
-## 12. Dependencies
+## 12. Dependencies (Active in pubspec.yaml)
 
-### Current (in pubspec.yaml)
-| Package | Version | Purpose | MVP Status |
-|---|---|---|---|
-| flutter | SDK | UI framework | Active |
-| path_provider | ^2.0.0 | File system access | Active |
-| record | >=5.1.2 | Audio recording | Active |
-| cupertino_icons | ^1.0.8 | iOS-style icons | Active |
-| google_fonts | ^6.1.0 | Custom typography | Active |
-| provider | ^6.1.2 | State management | To be replaced (Riverpod/Bloc) |
-| go_router | ^16.2.0 | Declarative routing | Active |
-
-### To Be Added for MVP
-| Package | Purpose |
-|---|---|
-| hive + hive_flutter | Local encrypted database |
-| hive_generator + build_runner | Hive model code generation (dev) |
-| flutter_riverpod / flutter_bloc | State management |
-| http or dio | API calls (transcription, AI) |
-| flutter_local_notifications | Reminder notifications |
-| connectivity_plus | Network status monitoring |
-| uuid | Unique ID generation |
-| intl | Date/time formatting |
-| audio_waveforms | Real-time waveform visualization |
-| permission_handler | Runtime permission management |
-| just_audio | Audio playback on note detail screen |
+| Package | Purpose | Status |
+|---|---|---|
+| flutter | UI framework | Active |
+| flutter_riverpod | Riverpod 3.x state management | Active |
+| go_router | Declarative routing | Active |
+| hive + hive_flutter | Local encrypted database | Active |
+| record | Audio recording (WAV for Whisper, AAC for live) | Active |
+| just_audio | Audio playback on note detail screen | Active |
+| speech_to_text | On-device live transcription | Active |
+| whisper_flutter_new | On-device Whisper model transcription | Active |
+| flutter_local_notifications | Reminder notifications | Active |
+| google_fonts | Custom typography (Plus Jakarta Sans, Inter) | Active |
+| path_provider | File system access | Active |
+| uuid | Unique ID generation | Active |
+| connectivity_plus | Network status monitoring | Active |
+| cupertino_icons | iOS-style icons | Active |
+| hive_generator + build_runner | Hive model code generation (dev) | Active |

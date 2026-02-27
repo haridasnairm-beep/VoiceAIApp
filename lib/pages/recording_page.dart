@@ -11,6 +11,9 @@ import 'package:voicenotes_ai/services/audio_recorder_service.dart';
 import 'package:voicenotes_ai/services/transcription_service.dart';
 import 'package:voicenotes_ai/services/whisper_service.dart';
 import 'package:voicenotes_ai/theme.dart';
+import 'package:voicenotes_ai/providers/notes_provider.dart';
+import 'package:voicenotes_ai/providers/folders_provider.dart';
+import 'package:voicenotes_ai/providers/project_documents_provider.dart';
 
 class RecordingPage extends ConsumerStatefulWidget {
   final String? folderId;
@@ -31,7 +34,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   Duration _elapsed = Duration.zero;
   bool _isStarting = true;
   bool _isPaused = false;
-  bool _isTranscribing = false;
   String? _activePath;
 
   // Mode: true = whisper (record then transcribe), false = live STT
@@ -43,9 +45,15 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   String _detectedLanguage = '';
   bool _speechAvailable = false;
 
+  // Folder & project selection (whisper mode)
+  String? _selectedFolderId;
+  String? _selectedProjectId;
+
   @override
   void initState() {
     super.initState();
+    _selectedFolderId =
+        widget.folderId ?? ref.read(settingsProvider).defaultFolderId;
     _startRecording();
   }
 
@@ -96,26 +104,37 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       _isStarting = true;
       _elapsed = Duration.zero;
       _isPaused = false;
-      _isTranscribing = false;
       _finalizedText = '';
       _interimText = '';
       _detectedLanguage = '';
     });
 
     if (_useWhisperMode) {
-      // Safety check: ensure Whisper model is downloaded
+      // Check if Whisper model is downloaded
       final modelReady = await _whisper.isModelDownloaded();
       if (!modelReady) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Whisper model not downloaded. Go to Settings to download it.'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 4),
+        // Navigate to settings and highlight whisper download
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Whisper Model Required'),
+            content: const Text(
+              'The Whisper AI model needs to be downloaded first (~140 MB).\n\n'
+              'Tap OK to go to Settings where you can download it.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
           ),
         );
-        // Fall back to live mode for this recording
-        _useWhisperMode = false;
+        if (!mounted) return;
+        context.push(AppRoutes.settings, extra: {'highlightWhisper': true});
+        return;
       }
     }
 
@@ -221,7 +240,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
 
   Future<void> _togglePause() async {
     try {
-      if (_isStarting || _isTranscribing) return;
+      if (_isStarting) return;
       if (_isPaused) {
         if (_useWhisperMode) {
           await _recorder.resume();
@@ -266,39 +285,55 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   }
 
   Future<void> _saveAndProcess() async {
-    if (_isStarting || _isTranscribing) return;
+    if (_isStarting) return;
     _timer?.cancel();
 
     if (_useWhisperMode) {
-      // Whisper mode: stop recording, then transcribe the audio file
+      // Whisper mode: save note immediately, transcribe in background
       final path = await _recorder.stop();
       if (!mounted || path == null) return;
 
-      setState(() => _isTranscribing = true);
+      // Use selected folder or the one passed via constructor
+      final folderId = _selectedFolderId ?? widget.folderId;
 
-      // Transcribe using Whisper
-      debugPrint('RecordingPage: starting Whisper transcription for $path');
-      final transcription = await _whisper.transcribe(path);
-      debugPrint('RecordingPage: Whisper result: ${transcription.length} chars');
-      if (!mounted) return;
+      // Create note with empty transcription — mark as unprocessed
+      final note = await ref.read(notesProvider.notifier).addNote(
+            audioFilePath: path,
+            audioDurationSeconds: _elapsed.inSeconds,
+            rawTranscription: '',
+            detectedLanguage: 'auto',
+            folderId: folderId,
+            isProcessed: false,
+          );
 
-      if (transcription.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transcription failed — you can edit the note manually'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 4),
-          ),
-        );
+      // Add note to selected folder if chosen
+      if (folderId != null) {
+        ref.read(foldersProvider.notifier).addNoteToFolder(folderId, note.id);
       }
 
-      context.pushReplacement(AppRoutes.noteDetail, extra: {
-        'recordingPath': path,
-        'transcription': transcription,
-        'duration': _elapsed.inSeconds,
-        'detectedLanguage': 'auto',
-        if (widget.folderId != null) 'folderId': widget.folderId,
-      });
+      // Add note to selected project if chosen
+      if (_selectedProjectId != null) {
+        ref
+            .read(projectDocumentsProvider.notifier)
+            .addNoteBlock(_selectedProjectId!, note.id);
+      }
+
+      // Fire-and-forget background transcription
+      // Pass manual selection flags so voice commands don't override user choices
+      ref.read(notesProvider.notifier).transcribeInBackground(
+            note.id,
+            path,
+            hasManualFolder: folderId != null,
+            hasManualProject: _selectedProjectId != null,
+          );
+
+      if (!mounted) return;
+      // Pop back to previous screen (home/folder) so user can continue
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(AppRoutes.home);
+      }
     } else {
       // Live mode: existing behavior
       String transcription = '';
@@ -318,7 +353,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
         'detectedLanguage': _transcription.detectedLanguage.isNotEmpty
             ? _transcription.detectedLanguage
             : 'en',
-        if (widget.folderId != null) 'folderId': widget.folderId,
+        if (_selectedFolderId != null || widget.folderId != null)
+          'folderId': _selectedFolderId ?? widget.folderId,
       });
     }
   }
@@ -393,11 +429,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                             ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.settings_outlined),
-                          color: Theme.of(context).colorScheme.onSurface,
-                          onPressed: () => context.push(AppRoutes.settings),
-                        ),
+                        const SizedBox(width: 48),
                       ],
                     ),
 
@@ -453,26 +485,67 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                     const Spacer(),
 
                     // Transcription area
-                    Container(
-                      height: 240,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(AppRadius.xl),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                        border: Border.all(
-                            color: Theme.of(context).dividerColor),
+                    if (_useWhisperMode) ...[
+                      // Compact whisper recording indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          border: Border.all(
+                              color: Theme.of(context).dividerColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: _isPaused
+                                    ? Theme.of(context).colorScheme.secondary
+                                    : AppColors.lightSuccess,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Recording audio for Whisper transcription',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: _useWhisperMode
-                          ? _buildWhisperModeBox(context)
-                          : _buildLiveModeBox(context, hasTranscription),
-                    ),
+                      const SizedBox(height: 16),
+                      // Folder & Project selection
+                      _buildFolderProjectSelection(context),
+                    ] else
+                      Container(
+                        height: 240,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(AppRadius.xl),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                          border: Border.all(
+                              color: Theme.of(context).dividerColor),
+                        ),
+                        child: _buildLiveModeBox(context, hasTranscription),
+                      ),
 
                     const Spacer(),
 
@@ -591,55 +664,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                 ),
               ),
 
-              // Transcribing overlay (Whisper mode only)
-              if (_isTranscribing)
-                Container(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(32),
-                      margin: const EdgeInsets.symmetric(horizontal: 48),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(AppRadius.xl),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'Transcribing...',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Processing your recording with Whisper AI',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
@@ -647,69 +671,229 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
     );
   }
 
-  /// Whisper mode: show info text instead of live transcription
-  Widget _buildWhisperModeBox(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: _isPaused
-                    ? Theme.of(context).colorScheme.secondary
-                    : AppColors.lightSuccess,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              "RECORDING AUDIO",
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-          ],
+  static const _newFolderSentinel = '__new_folder__';
+  static const _newProjectSentinel = '__new_project__';
+
+  Future<void> _showNewFolderDialog() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Folder'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Folder name'),
+          textCapitalization: TextCapitalization.words,
         ),
-        const SizedBox(height: 16),
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.graphic_eq_rounded,
-                  size: 48,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Recording audio for transcription',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tap Stop to transcribe with Whisper AI',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.secondary,
-                      ),
-                ),
-              ],
-            ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name != null && name.isNotEmpty && mounted) {
+      final folder =
+          await ref.read(foldersProvider.notifier).addFolder(name: name);
+      setState(() => _selectedFolderId = folder.id);
+    }
+  }
+
+  Future<void> _showNewProjectDialog() async {
+    final controller = TextEditingController();
+    final title = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Project'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Project title'),
+          textCapitalization: TextCapitalization.words,
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (title != null && title.isNotEmpty && mounted) {
+      final project =
+          await ref.read(projectDocumentsProvider.notifier).create(title: title);
+      setState(() => _selectedProjectId = project.id);
+    }
+  }
+
+  /// Folder & Project selection UI for whisper mode
+  Widget _buildFolderProjectSelection(BuildContext context) {
+    final folders = ref.watch(foldersProvider);
+    final projects = ref.watch(projectDocumentsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'SAVE TO',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+          ),
+          const SizedBox(height: 12),
+          // Folder selector
+          Row(
+            children: [
+              Icon(Icons.folder_outlined,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.secondary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedFolderId,
+                    isExpanded: true,
+                    hint: Text(
+                      'None',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                    dropdownColor: Theme.of(context).colorScheme.surface,
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('None',
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondary)),
+                      ),
+                      ...folders.map((f) => DropdownMenuItem<String?>(
+                            value: f.id,
+                            child: Text(f.name),
+                          )),
+                      DropdownMenuItem<String?>(
+                        value: _newFolderSentinel,
+                        child: Row(
+                          children: [
+                            Icon(Icons.add,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Text('New Folder',
+                                style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.primary)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == _newFolderSentinel) {
+                        _showNewFolderDialog();
+                        return;
+                      }
+                      setState(() => _selectedFolderId = value);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Divider(
+              height: 1,
+              color: Theme.of(context).dividerColor),
+          const SizedBox(height: 4),
+          // Project selector
+          Row(
+            children: [
+              Icon(Icons.article_outlined,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.secondary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedProjectId,
+                    isExpanded: true,
+                    hint: Text(
+                      'None',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                    dropdownColor: Theme.of(context).colorScheme.surface,
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('None',
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondary)),
+                      ),
+                      ...projects.map((p) => DropdownMenuItem<String?>(
+                            value: p.id,
+                            child: Text(p.title),
+                          )),
+                      DropdownMenuItem<String?>(
+                        value: _newProjectSentinel,
+                        child: Row(
+                          children: [
+                            Icon(Icons.add,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Text('New Project',
+                                style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.primary)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == _newProjectSentinel) {
+                        _showNewProjectDialog();
+                        return;
+                      }
+                      setState(() => _selectedProjectId = value);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

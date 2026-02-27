@@ -34,13 +34,15 @@ class NoteAdapter extends TypeAdapter<Note> {
       followUpQuestions: (fields[14] as List?)?.cast<String>(),
       isProcessed: fields[15] as bool,
       hasFollowUpTrigger: fields[16] as bool,
+      transcriptVersions: (fields[17] as List?)?.cast<TranscriptVersion>(),
+      projectDocumentIds: (fields[18] as List?)?.cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Note obj) {
     writer
-      ..writeByte(17)
+      ..writeByte(19)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -74,7 +76,11 @@ class NoteAdapter extends TypeAdapter<Note> {
       ..writeByte(15)
       ..write(obj.isProcessed)
       ..writeByte(16)
-      ..write(obj.hasFollowUpTrigger);
+      ..write(obj.hasFollowUpTrigger)
+      ..writeByte(17)
+      ..write(obj.transcriptVersions)
+      ..writeByte(18)
+      ..write(obj.projectDocumentIds);
   }
 
   @override

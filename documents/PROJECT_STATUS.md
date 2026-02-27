@@ -1,8 +1,8 @@
 # VoiceNotes AI - Project Status
 
-**Last Updated:** 2026-02-26
-**Current Version:** 1.0.3 (Phase 1 MVP)
-**Overall Progress:** Phase 1 Core Complete (100%) | Project Documents Feature Approved (0%)
+**Last Updated:** 2026-02-27
+**Current Version:** 1.4.0 (Phase 1 MVP + Project Documents + Voice Commands + Library Merge + Whisper UX)
+**Overall Progress:** Phase 1 Complete (100%) including Project Documents
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md)
 
@@ -85,7 +85,7 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 ### Bonus: Splash Screen & Quick Guide ✅
 - Animated splash screen with logo, tagline "Your voice, perfectly organized.", and "by HDMPixels" branding
 - 5-second timer then navigates to onboarding (first launch) or home (returning user)
-- Multi-page Quick Guide (4 swipeable pages): Welcome, Record & Transcribe, Organize Your Way, Privacy First
+- Multi-page Quick Guide (5 swipeable pages): Welcome, Record & Transcribe, Organize Your Way, Prepare Your App (Whisper setup), Privacy First
 - Skip button on first run, dot indicators, accessible from Settings
 
 ### Bonus: Settings Overhaul ✅
@@ -104,21 +104,21 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 
 ---
 
-## Upcoming: Step 4.5 — Project Documents ⏳
+## Step 4.5 — Project Documents ✅ COMPLETED
 
-**Status:** Approved for Development | **Effort:** Large | **Spec:** [FEATURE_PROJECT_DOCUMENTS.md](FEATURE_PROJECT_DOCUMENTS.md)
+**Status:** Complete | **Effort:** Large | **Spec:** [FEATURE_PROJECT_DOCUMENTS.md](FEATURE_PROJECT_DOCUMENTS.md)
 
 | Sub-step | Description | Status |
 |---|---|---|
-| A | Data Model & Storage (3 new Hive models, Note model changes, migration) | ⏳ Not Started |
-| B | Repository & Provider Layer (ProjectDocumentsRepository, versioning) | ⏳ Not Started |
-| C | UI — Project Documents List Screen | ⏳ Not Started |
-| D | UI — Project Document Detail Screen (block rendering, editing) | ⏳ Not Started |
-| E | UI — Note Picker & Supporting Screens (version history) | ⏳ Not Started |
-| F | Integration & Polish (edge cases, lazy rendering, accessibility) | ⏳ Not Started |
+| A | Data Model & Storage (3 new Hive models, Note model changes, migration) | ✅ Done |
+| B | Repository & Provider Layer (ProjectDocumentsRepository, versioning) | ✅ Done |
+| C | UI — Project Documents List Screen | ✅ Done |
+| D | UI — Project Document Detail Screen (block rendering, editing) | ✅ Done |
+| E | UI — Note Picker & Supporting Screens (version history) | ✅ Done |
+| F | Integration & Polish (home page entry, migration, build verified) | ✅ Done |
 
-**New files to create:** 13 files (3 models, 1 repository, 1 provider, 4 pages, 4 widgets)
-**Existing files to modify:** 8 files (Note model, HiveService, NotesRepository, providers, nav, Home, NoteDetail, Recording)
+**Created:** 13 files (3 models + 3 generated, 1 repository, 1 provider, 4 pages)
+**Modified:** 8 files (Note model, HiveService, NotesRepository, NotesProvider, nav, Home, main)
 
 ---
 
@@ -142,14 +142,14 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 | Screen | UI | Data Wired | Notes |
 |---|---|---|---|
 | Splash | ✅ | ✅ | Animated logo, timer → onboarding or home |
-| Onboarding | ✅ | ✅ | 4-page Quick Guide, skip button, accessible from Settings |
+| Onboarding | ✅ | ✅ | 5-page Quick Guide (incl. Whisper setup), skip button, accessible from Settings |
 | Login | ✅ | — | NOT IN USE (Phase 2) |
 | Home | ✅ | ✅ | AppBar header, dynamic notes + folders, "See All" wired |
 | Recording | ✅ | ✅ | Live STT transcription + waveform |
 | Note Detail | ✅ | ✅ | Edit/delete, audio playback, reminders |
-| Folders | ✅ | ✅ | AppBar with back button, create folder, dynamic list |
+| Library | ✅ | ✅ | Unified Folders + Projects with collapsible sections, SpeedDialFab |
 | Folder Detail | ✅ | ✅ | AppBar with folder name, notes filtered by folder |
-| Settings | ✅ | ✅ | Language/quality pickers, storage display, danger zone |
+| Settings | ✅ | ✅ | Language/quality pickers, storage display, whisper highlight scroll, danger zone |
 | Search | ✅ | ✅ | Live search, dynamic results, hour padding fixed |
 
 ### Phase 1 Services

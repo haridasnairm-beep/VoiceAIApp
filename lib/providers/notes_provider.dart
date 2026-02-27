@@ -1,9 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/note.dart';
 import '../models/reminder_item.dart';
+import '../models/transcript_version.dart';
 import '../services/notes_repository.dart';
 import '../services/notification_service.dart';
+import '../services/voice_command_processor.dart';
+import '../services/whisper_service.dart';
+import 'folders_provider.dart';
+import 'project_documents_provider.dart';
+import 'settings_provider.dart';
 
 /// Provider for the NotesRepository singleton.
 final notesRepositoryProvider = Provider<NotesRepository>((ref) {
@@ -21,25 +28,109 @@ class NotesNotifier extends Notifier<List<Note>> {
     state = ref.read(notesRepositoryProvider).getAllNotes();
   }
 
+  /// Generate the next auto-incrementing title using the user's prefix.
+  /// e.g. prefix "VOICE" → VOICE001, VOICE002, ...
+  String _generateTitle() {
+    final prefix = ref.read(settingsProvider).notePrefix;
+    // Find the highest existing number for this prefix
+    int maxNum = 0;
+    for (final note in state) {
+      if (note.title.startsWith(prefix)) {
+        final suffix = note.title.substring(prefix.length);
+        final num = int.tryParse(suffix);
+        if (num != null && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+    final next = maxNum + 1;
+    return '$prefix${next.toString().padLeft(3, '0')}';
+  }
+
   Future<Note> addNote({
     required String audioFilePath,
     int audioDurationSeconds = 0,
-    String title = 'Untitled Note',
+    String? title,
     String rawTranscription = '',
     String detectedLanguage = 'en',
     String? folderId,
+    bool isProcessed = true,
   }) async {
+    final noteTitle = title ?? _generateTitle();
     final repo = ref.read(notesRepositoryProvider);
     final note = await repo.createNote(
       audioFilePath: audioFilePath,
       audioDurationSeconds: audioDurationSeconds,
-      title: title,
+      title: noteTitle,
       rawTranscription: rawTranscription,
       detectedLanguage: detectedLanguage,
       folderId: folderId,
+      isProcessed: isProcessed,
     );
     state = [note, ...state];
     return note;
+  }
+
+  /// Transcribe a WAV file in the background using Whisper and update the note.
+  /// If voice commands are enabled, parses for folder/project keywords and
+  /// auto-links the note (only when user didn't manually select from dropdown).
+  Future<void> transcribeInBackground(
+    String noteId,
+    String wavPath, {
+    bool hasManualFolder = false,
+    bool hasManualProject = false,
+  }) async {
+    try {
+      final transcription = await WhisperService.instance.transcribe(wavPath);
+      final note = getNoteById(noteId);
+      if (note == null) return;
+
+      // Check if voice commands are enabled
+      final voiceCommandsEnabled =
+          ref.read(settingsProvider).voiceCommandsEnabled;
+
+      if (voiceCommandsEnabled && transcription.isNotEmpty) {
+        debugPrint('VoiceCmd: processing transcription (${transcription.length} chars)');
+        final result =
+            await VoiceCommandProcessor.process(transcription, ref);
+        debugPrint('VoiceCmd: hasFolder=${result.folderId != null}, hasProject=${result.projectId != null}, content="${result.noteContent}"');
+
+        // Use processed content (command prefix stripped)
+        note.rawTranscription = result.noteContent.isNotEmpty
+            ? result.noteContent
+            : 'No speech detected';
+
+        // Auto-assign folder if detected and user didn't manually select one
+        if (result.folderId != null && !hasManualFolder) {
+          note.folderId = result.folderId;
+          ref
+              .read(foldersProvider.notifier)
+              .addNoteToFolder(result.folderId!, noteId);
+          debugPrint('VoiceCmd: assigned folder ${result.folderId}');
+        }
+
+        // Auto-link to project if detected and user didn't manually select one
+        if (result.projectId != null && !hasManualProject) {
+          ref
+              .read(projectDocumentsProvider.notifier)
+              .addNoteBlock(result.projectId!, noteId);
+          debugPrint('VoiceCmd: linked to project ${result.projectId}');
+        }
+      } else {
+        note.rawTranscription =
+            transcription.isNotEmpty ? transcription : 'No speech detected';
+      }
+
+      note.isProcessed = true;
+      note.detectedLanguage = 'auto';
+      await updateNote(note);
+    } catch (_) {
+      final note = getNoteById(noteId);
+      if (note == null) return;
+      note.rawTranscription = 'Transcription failed';
+      note.isProcessed = true;
+      await updateNote(note);
+    }
   }
 
   Future<void> updateNote(Note note) async {
@@ -135,6 +226,40 @@ class NotesNotifier extends Notifier<List<Note>> {
     }
 
     await updateNote(note);
+  }
+
+  // --- Transcript Versioning ---
+
+  /// Add a transcript version and update rawTranscription.
+  Future<void> addTranscriptVersion(
+      String noteId, String newText, String editSource) async {
+    await ref
+        .read(notesRepositoryProvider)
+        .addTranscriptVersion(noteId, newText, editSource);
+    refresh();
+  }
+
+  /// Get all transcript versions for a note.
+  List<TranscriptVersion> getTranscriptVersions(String noteId) {
+    return ref.read(notesRepositoryProvider).getTranscriptVersions(noteId);
+  }
+
+  /// Restore a transcript version.
+  Future<void> restoreTranscriptVersion(
+      String noteId, String versionId) async {
+    await ref
+        .read(notesRepositoryProvider)
+        .restoreTranscriptVersion(noteId, versionId);
+    refresh();
+  }
+
+  /// Migrate existing notes to have at least one transcript version.
+  Future<void> migrateTranscriptVersions() async {
+    final repo = ref.read(notesRepositoryProvider);
+    for (final note in state) {
+      await repo.ensureTranscriptVersion(note);
+    }
+    refresh();
   }
 
   /// Delete a reminder from a note and cancel its notification.

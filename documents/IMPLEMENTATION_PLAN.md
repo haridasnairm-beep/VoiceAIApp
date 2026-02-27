@@ -1,7 +1,7 @@
 # VoiceNotes AI - Implementation Plan
 
-**Version:** 2.2
-**Last Updated:** 2026-02-26
+**Version:** 2.3
+**Last Updated:** 2026-02-27
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md)
 
@@ -14,8 +14,8 @@ This plan is split into two phases:
 - **Phase 1 (On-Device):** A fully functional voice note-taking app with recording, on-device transcription, local storage, folders, search, playback, and notifications — all without any AI/cloud dependency.
 - **Phase 2 (AI-Powered):** Adds AI categorization, smart structuring, Whisper API transcription, auto-folder assignment, and n8n integration.
 
-**Current state:** Phase 1 core complete (all 7 steps done + bonus features). Step 4.5 (Project Documents) approved for development.
-**Phase 1 target:** Privacy-first voice note app with on-device transcription, local Hive storage, audio playback, reminder notifications, and project documents. **Core achieved; Project Documents pending.**
+**Current state:** Phase 1 complete (all 7 steps + Step 4.5 Project Documents + bonus features: voice commands, unified Library, Whisper UX, default folder). Current version: **v1.4.0**.
+**Phase 1 target:** Privacy-first voice note app with on-device transcription, local Hive storage, audio playback, reminder notifications, project documents, and voice command auto-linking. **ACHIEVED.**
 
 ---
 
@@ -116,7 +116,7 @@ This plan is split into two phases:
 
 ---
 
-## Step 4.5: Project Documents ⏳ APPROVED — NOT YET STARTED
+## Step 4.5: Project Documents ✅ COMPLETED
 
 **Goal:** Implement the Project Documents feature — rich, composite documents assembled from individual voice notes with free-text blocks, section headers, drag-and-drop reordering, bi-directional transcript editing, and version history. All on-device, no AI.
 
@@ -424,7 +424,7 @@ PHASE 1 — On-Device (No AI)
 ├── Step 2: State Management (Riverpod) ─────── [Medium] ✅ DONE
 ├── Step 3: Data Models & Hive Database ─────── [Medium] ✅ DONE
 ├── Step 4: Wire UI to Data Layer ───────────── [Large]  ✅ DONE
-├── Step 4.5: Project Documents ─────────────── [Large]  ⏳ APPROVED
+├── Step 4.5: Project Documents ─────────────── [Large]  ✅ DONE
 │   ├── A: Data Model & Storage
 │   ├── B: Repository & Provider Layer
 │   ├── C: UI — Project Documents List
@@ -444,7 +444,8 @@ PHASE 2 — AI-Powered
 ├── Step 8: Whisper API Transcription ────────── [Medium]
 ├── Step 9: AI Categorization & Structuring ──── [Large]
 └── Step 10: n8n Integration & Advanced ──────── [Large]
-    + Project Documents Phase 2: AI summary, export, voice commands
+    + Project Documents Phase 2: AI summary, export, AI-suggested note additions
+    (Note: voice commands moved to Phase 1 — implemented in v1.3.0)
                                                     │
                                              PHASE 2 RELEASE
 ```

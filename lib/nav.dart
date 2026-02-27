@@ -9,6 +9,10 @@ import 'pages/folders_page.dart';
 import 'pages/folder_detail_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/search_page.dart';
+import 'pages/project_documents_page.dart';
+import 'pages/project_document_detail_page.dart';
+import 'pages/note_picker_page.dart';
+import 'pages/version_history_page.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -119,9 +123,17 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.settings,
         name: 'settings',
-        pageBuilder: (context, state) => const NoTransitionPage(
-          child: SettingsPage(),
-        ),
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          bool highlightWhisper = false;
+          if (extra is Map) {
+            final h = extra['highlightWhisper'];
+            if (h == true) highlightWhisper = true;
+          }
+          return NoTransitionPage(
+            child: SettingsPage(highlightWhisper: highlightWhisper),
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.search,
@@ -129,6 +141,58 @@ class AppRouter {
         pageBuilder: (context, state) => const NoTransitionPage(
           child: SearchPage(),
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.projectDocuments,
+        name: 'project_documents',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: ProjectDocumentsPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.projectDocumentDetail,
+        name: 'project_document_detail',
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          String? documentId;
+          if (extra is Map) {
+            final d = extra['documentId'];
+            if (d is String && d.isNotEmpty) documentId = d;
+          }
+          return NoTransitionPage(
+            child: ProjectDocumentDetailPage(documentId: documentId),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.notePickerRoute,
+        name: 'note_picker',
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          String? documentId;
+          if (extra is Map) {
+            final d = extra['documentId'];
+            if (d is String && d.isNotEmpty) documentId = d;
+          }
+          return NoTransitionPage(
+            child: NotePickerPage(documentId: documentId),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.versionHistory,
+        name: 'version_history',
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          String? noteId;
+          if (extra is Map) {
+            final n = extra['noteId'];
+            if (n is String && n.isNotEmpty) noteId = n;
+          }
+          return NoTransitionPage(
+            child: VersionHistoryPage(noteId: noteId),
+          );
+        },
       ),
     ],
   );
@@ -145,4 +209,8 @@ class AppRoutes {
   static const String folderDetail = '/folder_detail';
   static const String settings = '/settings';
   static const String search = '/search';
+  static const String projectDocuments = '/project_documents';
+  static const String projectDocumentDetail = '/project_document_detail';
+  static const String notePickerRoute = '/note_picker';
+  static const String versionHistory = '/version_history';
 }

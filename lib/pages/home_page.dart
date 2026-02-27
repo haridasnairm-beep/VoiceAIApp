@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,8 @@ import '../nav.dart';
 import '../theme.dart';
 import '../providers/notes_provider.dart';
 import '../providers/folders_provider.dart';
+import '../providers/project_documents_provider.dart';
+import '../widgets/speed_dial_fab.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -13,6 +17,7 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notes = ref.watch(notesProvider);
     final folders = ref.watch(foldersProvider);
+    final projects = ref.watch(projectDocumentsProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -114,6 +119,18 @@ class HomePage extends ConsumerWidget {
                           hasBorder: true,
                           onTap: () => context.push(AppRoutes.folders),
                         ),
+                        const SizedBox(width: 16),
+                        _CategoryCard(
+                          icon: Icons.article_rounded,
+                          title: "Projects",
+                          subtitle: "${projects.length} items",
+                          backgroundColor:
+                              Theme.of(context).colorScheme.surface,
+                          textColor: Theme.of(context).colorScheme.onSurface,
+                          iconColor: const Color(0xFF8E24AA),
+                          hasBorder: true,
+                          onTap: () => context.push(AppRoutes.folders),
+                        ),
                       ],
                     ),
                   ),
@@ -166,6 +183,9 @@ class HomePage extends ConsumerWidget {
                           hasTodo: note.todos.isNotEmpty,
                           hasAction: note.actions.isNotEmpty,
                           hasReminder: note.reminders.isNotEmpty,
+                          isProcessed: note.isProcessed,
+                          audioDurationSeconds: note.audioDurationSeconds,
+                          createdAt: note.createdAt,
                           onTap: () => context.push(
                             AppRoutes.noteDetail,
                             extra: {'noteId': note.id},
@@ -177,55 +197,34 @@ class HomePage extends ConsumerWidget {
               ),
             ),
 
-            // Floating Record Button
+            // Speed Dial FAB
             Align(
-              alignment: const Alignment(0, 0.9),
-              child: GestureDetector(
-                onTap: () => context.push(AppRoutes.recording),
-                child: SizedBox(
-                  width: 80,
-                  height: 80,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.4),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.mic_rounded,
-                            color: Theme.of(context).colorScheme.onPrimary,
-                            size: 32,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: SpeedDialFab(
+                  items: [
+                    SpeedDialItem(
+                      icon: Icons.mic_rounded,
+                      label: 'Record Note',
+                      onTap: () => context.push(AppRoutes.recording),
+                    ),
+                    SpeedDialItem(
+                      icon: Icons.create_new_folder_rounded,
+                      label: 'New Folder',
+                      onTap: () => _showNewFolderDialog(context, ref),
+                    ),
+                    SpeedDialItem(
+                      icon: Icons.article_rounded,
+                      label: 'New Project',
+                      onTap: () => _showNewProjectDialog(context, ref),
+                    ),
+                    SpeedDialItem(
+                      icon: Icons.search_rounded,
+                      label: 'Search',
+                      onTap: () => context.push(AppRoutes.search),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -273,6 +272,84 @@ class HomePage extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showNewFolderDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Folder'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Folder name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                ref.read(foldersProvider.notifier).addFolder(name: name);
+                Navigator.of(ctx).pop();
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNewProjectDialog(BuildContext context, WidgetRef ref) {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Project'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: 'Project title'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descController,
+              decoration:
+                  const InputDecoration(hintText: 'Description (optional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final title = titleController.text.trim();
+              if (title.isNotEmpty) {
+                final desc = descController.text.trim();
+                ref.read(projectDocumentsProvider.notifier).create(
+                      title: title,
+                      description: desc.isEmpty ? null : desc,
+                    );
+                Navigator.of(ctx).pop();
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
       ),
     );
   }
@@ -374,6 +451,9 @@ class _NoteCard extends StatelessWidget {
   final bool hasTodo;
   final bool hasAction;
   final bool hasReminder;
+  final bool isProcessed;
+  final int audioDurationSeconds;
+  final DateTime createdAt;
   final VoidCallback? onTap;
 
   const _NoteCard({
@@ -387,6 +467,9 @@ class _NoteCard extends StatelessWidget {
     required this.hasTodo,
     required this.hasAction,
     required this.hasReminder,
+    this.isProcessed = true,
+    this.audioDurationSeconds = 0,
+    required this.createdAt,
     this.onTap,
   });
 
@@ -469,14 +552,20 @@ class _NoteCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Text(
-              preview,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+            if (!isProcessed)
+              _TranscribingProgress(
+                audioDurationSeconds: audioDurationSeconds,
+                createdAt: createdAt,
+              )
+            else
+              Text(
+                preview,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             if (hasTodo || hasAction || hasReminder) ...[
               const SizedBox(height: 16),
               Row(
@@ -514,6 +603,90 @@ class _NoteCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TranscribingProgress extends StatefulWidget {
+  final int audioDurationSeconds;
+  final DateTime createdAt;
+
+  const _TranscribingProgress({
+    required this.audioDurationSeconds,
+    required this.createdAt,
+  });
+
+  @override
+  State<_TranscribingProgress> createState() => _TranscribingProgressState();
+}
+
+class _TranscribingProgressState extends State<_TranscribingProgress> {
+  Timer? _timer;
+  double _progress = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateProgress();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) _updateProgress();
+    });
+  }
+
+  void _updateProgress() {
+    // Estimate: ~1.2x realtime, minimum 5 seconds
+    final estimatedSeconds =
+        (widget.audioDurationSeconds * 1.2).clamp(5.0, double.infinity);
+    final elapsed =
+        DateTime.now().difference(widget.createdAt).inSeconds.toDouble();
+    setState(() {
+      _progress = (elapsed / estimatedSeconds).clamp(0.0, 0.95);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = (_progress * 100).toInt();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Transcribing... $percent%',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontStyle: FontStyle.italic,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        LinearProgressIndicator(
+          value: _progress,
+          backgroundColor: Theme.of(context)
+              .colorScheme
+              .primary
+              .withValues(alpha: 0.1),
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ],
     );
   }
 }

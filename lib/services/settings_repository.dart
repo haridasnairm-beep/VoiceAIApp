@@ -63,4 +63,22 @@ class SettingsRepository {
     settings.speakerName = name;
     await saveSettings(settings);
   }
+
+  Future<void> setNotePrefix(String prefix) async {
+    final settings = getSettings();
+    settings.notePrefix = prefix;
+    await saveSettings(settings);
+  }
+
+  Future<void> setDefaultFolderId(String? folderId) async {
+    final settings = getSettings();
+    settings.defaultFolderId = folderId;
+    await saveSettings(settings);
+  }
+
+  Future<void> setVoiceCommandsEnabled(bool enabled) async {
+    final settings = getSettings();
+    settings.voiceCommandsEnabled = enabled;
+    await saveSettings(settings);
+  }
 }

@@ -10,6 +10,9 @@ import '../models/todo_item.dart';
 import '../models/reminder_item.dart';
 import '../models/folder.dart';
 import '../models/user_settings.dart';
+import '../models/project_document.dart';
+import '../models/project_block.dart';
+import '../models/transcript_version.dart';
 
 /// Central Hive database service.
 /// Handles initialization, encryption, and box management.
@@ -17,6 +20,7 @@ class HiveService {
   static const String _notesBox = 'notes';
   static const String _foldersBox = 'folders';
   static const String _settingsBox = 'settings';
+  static const String _projectDocumentsBox = 'project_documents';
   static const String _encryptionKeyBox = 'encryption_key';
 
   static bool _initialized = false;
@@ -35,6 +39,10 @@ class HiveService {
     Hive.registerAdapter(ReminderItemAdapter());
     Hive.registerAdapter(FolderAdapter());
     Hive.registerAdapter(UserSettingsAdapter());
+    Hive.registerAdapter(ProjectDocumentAdapter());
+    Hive.registerAdapter(ProjectBlockAdapter());
+    Hive.registerAdapter(BlockTypeAdapter());
+    Hive.registerAdapter(TranscriptVersionAdapter());
 
     // Get or create encryption key
     final encryptionKey = await _getEncryptionKey();
@@ -45,6 +53,8 @@ class HiveService {
     await Hive.openBox<Folder>(_foldersBox,
         encryptionCipher: HiveAesCipher(encryptionKey));
     await Hive.openBox<UserSettings>(_settingsBox,
+        encryptionCipher: HiveAesCipher(encryptionKey));
+    await Hive.openBox<ProjectDocument>(_projectDocumentsBox,
         encryptionCipher: HiveAesCipher(encryptionKey));
 
     _initialized = true;
@@ -76,6 +86,10 @@ class HiveService {
   /// Get the settings box.
   static Box<UserSettings> get settingsBox =>
       Hive.box<UserSettings>(_settingsBox);
+
+  /// Get the project documents box.
+  static Box<ProjectDocument> get projectDocumentsBox =>
+      Hive.box<ProjectDocument>(_projectDocumentsBox);
 
   /// Close all boxes.
   static Future<void> close() async {
@@ -124,12 +138,71 @@ class HiveService {
     }
   }
 
+  /// Migrate existing notes: ensure each has at least one TranscriptVersion.
+  static Future<void> migrateTranscriptVersions() async {
+    final notes = notesBox.values.toList();
+    for (final note in notes) {
+      if (note.transcriptVersions.isEmpty &&
+          note.rawTranscription.isNotEmpty) {
+        final version = TranscriptVersion(
+          id: '${note.id}_v1',
+          text: note.rawTranscription,
+          versionNumber: 1,
+          editSource: 'Original transcription',
+          createdAt: note.createdAt,
+          isOriginal: true,
+        );
+        note.transcriptVersions = [version];
+        await notesBox.put(note.id, note);
+      }
+    }
+    debugPrint('HiveService: transcript version migration complete');
+  }
+
+  /// Migrate transcription mode default from 'live' to 'whisper'.
+  static Future<void> migrateDefaultTranscriptionMode() async {
+    const settingsKey = 'user_settings';
+    final settings = settingsBox.get(settingsKey);
+    if (settings != null && settings.transcriptionMode == 'live') {
+      settings.transcriptionMode = 'whisper';
+      await settingsBox.put(settingsKey, settings);
+      debugPrint('HiveService: migrated transcription mode to whisper');
+    }
+  }
+
+  /// Ensure a default folder exists. Creates "General" on first launch.
+  static Future<void> ensureDefaultFolder() async {
+    const settingsKey = 'user_settings';
+    var settings = settingsBox.get(settingsKey);
+    if (settings == null) {
+      settings = UserSettings();
+      await settingsBox.put(settingsKey, settings);
+    }
+
+    // Already has a valid default folder
+    if (settings.defaultFolderId != null &&
+        foldersBox.containsKey(settings.defaultFolderId)) {
+      return;
+    }
+
+    // Create "General" folder
+    final folder = Folder(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: 'General',
+    );
+    await foldersBox.put(folder.id, folder);
+    settings.defaultFolderId = folder.id;
+    await settingsBox.put(settingsKey, settings);
+    debugPrint('HiveService: created default "General" folder (${folder.id})');
+  }
+
   /// Delete all data (privacy: one-tap delete).
   static Future<void> deleteAllData() async {
     await NotificationService.instance.cancelAll();
     await notesBox.clear();
     await foldersBox.clear();
     await settingsBox.clear();
+    await projectDocumentsBox.clear();
     debugPrint('HiveService: all data deleted');
   }
 }

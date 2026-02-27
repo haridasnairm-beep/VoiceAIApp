@@ -25,11 +25,61 @@ const _languageOptions = <String?, String>{
   'it': 'Italian',
 };
 
-class SettingsPage extends ConsumerWidget {
-  const SettingsPage({super.key});
+class SettingsPage extends ConsumerStatefulWidget {
+  final bool highlightWhisper;
+  const SettingsPage({super.key, this.highlightWhisper = false});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _whisperSectionKey = GlobalKey();
+  bool _showHighlight = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.highlightWhisper) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToWhisperSection();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _scrollToWhisperSection() async {
+    // Wait for layout
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+
+    final keyContext = _whisperSectionKey.currentContext;
+    if (keyContext != null) {
+      await Scrollable.ensureVisible(
+        keyContext,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+        alignment: 0.3,
+      );
+    }
+
+    if (!mounted) return;
+    // Flash highlight
+    setState(() => _showHighlight = true);
+    await Future.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) return;
+    setState(() => _showHighlight = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final settings = ref.watch(settingsProvider);
     final notes = ref.watch(notesProvider);
     final folders = ref.watch(foldersProvider);
@@ -104,6 +154,7 @@ class SettingsPage extends ConsumerWidget {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          controller: _scrollController,
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -153,6 +204,54 @@ class SettingsPage extends ConsumerWidget {
                         ref
                             .read(settingsProvider.notifier)
                             .setSpeakerName(result);
+                      }
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _SettingsItem(
+                    icon: Icons.text_fields_rounded,
+                    iconBg: const Color(0xFFE8F5E9),
+                    iconColor: const Color(0xFF2E7D32),
+                    label: "Note Prefix",
+                    sublabel: "Auto-name: ${settings.notePrefix}001, ${settings.notePrefix}002...",
+                    type: _SettingsType.value,
+                    valueText: settings.notePrefix,
+                    hasSublabel: true,
+                    onTap: () async {
+                      final controller = TextEditingController(
+                          text: settings.notePrefix);
+                      final result = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Note Prefix'),
+                          content: TextField(
+                            controller: controller,
+                            autofocus: true,
+                            maxLength: 10,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(
+                              hintText: 'e.g. VOICE, NOTE, REC',
+                              border: OutlineInputBorder(),
+                              counterText: 'Max 10 characters',
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () =>
+                                  Navigator.pop(ctx, controller.text.trim()),
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (result != null && result.isNotEmpty) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setNotePrefix(result);
                       }
                     },
                   ),
@@ -439,6 +538,97 @@ class SettingsPage extends ConsumerWidget {
                           ),
                         );
                       }
+                    },
+                  ),
+                  if (settings.transcriptionMode == 'whisper') ...[
+                    const Divider(height: 1, indent: 56),
+                    AnimatedContainer(
+                      key: _whisperSectionKey,
+                      duration: const Duration(milliseconds: 600),
+                      decoration: BoxDecoration(
+                        color: _showHighlight
+                            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: _WhisperModelStatusItem(),
+                    ),
+                  ],
+                  const Divider(height: 1, indent: 56),
+                  Builder(builder: (context) {
+                    final folders = ref.watch(foldersProvider);
+                    final defaultId = settings.defaultFolderId;
+                    String folderName = 'None';
+                    for (final f in folders) {
+                      if (f.id == defaultId) {
+                        folderName = f.name;
+                        break;
+                      }
+                    }
+                    return _SettingsItem(
+                      icon: Icons.folder_special_rounded,
+                      iconBg: const Color(0xFFE3F2FD),
+                      iconColor: const Color(0xFF1565C0),
+                      label: "Default Folder",
+                      sublabel: "New recordings are saved here",
+                      type: _SettingsType.value,
+                      valueText: folderName,
+                      hasSublabel: true,
+                      onTap: () async {
+                        final picked = await showDialog<String?>(
+                          context: context,
+                          builder: (ctx) {
+                            return SimpleDialog(
+                              title: const Text('Default Folder'),
+                              children: [
+                                SimpleDialogOption(
+                                  onPressed: () => Navigator.pop(ctx, '__none__'),
+                                  child: const ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: Icon(Icons.block_rounded),
+                                    title: Text('None'),
+                                    subtitle: Text('No default folder'),
+                                  ),
+                                ),
+                                ...folders.map((f) => SimpleDialogOption(
+                                      onPressed: () => Navigator.pop(ctx, f.id),
+                                      child: ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        leading: const Icon(Icons.folder_rounded),
+                                        title: Text(f.name),
+                                        trailing: f.id == defaultId
+                                            ? const Icon(Icons.check_rounded,
+                                                color: Color(0xFF2E7D32))
+                                            : null,
+                                      ),
+                                    )),
+                              ],
+                            );
+                          },
+                        );
+                        if (picked == null || !context.mounted) return;
+                        final newId = picked == '__none__' ? null : picked;
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setDefaultFolderId(newId);
+                      },
+                    );
+                  }),
+                  const Divider(height: 1, indent: 56),
+                  _SettingsItem(
+                    icon: Icons.record_voice_over_rounded,
+                    iconBg: const Color(0xFFF3E5F5),
+                    iconColor: const Color(0xFF7B1FA2),
+                    label: "Voice Commands",
+                    sublabel:
+                        'Say "Folder/Project <name> Start" to auto-organize',
+                    type: _SettingsType.toggle,
+                    switchValue: settings.voiceCommandsEnabled,
+                    hasSublabel: true,
+                    onChanged: (value) {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setVoiceCommandsEnabled(value);
                     },
                   ),
                 ],
@@ -786,6 +976,173 @@ class _SettingsItem extends StatelessWidget {
     }
 
     return content;
+  }
+}
+
+/// Always-visible Whisper model status row in the AUDIO settings section.
+class _WhisperModelStatusItem extends StatefulWidget {
+  @override
+  State<_WhisperModelStatusItem> createState() =>
+      _WhisperModelStatusItemState();
+}
+
+class _WhisperModelStatusItemState extends State<_WhisperModelStatusItem> {
+  bool _isDownloaded = false;
+  bool _isChecking = true;
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkModel();
+  }
+
+  Future<void> _checkModel() async {
+    final downloaded = await WhisperService.instance.isModelDownloaded();
+    if (!mounted) return;
+    setState(() {
+      _isDownloaded = downloaded;
+      _isChecking = false;
+    });
+  }
+
+  Future<void> _startDownload() async {
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+    });
+
+    final success = await WhisperService.instance.downloadModel(
+      onProgress: (progress) {
+        if (!mounted) return;
+        setState(() => _downloadProgress = progress);
+      },
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isDownloading = false;
+      _isDownloaded = success;
+    });
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Whisper model downloaded successfully.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Download failed. Please check your connection and retry.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    Widget trailing;
+    String sublabel;
+
+    if (_isChecking) {
+      trailing = const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+      sublabel = 'Checking...';
+    } else if (_isDownloading) {
+      trailing = SizedBox(
+        width: 120,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            LinearProgressIndicator(
+              value: _downloadProgress > 0 ? _downloadProgress : null,
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(3),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${(_downloadProgress * 100).toInt()}%',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+          ],
+        ),
+      );
+      sublabel = 'Downloading ~140 MB...';
+    } else if (_isDownloaded) {
+      trailing = Icon(
+        Icons.check_circle_rounded,
+        color: const Color(0xFF2E7D32),
+        size: 22,
+      );
+      sublabel = 'Ready to use';
+    } else {
+      trailing = FilledButton.tonal(
+        onPressed: _startDownload,
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: const Text('Download'),
+      );
+      sublabel = 'One-time download (~140 MB)';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.downloading_rounded,
+              color: Color(0xFFE65100),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Whisper Model',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sublabel,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          trailing,
+        ],
+      ),
+    );
   }
 }
 

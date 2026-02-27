@@ -663,7 +663,8 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
         ),
       ),
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(
+            24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           border: Border(

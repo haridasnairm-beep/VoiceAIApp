@@ -2,6 +2,7 @@ import 'package:hive/hive.dart';
 import 'action_item.dart';
 import 'todo_item.dart';
 import 'reminder_item.dart';
+import 'transcript_version.dart';
 
 part 'note.g.dart';
 
@@ -58,6 +59,12 @@ class Note extends HiveObject {
   @HiveField(16)
   bool hasFollowUpTrigger;
 
+  @HiveField(17)
+  List<TranscriptVersion> transcriptVersions;
+
+  @HiveField(18)
+  List<String> projectDocumentIds;
+
   Note({
     required this.id,
     required this.title,
@@ -76,11 +83,15 @@ class Note extends HiveObject {
     this.followUpQuestions,
     this.isProcessed = false,
     this.hasFollowUpTrigger = false,
+    List<TranscriptVersion>? transcriptVersions,
+    List<String>? projectDocumentIds,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         topics = topics ?? [],
         actions = actions ?? [],
         todos = todos ?? [],
         reminders = reminders ?? [],
-        generalNotes = generalNotes ?? [];
+        generalNotes = generalNotes ?? [],
+        transcriptVersions = transcriptVersions ?? [],
+        projectDocumentIds = projectDocumentIds ?? [];
 }

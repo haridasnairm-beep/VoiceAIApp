@@ -19,6 +19,9 @@ void main() async {
   ));
 
   await HiveService.initialize();
+  await HiveService.migrateTranscriptVersions();
+  await HiveService.migrateDefaultTranscriptionMode();
+  await HiveService.ensureDefaultFolder();
   await NotificationService.instance.initialize();
   runApp(const ProviderScope(child: VoiceNotesApp()));
 }
@@ -36,6 +39,18 @@ class VoiceNotesApp extends ConsumerWidget {
         AppRouter.router.go(AppRoutes.noteDetail, extra: {'noteId': noteId});
       }
     };
+
+    // Update nav bar icon brightness based on theme
+    final brightness = settings.themeMode == ThemeMode.dark ||
+            (settings.themeMode == ThemeMode.system &&
+                MediaQuery.platformBrightnessOf(context) == Brightness.dark)
+        ? Brightness.light
+        : Brightness.dark;
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: brightness,
+    ));
 
     return MaterialApp.router(
       title: 'VoiceNotes AI',

@@ -31,6 +31,15 @@ class UserSettings extends HiveObject {
   @HiveField(8)
   String speakerName; // User's display name for transcription timestamps
 
+  @HiveField(9)
+  String notePrefix; // Prefix for auto-generated note names (e.g. "VOICE" → VOICE001)
+
+  @HiveField(10)
+  String? defaultFolderId; // ID of the default folder for new recordings
+
+  @HiveField(11)
+  bool voiceCommandsEnabled; // Parse "Folder/Project <name> Start" in whisper mode
+
   UserSettings({
     this.defaultLanguage,
     this.audioQuality = 'standard',
@@ -39,7 +48,10 @@ class UserSettings extends HiveObject {
     this.quietHoursEndMinutes,
     this.themeMode = 'system',
     this.onboardingCompleted = false,
-    this.transcriptionMode = 'live',
+    this.transcriptionMode = 'whisper',
     this.speakerName = 'Speaker 1',
+    this.notePrefix = 'VOICE',
+    this.defaultFolderId,
+    this.voiceCommandsEnabled = true,
   });
 }
