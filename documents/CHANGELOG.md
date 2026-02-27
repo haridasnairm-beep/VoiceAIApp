@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - Steps 4.6 & 4.7: Tasks, Reminders, Sharing, Rich Text & Images
+
+### Documentation
+- Added **FEATURE_TASKS_AND_REMINDERS.md** — full feature spec for interactive checkboxes, aggregated tasks view, and hybrid reminder model
+- Added **FEATURE_PROJECT_DOCUMENTS.md Addendum A** — feature spec for sharing/export (A1), rich text formatting (A2), and image blocks/photo attachments (A3)
+- Updated **PROJECT_SPECIFICATION.md** (v2.3 → v2.4):
+  - Step 4.6: added sections 4.15 (Aggregated Tasks View), 4.16 (Reminder Enhancement), updated Note Detail with interactive checkboxes/manual task creation, updated Home with Tasks tab, added TaskItem view model, added `add_2_calendar`
+  - Step 4.7: updated Note Detail with photo attachments and share button, updated Project Document Detail with image blocks/rich text/share/export, added section 4.14 (Image Viewer), added ImageAttachment model, updated ProjectBlock with `imageAttachmentId`/`contentFormat`, added 7 new packages, updated permissions (Camera, Photo Library), updated key behaviors and Out of Scope
+- Updated **IMPLEMENTATION_PLAN.md** (v2.3 → v2.4):
+  - Added Step 4.6 with 5 sub-steps (A-E): checkboxes, tasks view, reminder enhancement
+  - Added Step 4.7 with 7 sub-steps (A-G): data models, sharing/export, rich text, image blocks, note photos, polish; 8 new files, 11 modified files, 7 new packages
+  - Updated phase summary diagram with both new steps
+- Updated **PROJECT_STATUS.md** — added Step 4.6 and 4.7 status tables, updated Next Steps
+
+---
+
 ## [1.4.0] - 2026-02-27 - Library Merge, Whisper UX, UI Polish
 
 ### Added

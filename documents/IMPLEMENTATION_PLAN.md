@@ -1,9 +1,9 @@
 # VoiceNotes AI - Implementation Plan
 
-**Version:** 2.3
+**Version:** 2.4
 **Last Updated:** 2026-02-27
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md)
+**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
 ---
 
@@ -14,8 +14,8 @@ This plan is split into two phases:
 - **Phase 1 (On-Device):** A fully functional voice note-taking app with recording, on-device transcription, local storage, folders, search, playback, and notifications — all without any AI/cloud dependency.
 - **Phase 2 (AI-Powered):** Adds AI categorization, smart structuring, Whisper API transcription, auto-folder assignment, and n8n integration.
 
-**Current state:** Phase 1 complete (all 7 steps + Step 4.5 Project Documents + bonus features: voice commands, unified Library, Whisper UX, default folder). Current version: **v1.4.0**.
-**Phase 1 target:** Privacy-first voice note app with on-device transcription, local Hive storage, audio playback, reminder notifications, project documents, and voice command auto-linking. **ACHIEVED.**
+**Current state:** Phase 1 complete (all 7 steps + Step 4.5 Project Documents + bonus features: voice commands, unified Library, Whisper UX, default folder). Current version: **v1.4.0**. Steps 4.6 (Interactive Tasks & Reminders) and 4.7 (Sharing, Rich Text & Images) approved for development.
+**Phase 1 target:** Privacy-first voice note app with on-device transcription, local Hive storage, audio playback, reminder notifications, project documents, voice command auto-linking, interactive tasks, hybrid reminders, sharing/export, rich text editing, and photo attachments.
 
 ---
 
@@ -210,6 +210,229 @@ This plan is split into two phases:
 | `lib/pages/home_page.dart` | Add Projects navigation entry |
 | `lib/pages/note_detail_page.dart` | Add "Linked Projects" section and "Add to Project" button |
 | `lib/pages/recording_page.dart` | Add optional "Add to Project" prompt post-save |
+
+### Estimated effort: Large
+
+---
+
+## Step 4.6: Interactive Tasks & Reminder Enhancement ⏳ APPROVED
+
+**Goal:** Make todos, actions, and reminders interactive across all surfaces; add aggregated tasks view on Home page; enhance reminders with OS calendar bridge and reschedule capability. All on-device, no AI.
+
+**Feature Spec:** [FEATURE_TASKS_AND_REMINDERS.md](FEATURE_TASKS_AND_REMINDERS.md)
+
+### Sub-step A: Interactive Checkboxes on Note Detail
+
+1. Update todo item rendering — add interactive checkbox widget with strikethrough + muted styling when completed
+2. Update action item rendering — add interactive checkbox widget with same visual treatment
+3. Add overdue date highlighting (red badge) for todos with past due dates
+4. Wire checkbox taps to `NotesProvider.toggleTodoCompleted()` / `toggleActionCompleted()`
+5. Add "Add Task" button to Todos section — inline text field + optional due date picker
+6. Add "Add Action" button to Actions section — inline text field
+7. Add overflow menu (⋮) on each item: Edit text, Delete, Set/change due date (todos only)
+8. Implement `NotesRepository` methods: `toggleTodoCompleted`, `toggleActionCompleted`, `addTodoItem`, `addActionItem`, `updateTodoItem`, `updateActionItem`, `deleteTodoItem`, `deleteActionItem`
+9. Expose above methods through `NotesProvider`
+
+### Sub-step B: Checkboxes in Project Document Blocks
+
+1. Add collapsible "Tasks" sub-section to `note_reference_block` widget
+2. Render todos and actions from the linked note with interactive checkboxes
+3. Show task count indicator in collapsed state: "3 tasks (1 completed)"
+4. Wire checkbox taps to `NotesProvider` (same as Note Detail — bi-directional sync)
+5. Auto-expand when tasks exist, collapse when none
+
+### Sub-step C: Aggregated Tasks View
+
+1. Create `TaskItem` view model class (`lib/models/task_item.dart`) — NOT a Hive model
+2. Create `TaskType` enum: `todo`, `action`, `reminder`
+3. Create `tasksProvider` — derived Riverpod provider that reads `notesProvider` and assembles flat `TaskItem` list
+4. Add segmented control / tab bar to Home page: `[ Notes ]  [ Tasks ]`
+5. Implement Tasks tab UI: open task count header, filter chips (All / Todos / Actions), task list
+6. Implement task list row: checkbox, text, source note link (tappable → Note Detail), due date badge, type indicator
+7. Include reminders in the aggregated view with bell icon and scheduled time
+8. Implement "Show completed" toggle — completed items grouped at bottom with strikethrough
+9. Implement sorting: overdue first → due date soonest → creation date newest
+10. Implement open task count badge on Tasks tab label
+11. Implement empty states ("No open tasks — you're all caught up!" / filter-specific messages)
+12. Wire checkbox taps and source note navigation
+
+### Sub-step D: Reminder Enhancement (Hybrid Model)
+
+1. Add `add_2_calendar` package to `pubspec.yaml`
+2. Create `lib/services/os_reminder_service.dart` — bridge to OS calendar via `add_2_calendar`
+3. Create reminder destination bottom sheet (`lib/widgets/reminder_destination_sheet.dart`):
+   - "Keep in VoiceNotes AI" (existing behavior)
+   - "Also add to OS Reminders" (creates in-app + opens native calendar pre-filled)
+4. Show bottom sheet after each reminder creation — user chooses per-reminder
+5. Implement calendar event creation with pre-filled title, description ("From VoiceNotes AI: [note title]"), start time
+6. Add "Reschedule" action to reminder items on Note Detail (clock icon / overflow menu)
+7. Implement reschedule date/time picker pre-filled with current time; cancel old notification, schedule new
+8. Add `NotesRepository.rescheduleReminder(noteId, reminderId, newTime)` method
+9. Handle edge case: no calendar app available → SnackBar fallback
+10. (Stretch) Add notification action buttons: "Done" (marks complete) and "Snooze 1hr" (reschedules +1 hour)
+
+### Sub-step E: Polish & Integration
+
+1. Ensure checkbox state syncs across all surfaces (Note Detail ↔ Project Document ↔ Tasks View) via `ref.watch()`
+2. Test with notes that have many tasks (20+ items per note, 100+ total across notes)
+3. Verify reminder notification deep-links still work
+4. Update "Delete All Data" to handle any new state
+5. Accessibility: checkbox labels, screen reader support for task counts
+6. Test OS calendar integration on Android + iOS (calendar app not installed edge case)
+7. Validate overdue sorting, empty states, filter combinations
+
+### New Files:
+
+| File | Purpose |
+|---|---|
+| `lib/models/task_item.dart` | TaskItem view model + TaskType enum for aggregated tasks |
+| `lib/providers/tasks_provider.dart` | Derived provider aggregating todos + actions + reminders across all notes |
+| `lib/widgets/task_list_item.dart` | Reusable task row widget (checkbox + text + source + date) |
+| `lib/widgets/tasks_tab.dart` | Tasks tab content for Home page |
+| `lib/widgets/interactive_todo_item.dart` | Todo item with checkbox, strikethrough, overflow menu |
+| `lib/widgets/interactive_action_item.dart` | Action item with checkbox, strikethrough, overflow menu |
+| `lib/widgets/reminder_destination_sheet.dart` | Bottom sheet for "Keep in-app / Also add to OS" choice |
+| `lib/widgets/task_creation_inline.dart` | Inline text field for adding new tasks |
+| `lib/services/os_reminder_service.dart` | Bridge to OS calendar/reminders via add_2_calendar |
+
+### Modified Files:
+
+| File | Change |
+|---|---|
+| `lib/pages/note_detail_page.dart` | Interactive checkboxes, manual task/action creation, reschedule, "Also add to OS" flow |
+| `lib/pages/home_page.dart` | Add Tasks tab with segmented control, task count badge |
+| `lib/widgets/note_reference_block.dart` | Add collapsible Tasks sub-section with interactive checkboxes |
+| `lib/services/notes_repository.dart` | Add toggle, CRUD, and reschedule methods for todos/actions/reminders |
+| `lib/providers/notes_provider.dart` | Expose new repository methods |
+| `lib/services/notification_service.dart` | Add reschedule method, (stretch) notification action buttons |
+| `pubspec.yaml` | Add `add_2_calendar` dependency |
+
+### Estimated effort: Medium-Large
+
+---
+
+## Step 4.7: Sharing, Rich Text & Image Blocks ⏳ APPROVED
+
+**Goal:** Extend Project Documents with sharing/export, rich text formatting in free-text blocks, and image blocks (photos). Add note-level sharing and photo attachments. All on-device, no AI.
+
+**Feature Spec:** [FEATURE_PROJECT_DOCUMENTS.md — Addendum A](FEATURE_PROJECT_DOCUMENTS.md)
+
+### Sub-step A: Data Model & Storage Extensions
+
+1. Create `ImageAttachment` Hive model with type adapter (typeId: 9)
+2. Add `image_block` to `BlockType` enum
+3. Add `imageAttachmentId: String?` field to `ProjectBlock` model
+4. Add `contentFormat: String?` field to `ProjectBlock` model ("plain" or "quill_delta")
+5. Add `imageAttachmentIds: List<String>` field to `Note` model
+6. Add `imageAttachmentsBox` to HiveService initialization (AES-256 encrypted)
+7. Create `Documents/images/` directory on app initialization
+8. Run `build_runner` to regenerate all type adapters
+9. Write migration: existing free-text blocks get `contentFormat: "plain"`
+
+### Sub-step B: Repository & Provider Extensions
+
+1. Create `ImageAttachmentRepository` — CRUD for imageAttachmentsBox + file management
+   - `saveImage(file, sourceType)` → process, store, return ImageAttachment
+   - `getImageAttachment(id)` → return metadata
+   - `deleteImageAttachment(id)` → delete metadata AND file from disk
+   - `getImageFile(id)` → return File reference for display
+2. Add image methods to `NotesRepository`: `addImageAttachment`, `removeImageAttachment`
+3. Add image block methods to `ProjectDocumentsRepository`: `addImageBlock(documentId, attachmentId, caption?)`
+4. Extend `projectDocumentsProvider` with image, sharing, and export methods
+5. Create `SharingService` — assemble share text for notes and project documents, generate export files (.md, .txt)
+
+### Sub-step C: UI — Sharing & Export
+
+1. Add share button to Note Detail page — assemble note text → `share_plus`
+2. Add share button to note card overflow menu on Home page
+3. Add share button to Project Document Detail toolbar — assemble all blocks in order → `share_plus`
+4. Add export option to Project Document overflow menu (⋮): Markdown (.md) or plain text (.txt)
+5. Generate export file in temp directory → share via `share_plus` with file path
+6. File naming: `[document_title]_[date].md` or `.txt`
+
+### Sub-step D: UI — Rich Text Formatting (Free-Text Blocks)
+
+1. Add `flutter_quill` package to `pubspec.yaml`
+2. Integrate `flutter_quill` editor into free-text block widget
+3. Implement compact formatting toolbar: `[ B ] [ I ] [ • ] [ H1 ] [ H2 ] [ 🔗 ]`
+   - Toolbar appears only when editing a free-text block
+   - Active formatting states highlighted
+   - Link insertion: select text → tap link → enter URL dialog
+4. Implement Quill Delta JSON serialization to/from `ProjectBlock.content`
+5. Set `ProjectBlock.contentFormat = "quill_delta"` for rich text blocks
+6. Implement Delta → Markdown conversion for export (`delta_to_markdown` or custom)
+7. Implement Delta → plain text stripping for share
+8. Migration: existing plain-text blocks converted to simple Delta on first load
+
+### Sub-step E: UI — Image Blocks (Project Documents)
+
+1. Add `image_picker`, `image_cropper`, `photo_view`, `flutter_image_compress` packages
+2. Add "Add Image" option to "Add Block" action sheet (alongside Voice Note / Free Text / Section Header)
+3. Implement image source selection bottom sheet (Gallery / Camera)
+4. Implement crop/resize flow: free-form crop, auto-resize >2048px, JPEG 85% quality
+5. Implement Image Block widget: full-width image, optional caption, overflow menu (edit caption, replace, remove, view full screen)
+6. Implement full-screen image viewer page (pinch-to-zoom, pan via `photo_view`)
+7. Image blocks support drag-and-drop reorder like other blocks
+
+### Sub-step F: Note Detail — Photo Attachments
+
+1. Add "Attachments" section to Note Detail page (below structured output, above audio playback)
+2. Implement horizontal scrollable thumbnail row (or 2-column grid for 3+)
+3. Implement "Add Photo" button — gallery/camera picker + crop/resize
+4. Implement full-screen photo viewer on tap
+5. Implement photo deletion with confirmation
+6. Note reference blocks in Project Documents show photo indicator (📎 N photos)
+
+### Sub-step G: Integration & Polish
+
+1. Handle image cleanup on note deletion (delete associated ImageAttachments + files)
+2. Handle image cleanup on project document deletion (delete image_block attachments + files)
+3. Update "Delete All Data" to include imageAttachmentsBox and image files
+4. Update storage display in Settings to include image file sizes
+5. Handle edge cases: image file missing from disk (placeholder), camera/gallery permission denied (fallback), low storage (<100MB warning)
+6. Test with large images, many photos (20+), low storage scenarios
+7. Accessibility: image alt-text from caption, screen reader labels
+
+### New Files:
+
+| File | Purpose |
+|---|---|
+| `lib/models/image_attachment.dart` | ImageAttachment Hive model |
+| `lib/services/image_attachment_repository.dart` | Image CRUD + file management |
+| `lib/services/sharing_service.dart` | Assemble share text, generate export files |
+| `lib/services/image_processing_service.dart` | Crop, resize, compress, save |
+| `lib/widgets/image_block_widget.dart` | Image block for Project Document |
+| `lib/widgets/note_attachments_section.dart` | Photo section on Note Detail |
+| `lib/widgets/formatting_toolbar.dart` | Rich text toolbar for free-text blocks |
+| `lib/pages/image_viewer_page.dart` | Full-screen image viewer |
+
+### Modified Files:
+
+| File | Change |
+|---|---|
+| `lib/models/project_block.dart` | Add `imageAttachmentId`, `contentFormat` fields, `image_block` to BlockType |
+| `lib/models/note.dart` | Add `imageAttachmentIds` field |
+| `lib/services/hive_service.dart` | Add `imageAttachmentsBox`, image directory creation |
+| `lib/services/project_documents_repository.dart` | Add image block methods |
+| `lib/services/notes_repository.dart` | Add image attachment methods |
+| `lib/providers/project_documents_provider.dart` | Add image, sharing, export methods |
+| `lib/pages/project_document_detail_page.dart` | Image blocks, rich text editor, share/export buttons |
+| `lib/pages/note_detail_page.dart` | Attachments section, share button |
+| `lib/widgets/free_text_block.dart` | Replace plain TextField with flutter_quill editor |
+| `lib/pages/settings_page.dart` | Update storage display to include images |
+| `pubspec.yaml` | Add 7 new packages |
+
+### New Package Dependencies:
+
+| Package | Purpose |
+|---|---|
+| `share_plus` | Native OS share sheet |
+| `flutter_quill` | Rich text editing and viewing |
+| `delta_to_markdown` | Export Delta → Markdown |
+| `image_picker` | Gallery and camera photo selection |
+| `image_cropper` | Crop and resize UI |
+| `photo_view` | Full-screen image viewer with zoom |
+| `flutter_image_compress` | Image compression and resizing |
 
 ### Estimated effort: Large
 
@@ -431,21 +654,41 @@ PHASE 1 — On-Device (No AI)
 │   ├── D: UI — Project Document Detail
 │   ├── E: UI — Note Picker & Supporting Screens
 │   └── F: Integration & Polish
+├── Step 4.6: Interactive Tasks & Reminders ──── [Med-Lg] ⏳ APPROVED
+│   ├── A: Interactive Checkboxes on Note Detail
+│   ├── B: Checkboxes in Project Document Blocks
+│   ├── C: Aggregated Tasks View (Home tab)
+│   ├── D: Reminder Enhancement (Hybrid Model)
+│   └── E: Polish & Integration
+├── Step 4.7: Sharing, Rich Text & Images ────── [Large]  ⏳ APPROVED
+│   ├── A: Data Model & Storage Extensions
+│   ├── B: Repository & Provider Extensions
+│   ├── C: UI — Sharing & Export
+│   ├── D: UI — Rich Text Formatting
+│   ├── E: UI — Image Blocks (Projects)
+│   ├── F: Note Detail — Photo Attachments
+│   └── G: Integration & Polish
 ├── Step 5: On-Device Speech-to-Text ────────── [Medium] ✅ DONE
 ├── Step 6: Waveform, Playback & Notifications ─ [Medium] ✅ DONE
 └── Step 7: Testing, Polish & Release ────────── [Large]  ✅ DONE
     + Bonus: Splash Screen & Multi-page Quick Guide
     + Bonus: Settings Overhaul (pickers, storage, danger zone)
     + Bonus: Compact AppBar Headers across all pages
+    + Bonus: Voice Commands (auto-link to folder/project)
+    + Bonus: Unified Library (folders + projects)
+    + Bonus: Whisper UX (auto-scroll + flash highlight)
                                                     │
-                                             PHASE 1 RELEASE (after Step 4.5)
+                                             PHASE 1 RELEASE (after Step 4.7)
 
 PHASE 2 — AI-Powered
 ├── Step 8: Whisper API Transcription ────────── [Medium]
 ├── Step 9: AI Categorization & Structuring ──── [Large]
 └── Step 10: n8n Integration & Advanced ──────── [Large]
-    + Project Documents Phase 2: AI summary, export, AI-suggested note additions
-    (Note: voice commands moved to Phase 1 — implemented in v1.3.0)
+    + Project Documents Phase 2: AI summary, PDF export, AI-suggested note additions
+    + Tasks Phase 2: AI auto-extraction, smart due dates, recurring reminders,
+      priority levels, Todoist/Apple Reminders API/Google Tasks API
+    (Note: voice commands moved to Phase 1 — v1.3.0)
+    (Note: sharing/export + rich text + images moved to Phase 1 — Step 4.7)
                                                     │
                                              PHASE 2 RELEASE
 ```

@@ -1,10 +1,10 @@
 # VoiceNotes AI — Feature Spec: Project Documents
 
-**Version:** 1.0
-**Date:** 2026-02-26
-**Status:** Approved for Development
+**Version:** 1.1
+**Date:** 2026-02-27
+**Status:** Core Feature COMPLETE (Step 4.5) · Addendum A features pending implementation
 **Phase:** Phase 1 Addition (Step 4.5 — after Wire UI to Data Layer)
-**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md)
+**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Status](PROJECT_STATUS.md)
 
 ---
 
@@ -18,7 +18,33 @@
 
 ---
 
-## 2. User Stories
+## 2. Implementation Status
+
+### Core Project Documents — ✅ COMPLETE (Step 4.5)
+
+| Sub-step | Description | Status |
+|---|---|---|
+| A | Data Model & Storage (3 new Hive models, Note model changes, migration) | ✅ Done |
+| B | Repository & Provider Layer (ProjectDocumentsRepository, versioning) | ✅ Done |
+| C | UI — Project Documents List Screen | ✅ Done |
+| D | UI — Project Document Detail Screen (block rendering, editing) | ✅ Done |
+| E | UI — Note Picker & Supporting Screens (version history) | ✅ Done |
+| F | Integration & Polish (home page entry, migration, build verified) | ✅ Done |
+
+**Created:** 13 files (3 models + 3 generated, 1 repository, 1 provider, 4 pages)
+**Modified:** 8 files (Note model, HiveService, NotesRepository, NotesProvider, nav, Home, main)
+
+### Addendum A Features — ⏳ PENDING
+
+| Feature | Status | Description |
+|---|---|---|
+| A1. Sharing & Export | ⏳ Pending | Share notes/projects via OS share sheet, export as Markdown/plain text |
+| A2. Rich Text Formatting | ⏳ Pending | Bold, italic, bullets, headings, links in free-text blocks |
+| A3. Image Blocks (Photos) | ⏳ Pending | Photo blocks in projects + note attachments, gallery/camera/crop |
+
+---
+
+## 3. User Stories
 
 1. **As a user**, I want to create a Project Document so I can group related voice notes into a single, organized page.
 2. **As a user**, I want to add any existing voice note's transcript to a Project Document so I can build a comprehensive view of a topic.
@@ -33,41 +59,48 @@
 
 ---
 
-## 3. Phasing
+## 4. Phasing
 
 This feature spans Phase 1 and Phase 2. The split is clean — Phase 1 covers everything that works locally without AI or cloud services.
 
 ### Phase 1 Scope (On-Device, No AI)
 
-| Capability | Included |
+| Capability | Status |
 |---|---|
-| Create / rename / delete Project Documents | ✅ |
-| Add voice note references to a Project Document | ✅ |
-| One note can appear in multiple Project Documents | ✅ |
-| Reorder blocks via drag and drop | ✅ |
-| Add section header / divider blocks | ✅ |
-| Add free-text blocks | ✅ |
-| Edit transcript within Project Document (bi-directional) | ✅ |
-| Full version history on note transcripts | ✅ |
-| View Project Document as a single scrollable page | ✅ |
-| Remove a block from Project Document (does not delete the original note) | ✅ |
-| Timestamp display per note block (original recording time) | ✅ |
-| Project Document list screen | ✅ |
+| Create / rename / delete Project Documents | ✅ Complete |
+| Add voice note references to a Project Document | ✅ Complete |
+| One note can appear in multiple Project Documents | ✅ Complete |
+| Reorder blocks via drag and drop | ✅ Complete |
+| Add section header / divider blocks | ✅ Complete |
+| Add free-text blocks | ✅ Complete |
+| Edit transcript within Project Document (bi-directional) | ✅ Complete |
+| Full version history on note transcripts | ✅ Complete |
+| View Project Document as a single scrollable page | ✅ Complete |
+| Remove a block from Project Document (does not delete the original note) | ✅ Complete |
+| Timestamp display per note block (original recording time) | ✅ Complete |
+| Project Document list screen | ✅ Complete |
+| Voice command to add note to project ("Project \<name\> Start \<content\>") | ✅ Complete (v1.3.0) |
+| Share single note / project document via OS share sheet | ⏳ Addendum A1 |
+| Export as Markdown / plain text file | ⏳ Addendum A1 |
+| Rich text formatting in free-text blocks | ⏳ Addendum A2 |
+| Image blocks (photos) in projects + note attachments | ⏳ Addendum A3 |
 
 ### Phase 2 Scope (AI-Powered)
 
 | Capability | Phase |
 |---|---|
 | AI-generated summary of entire Project Document | Phase 2 |
-| Export as single file (Markdown / PDF / plain text) | Phase 2 |
+| PDF export (formatted, professional) | Phase 2 |
 | AI-suggested note additions ("You have 3 other notes about this topic") | Phase 2 |
-| Voice command to add current note to a project ("Add this to Kitchen Renovation") | Phase 2 |
+| Share with embedded images / audio | Phase 2 |
 
 ---
 
-## 4. Data Models
+## 5. Data Models
 
-### 4.1 New Models
+### 5.1 Implemented Models (Current State)
+
+These models are live in the codebase as of v1.4.0:
 
 ```
 ProjectDocument
@@ -96,35 +129,41 @@ TranscriptVersion
 └── isOriginal: bool (true only for the first version from STT)
 ```
 
-### 4.2 Modified Existing Models
-
-The existing **Note** model requires the following changes:
+### 5.2 Note Model (Current State — with Project Document fields)
 
 ```
-Note (MODIFIED)
-├── ... (all existing fields remain unchanged)
-│
-├── rawTranscription: String          ← KEEP for backward compatibility
-│                                        (always reflects the latest version text)
-│
-├── transcriptVersions: List<TranscriptVersion>  ← NEW
-│                                        (full version history; first entry = original STT output)
-│
-└── projectDocumentIds: List<String>  ← NEW
-                                        (list of ProjectDocument IDs this note belongs to;
-                                         used for reverse lookup / UI indicators)
+Note
+├── id: String (UUID)
+├── title: String (auto-generated from content)
+├── rawTranscription: String (always reflects latest version text)
+├── detectedLanguage: String
+├── audioFilePath: String
+├── audioDurationSeconds: int
+├── createdAt: DateTime
+├── updatedAt: DateTime
+├── folderId: String? (nullable)
+├── topics: List<String>
+├── actions: List<ActionItem>
+├── todos: List<TodoItem>
+├── reminders: List<ReminderItem>
+├── generalNotes: List<String>
+├── followUpQuestions: List<String>?
+├── isProcessed: bool (false if in offline queue)
+├── hasFollowUpTrigger: bool (user said "any suggestions?" etc.)
+├── transcriptVersions: List<TranscriptVersion> (full version history)
+└── projectDocumentIds: List<String> (reverse lookup for linked projects)
 ```
 
-**Migration note:** When this feature is implemented, existing notes should be migrated by creating a single `TranscriptVersion` entry (versionNumber: 1, isOriginal: true) from their current `rawTranscription` value. The `rawTranscription` field continues to hold the latest text for backward compatibility with search, display, and other features that read it directly.
+### 5.3 Hive Storage (Current State)
 
-### 4.3 Hive Storage
+| Box | Contents | Status |
+|---|---|---|
+| `projectDocumentsBox` | All ProjectDocument objects, AES-256 encrypted | ✅ Active |
+| `notesBox` | Note objects with transcriptVersions and projectDocumentIds | ✅ Active |
+| `foldersBox` | Folder objects | ✅ Active |
+| `settingsBox` | UserSettings | ✅ Active |
 
-| Box | Contents |
-|---|---|
-| `projectDocumentsBox` (NEW) | All ProjectDocument objects, AES-256 encrypted |
-| `notesBox` (EXISTING) | Updated Note objects with new fields |
-
-### 4.4 Relationship Diagram
+### 5.4 Relationship Diagram (Current State)
 
 ```
 ProjectDocument ──has many──▶ ProjectBlock
@@ -150,29 +189,26 @@ ProjectDocument ──has many──▶ ProjectBlock
 
 ---
 
-## 5. Screens & UI
+## 6. Screens & UI (Implemented)
 
-### 5.1 Project Documents List Screen
+### 6.1 Library Page (Folders & Projects — Unified View)
 
-**Route:** `/project-documents`
-**Access:** From Home page (new tab or navigation item alongside Folders) and from bottom navigation or drawer.
+**Route:** Part of main navigation
+**Access:** From Home page navigation
 
 **Layout:**
-- Screen title: "Projects"
-- **"New Project" button** — prominent, top or floating action button
-- **Project Document cards** in a list, each showing:
-  - Title
-  - Description (if present, first line)
-  - Number of blocks / linked notes count
-  - Last updated timestamp
-  - Brief preview (first block's content, truncated)
-- **Empty state** when no project documents exist — illustration + "Create your first project document" prompt
-- **Search** — filter project documents by title/description keyword
+- Unified view with collapsible section headers for Folders and Projects (arrow toggle + count badge)
+- **Folders section** — user-created folders with note count, last updated timestamp
+- **Projects section** — project documents with note count, block count, last updated, description preview
+- **SpeedDialFab** — Record Note, New Folder, New Project actions
+- **Topics chips** — horizontally scrollable topic tags extracted from folders
 
-### 5.2 Project Document Detail Screen
+> **Note:** The original spec proposed a separate Project Documents List Screen (`/project-documents`). The actual implementation merges this into the Library page alongside Folders, which is a better UX — one place for all organization.
+
+### 6.2 Project Document Detail Screen
 
 **Route:** `/project-documents/:id`
-**Access:** Tapping a project document card from the list.
+**Access:** Tapping a project document card from the Library page.
 
 **Layout:**
 This is the core screen — a single scrollable canvas displaying all blocks in order.
@@ -215,7 +251,7 @@ Each block is a distinct card/section within the scrollable page:
 - "Done" button to exit reorder mode
 - sortOrder values updated on save
 
-### 5.3 Add Block Flow
+### 6.3 Add Block Flow
 
 When the user taps "Add Block" on a Project Document, present options:
 
@@ -223,14 +259,17 @@ When the user taps "Add Block" on a Project Document, present options:
 2. **Add Free Text** — inserts a new empty `free_text` block at the end. Cursor focuses for immediate typing.
 3. **Add Section Header** — inserts a new `section_header` block at the end. Cursor focuses for immediate typing.
 
-**Note Picker screen:**
+### 6.4 Note Picker Screen
+
+**Route:** `/project-documents/:id/add-notes`
+
 - Shows all notes (reverse chronological)
 - Search bar to filter
 - Checkboxes for multi-select
 - Already-linked notes shown with a "linked" indicator (but can still be added again if user wants — no restriction)
 - "Add Selected" button confirms
 
-### 5.4 Bi-Directional Editing Flow
+### 6.5 Bi-Directional Editing Flow
 
 When a user edits a voice note transcript inside a Project Document:
 
@@ -244,93 +283,85 @@ When a user edits a voice note transcript inside a Project Document:
 5. App updates `Note.updatedAt` timestamp
 6. The change is immediately reflected everywhere this note appears (other project documents, note detail, search results, home feed)
 
-**Version History access:**
-- From the block's overflow menu: "View version history"
-- Opens a bottom sheet or sub-screen showing all versions:
-  - Version number, date, edit source
-  - Diff indicator or full text per version
-  - "Restore this version" action — creates a NEW version with the restored text (does not delete intermediate versions)
+### 6.6 Version History Screen
 
-### 5.5 Integration Points with Existing Screens
+**Route:** `/project-documents/:id/version-history/:noteId`
+
+- Version list showing: version number, date, edit source
+- Full text per version
+- "Restore this version" action — creates a NEW version with the restored text (non-destructive)
+
+### 6.7 Voice Command Integration (Implemented in v1.3.0)
+
+In Whisper recording mode, users can say "Project \<name\> Start \<content\>" to automatically assign the recording to a project. The `VoiceCommandParser` extracts the project name, `VoiceCommandProcessor` looks up or auto-creates the project by name (case-insensitive match), and only the content after "Start" is saved as the note's transcription. Manual dropdown selections take priority over voice command results. Controlled by `voiceCommandsEnabled` setting.
+
+### 6.8 Integration with Existing Screens
 
 **Home Page:**
-- Add a "Projects" section or tab alongside recent notes and folders
-- Or add "Projects" as a navigation item in bottom nav / drawer
+- Recent notes feed remains the primary view
+- "See All" on folders/projects navigates to Library
 
 **Note Detail Page:**
-- Add a "Linked Projects" section showing which Project Documents reference this note
+- "Linked Projects" section shows which Project Documents reference this note
 - Each linked project is tappable → navigates to that Project Document
-- Add "Add to Project" action button — opens project picker to link this note to a project document
+- "Add to Project" action available
 
-**Recording Flow (post-save):**
-- After saving a new voice note, show an optional prompt: "Add to a Project?" with quick project selection
-- This is non-blocking — user can dismiss and add later
+**Recording Flow (Whisper mode):**
+- Folder & Project dropdowns allow assignment before saving
+- Voice commands auto-assign to folder/project
+- Manual dropdown selections override voice command results
+- Default folder pre-selected from Settings
 
 **Folders vs. Projects — Distinction:**
 - **Folders** = simple organizational containers. A note lives in one folder. Flat grouping.
 - **Project Documents** = rich composite documents. A note can be referenced in many projects. Structured, ordered, editable canvas.
-- Both coexist. They serve different purposes. Folders organize; Projects compose.
+- Both coexist in the Library page. They serve different purposes. Folders organize; Projects compose.
 
 ---
 
-## 6. Repository & Provider Layer
+## 7. Repository & Provider Layer (Implemented)
 
-### 6.1 New Repository
+### 7.1 ProjectDocumentsRepository
 
-**ProjectDocumentsRepository** — CRUD operations for the `projectDocumentsBox` Hive box:
+CRUD operations for the `projectDocumentsBox` Hive box:
 
-| Method | Description |
-|---|---|
-| `getAllProjectDocuments()` | Returns all project documents, sorted by updatedAt desc |
-| `getProjectDocument(id)` | Returns a single project document by ID |
-| `createProjectDocument(title, description?)` | Creates a new empty project document |
-| `updateProjectDocument(document)` | Saves changes (title, description, blocks) |
-| `deleteProjectDocument(id)` | Deletes document and removes its ID from all linked notes' `projectDocumentIds` |
-| `addBlockToDocument(documentId, block)` | Appends a new block, updates sortOrder |
-| `removeBlockFromDocument(documentId, blockId)` | Removes block, updates sortOrder of remaining blocks; if note_reference, removes documentId from the note's `projectDocumentIds` |
-| `reorderBlocks(documentId, newBlockOrder)` | Updates sortOrder for all blocks based on new ordering |
-
-### 6.2 Modified Repository
-
-**NotesRepository** — additions:
-
-| Method | Description |
-|---|---|
-| `addTranscriptVersion(noteId, newText, editSource)` | Creates new TranscriptVersion, updates rawTranscription to latest text |
-| `getTranscriptVersions(noteId)` | Returns all versions for a note, sorted by versionNumber asc |
-| `restoreTranscriptVersion(noteId, versionId)` | Creates a new version with the restored text, updates rawTranscription |
-| `addProjectDocumentId(noteId, documentId)` | Adds documentId to note's projectDocumentIds list |
-| `removeProjectDocumentId(noteId, documentId)` | Removes documentId from note's projectDocumentIds list |
-
-### 6.3 New Riverpod Provider
-
-**projectDocumentsProvider** — Notifier backed by ProjectDocumentsRepository:
-
-| State/Method | Description |
-|---|---|
-| `state` | List of all ProjectDocuments |
-| `create(title, description?)` | Creates new document, refreshes state |
-| `delete(id)` | Deletes document, cleans up note references, refreshes state |
-| `addNoteBlock(documentId, noteId)` | Adds note_reference block, updates note's projectDocumentIds |
-| `addFreeTextBlock(documentId, content)` | Adds free_text block |
-| `addSectionHeaderBlock(documentId, content)` | Adds section_header block |
-| `removeBlock(documentId, blockId)` | Removes block, cleans up references |
-| `reorderBlocks(documentId, newOrder)` | Updates block ordering |
-| `updateBlockContent(documentId, blockId, newContent)` | For free_text and section_header edits |
-| `editNoteTranscript(documentId, blockId, noteId, newText)` | Bi-directional edit — creates new version on note |
-
----
-
-## 7. Navigation / Routes
-
-Add these routes to the existing go_router configuration:
-
-| Route | Screen | Extras |
+| Method | Description | Status |
 |---|---|---|
-| `/project-documents` | Project Documents List | — |
-| `/project-documents/:id` | Project Document Detail | documentId |
-| `/project-documents/:id/add-notes` | Note Picker (for adding notes to a project) | documentId |
-| `/project-documents/:id/version-history/:noteId` | Transcript Version History | documentId, noteId |
+| `getAllProjectDocuments()` | Returns all project documents, sorted by updatedAt desc | ✅ |
+| `getProjectDocument(id)` | Returns a single project document by ID | ✅ |
+| `createProjectDocument(title, description?)` | Creates a new empty project document | ✅ |
+| `updateProjectDocument(document)` | Saves changes (title, description, blocks) | ✅ |
+| `deleteProjectDocument(id)` | Deletes document and removes its ID from all linked notes' `projectDocumentIds` | ✅ |
+| `addBlockToDocument(documentId, block)` | Appends a new block, updates sortOrder | ✅ |
+| `removeBlockFromDocument(documentId, blockId)` | Removes block, updates sortOrder; cleans up note's `projectDocumentIds` | ✅ |
+| `reorderBlocks(documentId, newBlockOrder)` | Updates sortOrder for all blocks based on new ordering | ✅ |
+
+### 7.2 NotesRepository — Project Document Additions
+
+| Method | Description | Status |
+|---|---|---|
+| `addTranscriptVersion(noteId, newText, editSource)` | Creates new TranscriptVersion, updates rawTranscription | ✅ |
+| `getTranscriptVersions(noteId)` | Returns all versions, sorted by versionNumber asc | ✅ |
+| `restoreTranscriptVersion(noteId, versionId)` | Creates new version with restored text, updates rawTranscription | ✅ |
+| `addProjectDocumentId(noteId, documentId)` | Adds documentId to note's projectDocumentIds list | ✅ |
+| `removeProjectDocumentId(noteId, documentId)` | Removes documentId from note's projectDocumentIds list | ✅ |
+
+### 7.3 projectDocumentsProvider
+
+Riverpod Notifier backed by ProjectDocumentsRepository (one of 6 active providers):
+
+| State/Method | Description | Status |
+|---|---|---|
+| `state` | List of all ProjectDocuments | ✅ |
+| `create(title, description?)` | Creates new document, refreshes state | ✅ |
+| `delete(id)` | Deletes document, cleans up note references, refreshes state | ✅ |
+| `addNoteBlock(documentId, noteId)` | Adds note_reference block, updates note's projectDocumentIds | ✅ |
+| `addFreeTextBlock(documentId, content)` | Adds free_text block | ✅ |
+| `addSectionHeaderBlock(documentId, content)` | Adds section_header block | ✅ |
+| `removeBlock(documentId, blockId)` | Removes block, cleans up references | ✅ |
+| `reorderBlocks(documentId, newOrder)` | Updates block ordering | ✅ |
+| `updateBlockContent(documentId, blockId, newContent)` | For free_text and section_header edits | ✅ |
+| `editNoteTranscript(documentId, blockId, noteId, newText)` | Bi-directional edit — creates new version on note | ✅ |
 
 ---
 
@@ -351,155 +382,587 @@ Add these routes to the existing go_router configuration:
 
 ---
 
-## 9. Implementation Tasks
+## 9. Future Considerations (Phase 2+)
 
-### Step 4.5: Project Documents (Phase 1 Addition)
-
-**Goal:** Implement the Project Documents feature with local Hive storage, bi-directional editing, version history, and all Phase 1 UI.
-
-**Estimated effort:** Large
-
-### Sub-step A: Data Model & Storage
-
-1. Create `ProjectDocument` Hive model with type adapter
-2. Create `ProjectBlock` Hive model with type adapter
-3. Create `TranscriptVersion` Hive model with type adapter
-4. Create `BlockType` enum (note_reference, free_text, section_header)
-5. Add `projectDocumentsBox` to HiveService initialization (AES-256 encrypted)
-6. Modify existing `Note` model:
-   - Add `transcriptVersions: List<TranscriptVersion>` field
-   - Add `projectDocumentIds: List<String>` field
-7. Write data migration: on app start, if a Note has no transcriptVersions, create v1 from rawTranscription
-8. Run `build_runner` to regenerate type adapters
-
-### Sub-step B: Repository & Provider Layer
-
-1. Create `ProjectDocumentsRepository` with all CRUD methods
-2. Add transcript versioning methods to `NotesRepository`
-3. Add projectDocumentIds management methods to `NotesRepository`
-4. Create `projectDocumentsProvider` (Notifier/NotifierProvider)
-5. Wire provider to repository with proper state management
-
-### Sub-step C: UI — Project Documents List Screen
-
-1. Create `/project-documents` route and screen
-2. Implement project document card widget
-3. Implement "New Project" creation dialog (title + optional description)
-4. Implement rename and delete actions with confirmation
-5. Implement search/filter within project documents
-6. Implement empty state
-7. Add navigation entry point from Home page
-
-### Sub-step D: UI — Project Document Detail Screen
-
-1. Create `/project-documents/:id` route and screen
-2. Implement block rendering engine (switch on block type → render appropriate card)
-3. Implement Note Reference Block widget:
-   - Display transcript, timestamp, language badge, note title
-   - In-place editing with save
-   - Overflow menu (remove, view original, version history)
-4. Implement Free-Text Block widget:
-   - Editable text area
-   - Overflow menu (remove)
-5. Implement Section Header Block widget:
-   - Large/bold editable text with optional divider
-   - Overflow menu (remove)
-6. Implement "Add Block" action sheet (Add Voice Note / Add Free Text / Add Section Header)
-7. Implement reorder mode with drag handles
-8. Wire all edit/save/delete actions to provider
-
-### Sub-step E: UI — Note Picker & Supporting Screens
-
-1. Create note picker screen with search and multi-select
-2. Show "already linked" indicator on notes
-3. Implement "Add to Project" action on Note Detail page
-4. Implement "Linked Projects" section on Note Detail page
-5. Implement optional "Add to Project?" prompt after saving a new recording
-6. Create Version History screen/bottom sheet:
-   - List all versions with number, date, source
-   - "Restore this version" action
-
-### Sub-step F: Integration & Polish
-
-1. Handle note deletion — update project document blocks to show placeholder
-2. Handle project document deletion — clean up note references
-3. Ensure search indexes include project document titles
-4. Test with large documents (50+ blocks)
-5. Implement lazy rendering for block list
-6. Accessibility: screen reader labels, drag-and-drop alternatives
-7. Empty states for all new screens
-
----
-
-## 10. Impact on Existing Code
-
-### Files to Modify
-
-| File / Area | Change |
-|---|---|
-| **Note Hive model** | Add `transcriptVersions` and `projectDocumentIds` fields |
-| **Note type adapter** | Regenerate with build_runner |
-| **HiveService** | Add `projectDocumentsBox` initialization |
-| **NotesRepository** | Add versioning and project reference methods |
-| **Notes Provider** | Expose new repository methods |
-| **go_router config** | Add 4 new routes |
-| **Home Page** | Add Projects navigation entry |
-| **Note Detail Page** | Add "Linked Projects" section and "Add to Project" button |
-| **Recording Page (post-save flow)** | Add optional "Add to Project" prompt |
-| **Bottom navigation / drawer** | Add Projects entry if applicable |
-
-### New Files to Create
-
-| File | Purpose |
-|---|---|
-| `lib/models/project_document.dart` | ProjectDocument Hive model |
-| `lib/models/project_block.dart` | ProjectBlock Hive model |
-| `lib/models/transcript_version.dart` | TranscriptVersion Hive model |
-| `lib/repositories/project_documents_repository.dart` | CRUD for project documents |
-| `lib/providers/project_documents_provider.dart` | Riverpod provider |
-| `lib/pages/project_documents_page.dart` | List screen |
-| `lib/pages/project_document_detail_page.dart` | Detail / canvas screen |
-| `lib/pages/note_picker_page.dart` | Multi-select note picker |
-| `lib/pages/version_history_page.dart` | Transcript version history |
-| `lib/widgets/note_reference_block.dart` | Block widget |
-| `lib/widgets/free_text_block.dart` | Block widget |
-| `lib/widgets/section_header_block.dart` | Block widget |
-| `lib/widgets/project_document_card.dart` | Card for list screen |
-
----
-
-## 11. Relationship to Existing Features
-
-### Folders vs. Project Documents
-
-These are complementary, not competing features:
-
-| Aspect | Folders | Project Documents |
-|---|---|---|
-| **Purpose** | Organize / group notes | Compose / build a document from notes |
-| **Note relationship** | A note belongs to one folder | A note can appear in many project documents |
-| **Content** | Just a container of note references | Rich canvas: note transcripts + free text + headers |
-| **Editing** | No editing within folder view | Full inline editing with version history |
-| **Structure** | Flat list of notes | Ordered, user-arranged blocks |
-| **Analogy** | File folder | Google Docs page built from voice clips |
-
-### Auto-Folder vs. Project Documents (Phase 2)
-
-In Phase 2, when AI auto-categorization is added, the AI could suggest creating a Project Document from a cluster of related notes, or suggest adding a new note to an existing Project Document based on topic matching. This is listed as Phase 2 scope.
-
----
-
-## 12. Future Considerations (Phase 2+)
-
-These are explicitly out of scope for the initial implementation but inform the data model design:
+These are explicitly out of scope for Phase 1 but inform the data model design:
 
 - **AI Summary:** "Summarize this project" button sends all block content to AI, returns a summary displayed at the top of the document.
-- **Export:** Render the full document as Markdown, PDF, or plain text. Markdown is simplest — section headers become `##`, note blocks become quoted text with timestamps, free text becomes paragraphs.
-- **Voice command integration:** "Add this to Kitchen Renovation" after recording a note. Requires Phase 2 AI pipeline.
+- **PDF Export:** Render the full document as a formatted PDF with professional layout.
+- **AI-suggested note additions:** AI detects related notes and suggests adding them to the project.
 - **Collaborative project documents:** Shared via E2E encrypted cloud sync. Requires Phase 2 accounts.
 - **Templates:** "Meeting Notes" template pre-creates a project document with section headers (Attendees, Discussion Points, Action Items, Next Steps).
 - **Cross-project note search:** "Show me all notes that appear in more than one project."
 
 ---
 
-*End of Feature Specification*
+*End of Core Feature Specification*
+
+---
+
+# ADDENDUM A: Sharing, Rich Text Formatting & Image Blocks
+
+**Version:** 1.1
+**Date:** 2026-02-27
+**Status:** Approved for Development
+**Phase:** Phase 1 Addition
+**Scope:** Extends the Project Documents feature with three new capabilities
+
+---
+
+## A1. Feature: Sharing & Export
+
+### A1.1 Overview
+
+Users can share individual voice notes or entire Project Documents via the native OS share sheet, and export Project Documents as Markdown or plain text files. No AI required. No account required.
+
+### A1.2 User Stories
+
+11. **As a user**, I want to share a single voice note's transcript via WhatsApp, email, or any app so I can send my notes to others.
+12. **As a user**, I want to share an entire Project Document as a single block of text so I can send a complete summary to someone.
+13. **As a user**, I want to export a Project Document as a Markdown file so I can save it outside the app.
+14. **As a user**, I want to export a Project Document as a plain text file for maximum compatibility.
+
+### A1.3 Share: Single Note
+
+**Trigger:** Share icon/button on the Note Detail page (and in the note card overflow menu on Home).
+
+**Shared content format (plain text):**
+```
+[Note Title]
+Recorded: [Date] · [Time] · [Language]
+
+[Full transcription text]
+
+— Shared from VoiceNotes AI
+```
+
+**Behavior:**
+- Uses Flutter's `share_plus` package to invoke the native OS share sheet
+- Shares text only (no audio file in Phase 1 — audio sharing is Phase 2)
+- If the note has photos attached (see A3), photos are NOT included in text share — only transcript text
+- Works offline (share sheet is an OS feature)
+
+### A1.4 Share: Project Document
+
+**Trigger:** Share button in the Project Document Detail screen header/toolbar.
+
+**Shared content format (plain text):**
+```
+[Project Document Title]
+[Description if present]
+Last updated: [Date]
+
+---
+
+[For each block, in order:]
+
+## [Section Header text]          ← for section_header blocks
+
+[Free text content]               ← for free_text blocks (formatting stripped to plain text)
+
+📝 [Note Title] · [Date] · [Language]
+[Full transcript text]            ← for note_reference blocks
+
+🖼️ [Photo caption or "Photo"]    ← for image_block blocks (placeholder text, image not shared)
+
+---
+
+— Shared from VoiceNotes AI
+```
+
+**Behavior:**
+- Assembles all blocks in display order into a single text string
+- Rich text formatting (bold, italic, etc.) is stripped for plain text share — only raw text
+- Images are represented as placeholder text (e.g., "[Photo]" or caption if set)
+- Uses `share_plus` for OS share sheet
+
+### A1.5 Export: Project Document as File
+
+**Trigger:** "Export" option in the Project Document Detail screen overflow menu (⋮).
+
+**Export formats available:**
+1. **Markdown (.md)** — preserves structure with Markdown syntax
+2. **Plain text (.txt)** — flat text, no formatting
+
+**Markdown export format:**
+```markdown
+# [Project Document Title]
+
+*[Description if present]*
+*Last updated: [Date]*
+
+---
+
+## [Section Header text]
+
+[Free text with Markdown formatting preserved — bold, italic, bullets, links]
+
+---
+
+### 📝 [Note Title]
+*Recorded: [Date] · [Time] · [Language]*
+
+> [Full transcript text as blockquote]
+
+---
+
+![Photo](photo_filename.jpg)     ← for image blocks (embedded if possible, filename reference if not)
+
+---
+```
+
+**Plain text export:** Same as the share format in A1.4.
+
+**File handling:**
+- File is generated in a temp directory
+- User is presented with the OS share sheet (which allows saving to Files, sending via email, etc.)
+- Alternatively, use `open_file` or `path_provider` to save to Downloads and show a confirmation
+- File name: `[document_title]_[date].md` or `.txt`
+
+### A1.6 Phase 2 Export Additions
+
+| Capability | Phase |
+|---|---|
+| PDF export (formatted, professional) | Phase 2 |
+| Share audio file alongside transcript | Phase 2 |
+| Share with embedded images | Phase 2 |
+| Email directly from app (pre-filled) | Phase 2 |
+
+### A1.7 Tech Stack for Sharing/Export
+
+| Component | Package | Purpose |
+|---|---|---|
+| OS share sheet | `share_plus` | Native sharing to any app |
+| File generation | `dart:io` + `path_provider` | Create temp .md / .txt files |
+| File sharing | `share_plus` (with file path) | Share generated files via OS sheet |
+
+---
+
+## A2. Feature: Rich Text Formatting (Free-Text Blocks)
+
+### A2.1 Overview
+
+Free-text blocks within Project Documents support medium-level rich text formatting: bold, italic, bullet lists, heading sizes, and links. This transforms free-text blocks from plain text inputs into lightly structured content areas — enough to write context, summaries, and commentary with visual hierarchy, without becoming a full document editor.
+
+### A2.2 User Stories
+
+15. **As a user**, I want to bold and italicize text in my free-text blocks so I can add emphasis.
+16. **As a user**, I want to create bullet lists in free-text blocks so I can organize points clearly.
+17. **As a user**, I want to set heading sizes in free-text blocks so I can create sub-sections within the document.
+18. **As a user**, I want to add links in free-text blocks so I can reference external resources.
+
+### A2.3 Supported Formatting
+
+| Format | Toolbar Icon | Markdown Equivalent | Behavior |
+|---|---|---|---|
+| **Bold** | **B** | `**text**` | Toggles bold on selected text or at cursor |
+| *Italic* | *I* | `*text*` | Toggles italic on selected text or at cursor |
+| Bullet list | • list icon | `- item` | Creates/extends an unordered list |
+| Heading 1 | H1 | `# text` | Large heading — for major sub-sections |
+| Heading 2 | H2 | `## text` | Medium heading — for minor sub-sections |
+| Link | 🔗 link icon | `[text](url)` | Opens dialog to enter URL for selected text |
+
+### A2.4 UI: Formatting Toolbar
+
+**Placement:** A compact toolbar appears above the keyboard (or below the block header) when a free-text block is in edit mode.
+
+**Toolbar layout:** `[ B ] [ I ] [ • ] [ H1 ] [ H2 ] [ 🔗 ]`
+
+**Behavior:**
+- Toolbar appears only when editing a free-text block — does NOT appear for section headers or note reference blocks
+- Toolbar scrolls horizontally if needed on small screens
+- Active formatting states are highlighted (e.g., B is highlighted when cursor is inside bold text)
+- Link insertion: select text → tap link icon → enter URL in dialog → text becomes tappable link
+- Tapping a link in view mode opens it in the system browser
+
+### A2.5 Storage Format
+
+**Recommendation: Store as Quill Delta JSON internally.**
+
+The rich text content of a free-text block is stored in the `content` field of `ProjectBlock` as a serialized Delta JSON string (used by `flutter_quill`). This preserves all formatting in a structured, diff-friendly format.
+
+**ProjectBlock model changes required:**
+```
+ProjectBlock (EXTENDED for rich text)
+├── ... (all existing fields)
+├── contentFormat: String? (NEW)
+│   ├── "plain" — for section_header and legacy blocks
+│   └── "quill_delta" — for rich free_text blocks
+```
+
+**Why Delta JSON over Markdown storage:**
+- Exact formatting fidelity (no parsing ambiguity)
+- Native to `flutter_quill` — no conversion layer needed for editing
+- Easily convertible TO Markdown for export (one-way conversion)
+- Supports future formatting additions without storage migration
+
+**Migration:** Existing free-text blocks with plain text content should be converted to a simple Delta with a single text insert on first load.
+
+### A2.6 Export Behavior with Formatting
+
+When exporting or sharing:
+- **Markdown export:** Delta JSON → converted to Markdown syntax (bold → `**`, italic → `*`, bullets → `- `, headings → `#`/`##`, links → `[text](url)`)
+- **Plain text export/share:** All formatting stripped, raw text only
+- **In-app display:** Rendered natively by `flutter_quill` viewer
+
+### A2.7 Scope Boundaries
+
+| In Scope (Phase 1) | Out of Scope |
+|---|---|
+| Bold, italic | Underline, strikethrough |
+| Bullet lists | Numbered lists, checklists |
+| H1, H2 headings | H3-H6 headings |
+| Links (URL) | Inline images within text |
+| Basic toolbar | Slash commands (e.g., `/heading`) |
+| Quill Delta storage | Markdown source editing mode |
+
+### A2.8 Tech Stack for Rich Text
+
+| Component | Package | Purpose |
+|---|---|---|
+| Rich text editor | `flutter_quill` | Editing with formatting toolbar |
+| Rich text viewer | `flutter_quill` (read-only mode) | Display formatted content |
+| Delta → Markdown | `quill_delta` + custom converter or `delta_to_markdown` | Export conversion |
+
+---
+
+## A3. Feature: Image Blocks (Photos)
+
+### A3.1 Overview
+
+Users can add photos to Project Documents as a new block type (`image_block`) and attach photos directly to individual voice notes on the Note Detail page. Photos can be picked from the device gallery or captured with the camera, with basic crop/resize before insertion. Images are stored locally on-device, consistent with the privacy-first architecture.
+
+### A3.2 User Stories
+
+19. **As a user**, I want to add a photo from my gallery to a Project Document so I can include visual context alongside my voice notes.
+20. **As a user**, I want to take a new photo with my camera and add it directly to a Project Document.
+21. **As a user**, I want to crop and resize a photo before adding it so I can focus on the relevant part.
+22. **As a user**, I want to add a caption to a photo block so I can describe what the image shows.
+23. **As a user**, I want to add photos to a voice note on the Note Detail page so I can associate images with a specific recording.
+24. **As a user**, I want to view photos in full-screen by tapping them.
+25. **As a user**, I want to remove a photo from a project or note without losing the original image on my phone.
+
+### A3.3 Where Photos Can Be Added
+
+| Location | Behavior |
+|---|---|
+| **Project Document** (as `image_block`) | New block type — sits alongside note references, free text, and section headers. Can be reordered like any other block. |
+| **Note Detail Page** (as note attachments) | Photos attached directly to a Note. Displayed in an "Attachments" section on the Note Detail page. Travel with the note into any Project Document that references it. |
+
+### A3.4 Data Models
+
+**New model:**
+```
+ImageAttachment
+├── id: String (UUID)
+├── filePath: String (local path to stored image file)
+├── fileName: String (original or generated filename)
+├── caption: String? (optional user-entered caption)
+├── width: int (pixels, after crop/resize)
+├── height: int (pixels, after crop/resize)
+├── fileSizeBytes: int
+├── createdAt: DateTime
+└── sourceType: String ("gallery" | "camera")
+```
+
+**Modified ProjectBlock model — new block type:**
+```
+ProjectBlock (EXTENDED)
+├── type: BlockType
+│   ├── note_reference      (existing)
+│   ├── free_text           (existing)
+│   ├── section_header      (existing)
+│   └── image_block         ← NEW
+├── imageAttachmentId: String?   ← NEW (required when type = image_block;
+│                                    references ImageAttachment.id)
+```
+
+**Modified Note model:**
+```
+Note (EXTENDED)
+├── ... (all existing fields)
+├── imageAttachmentIds: List<String>  ← NEW (list of ImageAttachment IDs
+│                                       attached directly to this note)
+```
+
+**Hive storage:**
+
+| Box | Contents |
+|---|---|
+| `imageAttachmentsBox` (NEW) | All ImageAttachment metadata objects, AES-256 encrypted |
+| `projectDocumentsBox` (EXISTING) | Updated with image_block support |
+| `notesBox` (EXISTING) | Updated with imageAttachmentIds field |
+
+**Image file storage:**
+- Actual image files stored in app's local documents directory: `Documents/images/[uuid].jpg`
+- Only metadata (path, dimensions, caption) stored in Hive
+- Images are NOT stored inside Hive boxes (too large) — only file paths
+
+### A3.5 Image Capture & Processing Flow
+
+**Step 1: Source selection**
+When user taps "Add Image" (from Project Document's "Add Block" menu or Note Detail's attachment area), present options:
+- 📷 **Take Photo** — opens device camera
+- 🖼️ **Choose from Gallery** — opens device photo picker
+
+**Step 2: Crop & Resize**
+After image is selected/captured:
+- Opens crop/resize screen
+- Crop: free-form aspect ratio (user drags corners)
+- Resize: automatic — images larger than 2048px on longest edge are scaled down to 2048px to save storage
+- Quality: JPEG at 85% quality for storage efficiency
+- User can skip cropping if they want the full image
+
+**Step 3: Save & Insert**
+- Processed image saved to `Documents/images/[uuid].jpg`
+- `ImageAttachment` metadata record created in Hive
+- If adding to Project Document → new `image_block` ProjectBlock created, appended to document
+- If adding to Note → `imageAttachmentId` added to note's `imageAttachmentIds` list
+- Optional: caption input dialog shown after insertion (or user can add/edit caption later)
+
+### A3.6 UI: Image Block in Project Document
+
+**Rendering:**
+- Image displayed at full block width with aspect ratio preserved
+- Caption displayed below image in smaller, muted text (if present)
+- Tap image → opens full-screen image viewer with pinch-to-zoom
+- Overflow menu (⋮): Edit caption, Replace image, Remove from document, View full screen
+
+**In reorder mode:** Image blocks show drag handles and can be reordered like any other block.
+
+### A3.7 UI: Photos on Note Detail Page
+
+**Placement:** "Attachments" section below the structured output sections (actions, todos, reminders, notes) and above the audio playback controls.
+
+**Layout:**
+- Horizontal scrollable thumbnail row (if multiple photos)
+- Or grid view (2 columns) if more than 3 photos
+- Tap thumbnail → full-screen viewer
+- "Add Photo" button (camera icon) at the end of the row
+- Long-press or overflow menu on thumbnail: Delete attachment, View full screen, Edit caption
+
+**In Project Documents:** When a note with attached photos is referenced in a Project Document, the note_reference block shows a small photo indicator (e.g., 📎 2 photos). Tapping "View original note" navigates to Note Detail where photos are visible. Photos are NOT displayed inline in the note_reference block itself — they stay on the Note Detail page to avoid clutter.
+
+### A3.8 Relationship Rules
+
+- An `ImageAttachment` can be referenced by one `image_block` in a Project Document OR attached to one Note — not both simultaneously. If the same photo is needed in both places, it's two separate copies/records.
+- Deleting an `image_block` from a Project Document deletes the `ImageAttachment` record AND the image file (since it's only used there).
+- Deleting a photo attachment from a Note deletes the `ImageAttachment` record AND the image file.
+- Deleting a Note that has photo attachments also deletes all associated `ImageAttachment` records and image files.
+- Deleting a Project Document deletes all `image_block` ImageAttachments and files within it. Note-attached photos (referenced via note_reference blocks) are NOT affected.
+
+### A3.9 Edge Cases
+
+| Scenario | Behavior |
+|---|---|
+| **Image file missing from disk** | Show placeholder with "Image unavailable" text. Log error. Do not crash. |
+| **Very large image (>10MB)** | Resize aggressively before saving (max 2048px, 85% JPEG). Show size warning if original is >20MB. |
+| **Many photos in one project (20+)** | Lazy load images. Load thumbnails first, full resolution on demand. |
+| **Camera permission denied** | Show permission dialog explaining why camera access is needed. Fall back to gallery-only. |
+| **Gallery permission denied** | Show permission dialog. Offer camera-only fallback. |
+| **Storage space low** | Check available space before saving. Warn user if <100MB remaining. |
+| **Duplicate photo added** | Allow it — each insertion creates a separate copy. No deduplication in Phase 1. |
+
+### A3.10 Tech Stack for Images
+
+| Component | Package | Purpose |
+|---|---|---|
+| Image picker (gallery + camera) | `image_picker` | Source selection |
+| Image cropping | `image_cropper` | Crop and resize UI |
+| Image display / full-screen viewer | `photo_view` | Pinch-to-zoom, pan |
+| File storage | `path_provider` + `dart:io` | Save to app documents directory |
+| Permissions | `permission_handler` | Camera and photo library permissions |
+| Image compression | `flutter_image_compress` | Resize and quality reduction |
+
+---
+
+## A4. Updated Data Model Summary
+
+This section summarizes all model changes required by the addendum, building on the current v1.4.0 codebase.
+
+### A4.1 BlockType Enum (Updated)
+
+```
+BlockType
+├── note_reference    (existing — implemented)
+├── free_text         (existing — implemented)
+├── section_header    (existing — implemented)
+└── image_block       (NEW — Addendum A3)
+```
+
+### A4.2 ProjectBlock Model (Updated)
+
+```
+ProjectBlock (FINAL)
+├── id: String (UUID)                          (existing)
+├── type: BlockType                            (existing — add image_block)
+├── sortOrder: int                             (existing)
+├── noteId: String?                            (existing — for note_reference)
+├── content: String?                           (existing — for free_text or section_header)
+├── contentFormat: String?                     (NEW — "plain" or "quill_delta"; for free_text blocks)
+├── imageAttachmentId: String?                 (NEW — for image_block)
+├── createdAt: DateTime                        (existing)
+└── updatedAt: DateTime                        (existing)
+```
+
+### A4.3 Note Model (Updated)
+
+```
+Note (FINAL — all additions)
+├── ... (all existing fields from v1.4.0)
+├── transcriptVersions: List<TranscriptVersion>   (existing — implemented)
+├── projectDocumentIds: List<String>              (existing — implemented)
+└── imageAttachmentIds: List<String>              (NEW — Addendum A3)
+```
+
+### A4.4 New Models Summary
+
+| Model | Source | Hive Box | Status |
+|---|---|---|---|
+| ProjectDocument | Original spec | projectDocumentsBox | ✅ Implemented |
+| ProjectBlock | Original spec (extended in addendum) | Nested in ProjectDocument | ✅ Implemented (needs extension) |
+| TranscriptVersion | Original spec | Nested in Note | ✅ Implemented |
+| ImageAttachment | Addendum A3 | imageAttachmentsBox (NEW) | ⏳ Pending |
+
+### A4.5 Updated Relationship Diagram
+
+```
+ProjectDocument ──has many──▶ ProjectBlock
+                                  │
+                    ┌─────────────┼──────────────────┐
+                    │             │                   │
+              note_reference   free_text          image_block
+              section_header   (rich text)             │
+                    │                                  ▼
+                    ▼                          ImageAttachment
+                  Note                         (stored on disk)
+                    │
+                    ├── has many ──▶ TranscriptVersion
+                    ├── has many ──▶ ImageAttachment (note-level photos)
+                    ├── can belong to many ProjectDocuments
+                    └── projectDocumentIds[] tracks reverse references
+```
+
+---
+
+## A5. Implementation Tasks
+
+These tasks build on the completed Step 4.5 codebase. All sub-steps reference extending existing files.
+
+### Sub-step A: Data Model & Storage Extensions
+
+1. Create `ImageAttachment` Hive model with type adapter
+2. Add `image_block` to `BlockType` enum
+3. Add `imageAttachmentId` field to `ProjectBlock` model
+4. Add `contentFormat` field to `ProjectBlock` model
+5. Add `imageAttachmentIds` field to `Note` model
+6. Add `imageAttachmentsBox` to HiveService initialization (AES-256 encrypted)
+7. Create `Documents/images/` directory on app initialization
+8. Run `build_runner` to regenerate all type adapters
+9. Write migration: existing free-text blocks get `contentFormat: "plain"`
+
+### Sub-step B: Repository & Provider Extensions
+
+1. Create `ImageAttachmentRepository` — CRUD for imageAttachmentsBox + file management
+   - `saveImage(file, sourceType)` → processes, stores, returns ImageAttachment
+   - `getImageAttachment(id)` → returns metadata
+   - `deleteImageAttachment(id)` → deletes metadata AND file from disk
+   - `getImageFile(id)` → returns File reference for display
+2. Add image methods to `NotesRepository`:
+   - `addImageAttachment(noteId, attachmentId)`
+   - `removeImageAttachment(noteId, attachmentId)`
+3. Add image block methods to `ProjectDocumentsRepository`:
+   - `addImageBlock(documentId, attachmentId, caption?)`
+4. Extend `projectDocumentsProvider` with image and sharing methods
+5. Create `imageAttachmentProvider` if needed (or fold into existing providers)
+
+### Sub-step C: UI — Project Document Detail Extensions
+
+1. Implement Image Block widget:
+   - Display image with aspect ratio preservation
+   - Caption display and edit
+   - Overflow menu (edit caption, replace, remove, full screen)
+   - Full-screen viewer on tap (photo_view)
+2. Add "Add Image" option to "Add Block" action sheet (alongside Voice Note / Free Text / Section Header)
+3. Implement image source selection bottom sheet (Gallery / Camera)
+4. Implement crop/resize flow (image_cropper)
+5. Implement rich text editing for free-text blocks:
+   - Integrate flutter_quill editor
+   - Formatting toolbar (bold, italic, bullets, H1, H2, link)
+   - Quill Delta serialization to/from Hive
+6. Implement sharing:
+   - Share button in toolbar → assemble document text → share_plus
+   - Export menu → generate .md or .txt file → share_plus with file
+
+### Sub-step D: Note Detail — Photos & Sharing
+
+1. Add "Attachments" section to Note Detail page
+2. Implement photo thumbnail row/grid
+3. Implement "Add Photo" button (gallery + camera picker)
+4. Implement crop/resize for note-level photos
+5. Implement full-screen photo viewer
+6. Implement photo deletion with confirmation
+7. Add Share button to Note Detail page
+8. Assemble note share text format → share_plus
+
+### Sub-step E: Integration & Polish
+
+1. Handle image cleanup on note deletion (delete associated ImageAttachments + files)
+2. Handle image cleanup on project document deletion
+3. Update "Delete All Data" to include imageAttachmentsBox and image files
+4. Update storage display in Settings to include image file sizes
+5. Test with large images, many photos, low storage scenarios
+6. Accessibility: image alt-text from caption, screen reader labels
+
+---
+
+## A6. Files Impact
+
+### Files to Modify (Existing)
+
+| File / Area | Change |
+|---|---|
+| **ProjectBlock Hive model** | Add `imageAttachmentId`, `contentFormat` fields |
+| **BlockType enum** | Add `image_block` |
+| **Note Hive model** | Add `imageAttachmentIds` field |
+| **HiveService** | Add `imageAttachmentsBox` initialization, image directory creation |
+| **ProjectDocumentsRepository** | Add image block methods |
+| **NotesRepository** | Add image attachment methods |
+| **projectDocumentsProvider** | Add image, sharing, and export methods |
+| **Project Document Detail screen** | Add image blocks, rich text editor, share/export buttons |
+| **Note Detail screen** | Add attachments section, share button |
+| **"Add Block" action sheet** | Add "Add Image" option |
+| **Settings page** | Update storage display to include images |
+
+### New Files to Create
+
+| File | Purpose |
+|---|---|
+| `lib/models/image_attachment.dart` | ImageAttachment Hive model |
+| `lib/repositories/image_attachment_repository.dart` | Image CRUD + file management |
+| `lib/services/sharing_service.dart` | Assemble share text, generate export files |
+| `lib/services/image_processing_service.dart` | Crop, resize, compress, save |
+| `lib/widgets/image_block_widget.dart` | Image block for Project Document |
+| `lib/widgets/note_attachments_section.dart` | Photo section on Note Detail |
+| `lib/widgets/formatting_toolbar.dart` | Rich text toolbar for free-text blocks |
+| `lib/pages/image_viewer_page.dart` | Full-screen image viewer |
+
+---
+
+## A7. Package Dependencies (Addendum)
+
+| Package | Purpose | Phase | Status |
+|---|---|---|---|
+| `share_plus` | Native OS share sheet | Phase 1 | To add |
+| `flutter_quill` | Rich text editing and viewing | Phase 1 | To add |
+| `delta_to_markdown` or custom converter | Export Delta → Markdown | Phase 1 | To add |
+| `image_picker` | Gallery and camera photo selection | Phase 1 | To add |
+| `image_cropper` | Crop and resize UI | Phase 1 | To add |
+| `photo_view` | Full-screen image viewer with zoom | Phase 1 | To add |
+| `flutter_image_compress` | Image compression and resizing | Phase 1 | To add |
+| `permission_handler` | Camera and photo library permissions | Phase 1 | Already in project |
+| `path_provider` | File system access for image storage | Phase 1 | Already in project |
+
+---
+
+*End of Addendum A*

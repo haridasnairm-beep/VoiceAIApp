@@ -2,9 +2,9 @@
 
 **Last Updated:** 2026-02-27
 **Current Version:** 1.4.0 (Phase 1 MVP + Project Documents + Voice Commands + Library Merge + Whisper UX)
-**Overall Progress:** Phase 1 Complete (100%) including Project Documents
+**Overall Progress:** Phase 1 Complete (100%) — Steps 4.6 (Tasks & Reminders) and 4.7 (Sharing, Rich Text & Images) approved
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md)
+**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
 ---
 
@@ -122,6 +122,44 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 
 ---
 
+## Step 4.6 — Interactive Tasks & Reminder Enhancement ⏳ APPROVED
+
+**Status:** Approved for Development | **Effort:** Medium-Large | **Spec:** [FEATURE_TASKS_AND_REMINDERS.md](FEATURE_TASKS_AND_REMINDERS.md)
+
+| Sub-step | Description | Status |
+|---|---|---|
+| A | Interactive Checkboxes on Note Detail (toggle, strikethrough, manual create, CRUD) | ⏳ Pending |
+| B | Checkboxes in Project Document Blocks (collapsible tasks sub-section) | ⏳ Pending |
+| C | Aggregated Tasks View (Home tab, tasksProvider, filters, sorting) | ⏳ Pending |
+| D | Reminder Enhancement (add_2_calendar, OS bridge, reschedule) | ⏳ Pending |
+| E | Polish & Integration (sync, testing, accessibility) | ⏳ Pending |
+
+**New files to create:** 9 (task_item model, tasks_provider, 6 widgets, os_reminder_service)
+**Files to modify:** 7 (note_detail, home, note_reference_block, notes_repository, notes_provider, notification_service, pubspec.yaml)
+**New dependency:** `add_2_calendar` (cross-platform OS calendar event creation)
+
+---
+
+## Step 4.7 — Sharing, Rich Text & Image Blocks ⏳ APPROVED
+
+**Status:** Approved for Development | **Effort:** Large | **Spec:** [FEATURE_PROJECT_DOCUMENTS.md — Addendum A](FEATURE_PROJECT_DOCUMENTS.md)
+
+| Sub-step | Description | Status |
+|---|---|---|
+| A | Data Model & Storage Extensions (ImageAttachment model, BlockType update, HiveField additions) | ⏳ Pending |
+| B | Repository & Provider Extensions (ImageAttachmentRepository, SharingService) | ⏳ Pending |
+| C | UI — Sharing & Export (share notes/projects via share_plus, export .md/.txt) | ⏳ Pending |
+| D | UI — Rich Text Formatting (flutter_quill editor, formatting toolbar, Quill Delta storage) | ⏳ Pending |
+| E | UI — Image Blocks in Projects (image_picker, image_cropper, photo_view, full-screen viewer) | ⏳ Pending |
+| F | Note Detail — Photo Attachments (attachments section, add/view/delete photos) | ⏳ Pending |
+| G | Integration & Polish (cleanup on delete, storage display update, edge cases) | ⏳ Pending |
+
+**New files to create:** 8 (image_attachment model, image repo, sharing service, image processing service, 4 widgets/pages)
+**Files to modify:** 11 (project_block, note, hive_service, project_documents_repo, notes_repo, project_documents_provider, project_document_detail, note_detail, free_text_block, settings, pubspec.yaml)
+**New dependencies:** `share_plus`, `flutter_quill`, `delta_to_markdown`, `image_picker`, `image_cropper`, `photo_view`, `flutter_image_compress`
+
+---
+
 ## Component Status
 
 ### Infrastructure & Setup
@@ -232,10 +270,12 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 ## Next Steps
 
 ### Phase 1 — Remaining
-1. **Step 4.5:** Project Documents (data models → repository → UI → integration)
+1. **Step 4.6:** Interactive Tasks & Reminder Enhancement (checkboxes, tasks view, OS reminders, reschedule)
+2. **Step 4.7:** Sharing, Rich Text & Image Blocks (share/export notes + projects, flutter_quill rich text, photo blocks + attachments)
 
 ### Phase 2 — AI-Powered
 2. **Step 8:** Whisper API Transcription (cloud-based, higher accuracy)
-3. **Step 9:** AI Categorization & Structuring
+3. **Step 9:** AI Categorization & Structuring (auto-extract actions/todos/reminders, smart due dates)
 4. **Step 10:** n8n Integration & Advanced Features
-   - Includes Project Documents Phase 2: AI summary, export, voice commands, AI-suggested note additions
+   - Includes Project Documents Phase 2: AI summary, export, AI-suggested note additions
+   - Includes Tasks Phase 2: recurring reminders, priority levels, Todoist/Apple Reminders API/Google Tasks API

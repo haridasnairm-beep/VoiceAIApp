@@ -1,11 +1,11 @@
 # VoiceNotes AI - Project Specification
 
-**Version:** 2.2
+**Version:** 2.4
 **Last Updated:** 2026-02-27
 **Platform:** Cross-platform (iOS + Android) via Flutter
 **Dart SDK:** ^3.6.0
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [VoiceNotes AI Concept Document](voicenotes-ai-concept.md)
+**Reference:** [VoiceNotes AI Concept Document](voicenotes-ai-concept.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md)
 
 ---
 
@@ -64,7 +64,10 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 
 ### 4.3 Home / Dashboard
 - **Prominent floating "Record" button** — large mic icon, bottom center, always visible
-- **Recent notes feed** — cards in reverse chronological order showing:
+- **Tab bar** — segmented control: `[ Notes ]  [ Tasks ]`
+  - **Notes tab** (default) — recent notes feed
+  - **Tasks tab** — aggregated view of all unchecked todos, actions, and reminders from every note (see 4.14)
+- **Recent notes feed** (Notes tab) — cards in reverse chronological order showing:
   - Auto-generated title (derived from content)
   - Date/time of recording
   - Detected language tag (small pill/badge)
@@ -72,6 +75,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
   - Brief transcription preview (first 2 lines)
 - **Search bar** — top of screen, searches by keyword, language, category, date
 - **Filter chips** — below search bar: All, Actions, Todos, Reminders, Notes
+- **Task count badge** — shown on Tasks tab label when not selected (e.g., "3" open tasks)
 
 ### 4.4 Recording Screen
 - **Two transcription modes:**
@@ -90,11 +94,14 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 ### 4.5 Note Detail Screen
 - **Full transcription** with detected language label
 - **Structured output sections** (visually separated):
-  - **Actions** — extracted from "I need to...", "let's make sure we...", "action item:..."
-  - **Todos** — task items with optional due dates ("by Friday"). Each has checkbox.
-  - **Reminders** — from "remind me to...", "don't forget...". Shows scheduled time.
+  - **Actions** — extracted from "I need to...", "let's make sure we...", "action item:...". Interactive checkbox, strikethrough when completed, overflow menu (edit/delete).
+  - **Todos** — task items with optional due dates. Interactive checkbox, overdue date highlighting (red badge), strikethrough when completed, overflow menu (edit/delete/set due date).
+  - **Reminders** — from "remind me to...", "don't forget...". Shows scheduled time. Reschedule action available. Option to "Also add to OS" (calendar event via `add_2_calendar`).
   - **General Notes** — everything else, preserved as formatted text.
+- **Manual task creation** — "Add Task" button on Todos section, "Add Action" button on Actions section. Inline text field + optional due date picker for instant task creation.
 - **AI Follow-up Questions** — shown only when user includes voice trigger ("any suggestions?", "what should I consider?", "what am I missing?"). 2-3 contextually relevant questions.
+- **Photo attachments** — "Attachments" section below structured output; horizontal scrollable thumbnails (or 2-column grid for 3+); tap for full-screen viewer with pinch-to-zoom; "Add Photo" button (gallery or camera); long-press/overflow to delete or edit caption
+- **Share button** — shares note transcript via OS share sheet (`share_plus`); format: title, date/language, full transcription, "— Shared from VoiceNotes AI"
 - **Edit capability** — user can manually edit transcription or structured items
 - **Audio playback** — replay original recording from this screen
 - **Delete note** — with confirmation prompt
@@ -142,14 +149,17 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Access:** From Home page (navigation alongside Folders)
 
 ### 4.11 Project Document Detail Screen
-- **Scrollable canvas** displaying all blocks (note references, free text, section headers) in user-defined order
+- **Scrollable canvas** displaying all blocks (note references, free text, section headers, images) in user-defined order
 - **Header area:** editable title, description, metadata (created, updated, block count), action buttons
-- **Note Reference Block:** mic icon, original recording timestamp, language badge, linked note title, full editable transcript, audio duration, overflow menu (remove, view original, version history)
-- **Free-Text Block:** editable text area with pen icon, overflow menu (remove)
+- **Note Reference Block:** mic icon, original recording timestamp, language badge, linked note title, full editable transcript, audio duration, photo attachment indicator (📎 N photos), overflow menu (remove, view original, version history)
+- **Free-Text Block:** rich text editing via `flutter_quill` with formatting toolbar (bold, italic, bullets, H1, H2, links); stored as Quill Delta JSON; overflow menu (remove)
 - **Section Header Block:** large/bold editable text with optional divider, overflow menu (remove)
-- **Add Block action sheet:** Add Voice Note (opens note picker), Add Free Text, Add Section Header
-- **Reorder Mode:** drag handles on each block, "Done" button to exit
+- **Image Block:** full-width image with aspect ratio preserved, optional caption below, tap for full-screen viewer (pinch-to-zoom via `photo_view`), overflow menu (edit caption, replace, remove, view full screen)
+- **Add Block action sheet:** Add Voice Note (opens note picker), Add Free Text, Add Section Header, Add Image (gallery or camera)
+- **Reorder Mode:** drag handles on each block (including image blocks), "Done" button to exit
 - **Bi-directional editing:** editing a transcript within a project document creates a new version on the original note and updates it everywhere
+- **Share button:** shares entire project document as assembled text via OS share sheet (`share_plus`)
+- **Export menu:** export as Markdown (.md) or plain text (.txt) file — generated in temp directory, shared via OS sheet
 
 ### 4.12 Note Picker Screen
 - **Multi-select** from all existing notes (reverse chronological)
@@ -161,6 +171,36 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Version list** showing: version number, date, edit source (e.g., "Note Detail", "Project: Kitchen Renovation")
 - **Full text** per version
 - **"Restore this version"** action — creates a new version with restored text (non-destructive)
+
+### 4.14 Image Viewer Screen
+- **Full-screen image display** with pinch-to-zoom and pan (via `photo_view`)
+- **Caption overlay** at bottom if present
+- **Close button** to return to previous screen
+
+### 4.15 Aggregated Tasks View (Tasks Tab on Home)
+- **Header area:** open task count ("12 open tasks"), filter chips (All / Todos / Actions), "Show completed" toggle
+- **Task list** — each row shows:
+  - Interactive checkbox (toggles completion, persists to Hive)
+  - Task text (strikethrough + muted when completed)
+  - Source note name + date (tappable, navigates to Note Detail)
+  - Due date badge (red if overdue, for todos)
+  - Reminder time (for reminders, with bell icon)
+  - Type indicator (todo vs action vs reminder)
+- **Sorting:** overdue first → due date soonest → creation date newest. Undated items after dated.
+- **Completed tasks:** grouped under "Completed" sub-header when "Show completed" is on
+- **Reminders** included alongside todos and actions with distinct bell icon
+- **Empty state:** "No open tasks — you're all caught up!"
+- **Data layer:** derived `tasksProvider` reads from `notesProvider`, assembles flat `TaskItem` list (view model, not Hive model)
+
+### 4.16 Reminder Enhancement (Hybrid Model)
+- **Existing in-app reminders preserved** — local notifications with deep-link back to note
+- **"Also add to OS" option** — after creating a reminder, bottom sheet offers:
+  - "Keep in VoiceNotes AI" — existing behavior (in-app notification)
+  - "Also add to OS Reminders" — creates in-app reminder AND opens native calendar with pre-filled event (via `add_2_calendar`)
+- **Per-reminder choice** — not a global setting; user decides per reminder
+- **In-app reminder always created** — OS push is additive (ensures deep-link back to note context)
+- **Reschedule** — clock icon or overflow menu on reminder items; opens date/time picker pre-filled with current time; cancels old notification and schedules new one
+- **Snooze** (stretch goal) — notification action buttons "Done" and "Snooze 1hr" on Android
 
 ---
 
@@ -177,6 +217,15 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 | No login required | App fully functional without account creation or sign-in. |
 | Default folder | New recordings automatically assigned to default folder (configurable in Settings). |
 | Project documents | Compose rich documents from voice notes with free text and section headers. |
+| Interactive tasks | Todos, actions, and reminders have tappable checkboxes across all surfaces (Note Detail, Project Documents, Tasks View). |
+| Aggregated tasks view | All open todos, actions, and reminders from every note in one filterable list on the Home page Tasks tab. |
+| Manual task creation | Users can manually add todos and actions to notes directly (before AI auto-extraction in Phase 2). |
+| Hybrid reminders | In-app reminders with local notifications + optional one-tap "Also add to OS" calendar event. |
+| Reminder reschedule | Reschedule reminder time from Note Detail with notification update. |
+| Sharing | Share individual notes or entire project documents via OS share sheet (text only, no audio). |
+| Export | Export project documents as Markdown (.md) or plain text (.txt) files. |
+| Rich text formatting | Free-text blocks in project documents support bold, italic, bullets, H1/H2 headings, and links via `flutter_quill`. |
+| Photo attachments | Add photos from gallery or camera to notes and project documents. Stored locally with crop/resize. |
 
 **Phase 2 behaviors (not yet implemented):** AI smart categorization, contextual grouping, follow-up intelligence, auto-folder assignment.
 
@@ -208,7 +257,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 ### 6.5 Local Database — Hive (Encrypted)
 - **Hive** — lightweight, fast, no-SQL database for Flutter/Dart
 - AES-256 encryption at rest with device-derived key
-- Hive boxes for: notes, folders, settings, offline queue
+- Hive boxes for: notes, folders, settings, projectDocuments, imageAttachments (planned), offline queue
 - No cloud persistence in MVP
 
 ### 6.6 Speech-to-Text (Phase 1 — On-Device)
@@ -232,10 +281,13 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - Manual dropdown selections take priority over voice command results
 - Controlled by `voiceCommandsEnabled` setting (default: true)
 
-### 6.9 Notifications
-- **flutter_local_notifications** for reminder alerts
+### 6.9 Notifications & Reminders
+- **flutter_local_notifications** for in-app reminder alerts
 - Manual reminder creation with date/time picker
 - Scheduled notifications with deep-link to specific note on tap
+- **Hybrid model:** in-app reminder always created; optional "Also add to OS" pushes a pre-filled calendar event via `add_2_calendar`
+- **Reschedule:** update reminder time, cancel old notification, schedule new one
+- **Snooze** (stretch): notification action buttons for "Done" / "Snooze 1hr" on Android
 
 ### 6.10 Offline Support
 - Recording works without internet
@@ -267,7 +319,8 @@ Note
 ├── isProcessed: bool (false if in offline queue)
 ├── hasFollowUpTrigger: bool (user said "any suggestions?" etc.)
 ├── transcriptVersions: List<TranscriptVersion> (full version history)
-└── projectDocumentIds: List<String> (reverse lookup for linked projects)
+├── projectDocumentIds: List<String> (reverse lookup for linked projects)
+└── imageAttachmentIds: List<String> (photos attached to this note — planned Step 4.7)
 
 ActionItem
 ├── id: String
@@ -323,10 +376,12 @@ ProjectDocument
 
 ProjectBlock
 ├── id: String (UUID)
-├── type: BlockType (note_reference | free_text | section_header)
+├── type: BlockType (note_reference | free_text | section_header | image_block)
 ├── sortOrder: int (position in the document)
 ├── noteId: String? (required when type = note_reference)
 ├── content: String? (required when type = free_text or section_header)
+├── contentFormat: String? ("plain" or "quill_delta" — for rich text in free_text blocks)
+├── imageAttachmentId: String? (required when type = image_block)
 ├── createdAt: DateTime
 └── updatedAt: DateTime
 
@@ -337,6 +392,29 @@ TranscriptVersion
 ├── editSource: String (where the edit was made)
 ├── createdAt: DateTime
 └── isOriginal: bool (true only for the first version from STT)
+
+ImageAttachment (planned — Step 4.7)
+├── id: String (UUID)
+├── filePath: String (local path: Documents/images/[uuid].jpg)
+├── fileName: String (original or generated filename)
+├── caption: String? (optional user-entered caption)
+├── width: int (pixels, after crop/resize)
+├── height: int (pixels, after crop/resize)
+├── fileSizeBytes: int
+├── createdAt: DateTime
+└── sourceType: String ("gallery" | "camera")
+
+TaskItem (UI view model — NOT stored in Hive)
+├── type: TaskType (todo | action | reminder)
+├── id: String (the TodoItem, ActionItem, or ReminderItem id)
+├── text: String
+├── isCompleted: bool
+├── dueDate: DateTime? (for todos)
+├── reminderTime: DateTime? (for reminders)
+├── createdAt: DateTime
+├── sourceNoteId: String
+├── sourceNoteTitle: String
+└── sourceNoteDate: DateTime
 ```
 
 ---
@@ -348,6 +426,8 @@ TranscriptVersion
 | Microphone | Android, iOS | Voice recording |
 | Storage | Android | Save recordings locally |
 | Notifications | Android, iOS | Reminder alerts |
+| Camera | Android, iOS | Photo capture for image blocks/attachments (planned — Step 4.7) |
+| Photo Library | Android, iOS | Gallery access for image picker (planned — Step 4.7) |
 | Internet | Android, iOS | Transcription and AI processing (transactional only) |
 
 ---
@@ -358,7 +438,7 @@ TranscriptVersion
 |---|---|---|
 | **Purpose** | Organize / group notes | Compose / build a document from notes |
 | **Note relationship** | A note belongs to one folder | A note can appear in many project documents |
-| **Content** | Container of note references | Rich canvas: note transcripts + free text + headers |
+| **Content** | Container of note references | Rich canvas: note transcripts + free text + headers + images |
 | **Editing** | No editing within folder view | Full inline editing with version history |
 | **Structure** | Flat list of notes | Ordered, user-arranged blocks |
 
@@ -379,11 +459,24 @@ Both coexist — folders organize, projects compose.
 | Sentiment & urgency tagging | Phase 2 |
 | Voice search | Phase 2 |
 | Quick capture widget | Phase 2 |
-| Export (Markdown, PDF, plain text) | Phase 2 |
+| ~~Export (Markdown, plain text)~~ | ~~Phase 2~~ → **Phase 1** (Step 4.7 — Addendum A1) |
+| Export as PDF (formatted, professional) | Phase 2 |
+| Share audio file alongside transcript | Phase 2 |
+| Share with embedded images | Phase 2 |
 | AI-generated Project Document summary | Phase 2 |
 | AI-suggested note additions for projects | Phase 2 |
 | ~~Voice command to add note to project~~ | ~~Phase 2~~ → **Implemented in Phase 1** (v1.3.0) |
-| Project Document export (Markdown/PDF) | Phase 2 |
+| Recurring reminders | Phase 2 |
+| Push to Todoist / Apple Reminders API / Google Tasks API | Phase 2 |
+| Notification action buttons (Done / Snooze) | Phase 2 (if too complex for Phase 1 stretch) |
+| Task priority levels (Low / Medium / High) | Phase 2 |
+| AI auto-extraction of todos/actions from transcription | Phase 2 |
+| Smart due date extraction ("by Friday") | Phase 2 |
+| Task assignment (multi-user) | Phase 3 |
+| ~~Project Document export (Markdown/plain text)~~ | ~~Phase 2~~ → **Phase 1** (Step 4.7) |
+| Numbered lists, checklists in rich text | Phase 2 |
+| H3-H6 headings, inline images in text | Phase 2 |
+| Markdown source editing mode | Phase 2 |
 | Music note capture | Phase 3 |
 | Smart automations | Phase 3 |
 | Ambient listening mode | Phase 3 |
@@ -406,6 +499,13 @@ Both coexist — folders organize, projects compose.
 | Speech-to-text (live) | speech_to_text (on-device, free) |
 | Speech-to-text (whisper) | whisper_flutter_new (on-device, ggml-base model) |
 | Notifications | flutter_local_notifications |
+| OS calendar bridge | add_2_calendar (planned — Step 4.6) |
+| Sharing | share_plus (planned — Step 4.7) |
+| Rich text editor | flutter_quill (planned — Step 4.7) |
+| Image picker | image_picker (planned — Step 4.7) |
+| Image cropping | image_cropper (planned — Step 4.7) |
+| Image viewer | photo_view (planned — Step 4.7) |
+| Image compression | flutter_image_compress (planned — Step 4.7) |
 | Typography | Google Fonts (Plus Jakarta Sans, Inter) |
 | App icon | assets/icons/logo.png (launcher + in-app branding) |
 
@@ -429,4 +529,12 @@ Both coexist — folders organize, projects compose.
 | uuid | Unique ID generation | Active |
 | connectivity_plus | Network status monitoring | Active |
 | cupertino_icons | iOS-style icons | Active |
+| add_2_calendar | OS calendar event creation for hybrid reminders | Planned (Step 4.6) |
+| share_plus | Native OS share sheet for notes and project documents | Planned (Step 4.7) |
+| flutter_quill | Rich text editing and viewing for free-text blocks | Planned (Step 4.7) |
+| delta_to_markdown | Convert Quill Delta → Markdown for export | Planned (Step 4.7) |
+| image_picker | Gallery and camera photo selection | Planned (Step 4.7) |
+| image_cropper | Crop and resize UI before saving | Planned (Step 4.7) |
+| photo_view | Full-screen image viewer with pinch-to-zoom | Planned (Step 4.7) |
+| flutter_image_compress | Image compression and resizing | Planned (Step 4.7) |
 | hive_generator + build_runner | Hive model code generation (dev) | Active |
