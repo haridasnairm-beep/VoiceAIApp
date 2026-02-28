@@ -10,7 +10,7 @@ final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
 
 /// User settings state (derived from Hive UserSettings model).
 class SettingsState {
-  final String? defaultLanguage; // null = auto-detect
+  final String? defaultLanguage; // speaking language code ('en', 'hi', etc.)
   final String audioQuality; // 'standard' or 'high'
   final bool notificationsEnabled;
   final TimeOfDay? quietHoursStart;
@@ -22,9 +22,15 @@ class SettingsState {
   final String notePrefix; // Prefix for auto-generated note names
   final String? defaultFolderId; // ID of the default folder for new recordings
   final bool voiceCommandsEnabled; // Parse voice commands in whisper mode
+  final String textNotePrefix; // Prefix for auto-generated text note names
+  final bool actionItemsEnabled; // Show action items section in note detail
+  final bool todosEnabled; // Show todos section in note detail
+  final String whisperModel; // 'base', 'small', 'medium'
+  final String noteOutputMode; // 'english' or 'native'
+  final bool keepScreenAwake; // Keep screen on during recording
 
   const SettingsState({
-    this.defaultLanguage,
+    this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
     this.notificationsEnabled = true,
     this.quietHoursStart,
@@ -36,6 +42,12 @@ class SettingsState {
     this.notePrefix = 'VOICE',
     this.defaultFolderId,
     this.voiceCommandsEnabled = true,
+    this.textNotePrefix = 'TXT',
+    this.actionItemsEnabled = true,
+    this.todosEnabled = true,
+    this.whisperModel = 'base',
+    this.noteOutputMode = 'english',
+    this.keepScreenAwake = true,
   });
 
   SettingsState copyWith({
@@ -51,6 +63,12 @@ class SettingsState {
     String? notePrefix,
     String? Function()? defaultFolderId,
     bool? voiceCommandsEnabled,
+    String? textNotePrefix,
+    bool? actionItemsEnabled,
+    bool? todosEnabled,
+    String? whisperModel,
+    String? noteOutputMode,
+    bool? keepScreenAwake,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -68,6 +86,12 @@ class SettingsState {
       notePrefix: notePrefix ?? this.notePrefix,
       defaultFolderId: defaultFolderId != null ? defaultFolderId() : this.defaultFolderId,
       voiceCommandsEnabled: voiceCommandsEnabled ?? this.voiceCommandsEnabled,
+      textNotePrefix: textNotePrefix ?? this.textNotePrefix,
+      actionItemsEnabled: actionItemsEnabled ?? this.actionItemsEnabled,
+      todosEnabled: todosEnabled ?? this.todosEnabled,
+      whisperModel: whisperModel ?? this.whisperModel,
+      noteOutputMode: noteOutputMode ?? this.noteOutputMode,
+      keepScreenAwake: keepScreenAwake ?? this.keepScreenAwake,
     );
   }
 
@@ -117,7 +141,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
     }
 
     return SettingsState(
-      defaultLanguage: settings.defaultLanguage,
+      defaultLanguage: settings.defaultLanguage ?? 'en',
       audioQuality: settings.audioQuality,
       notificationsEnabled: settings.notificationsEnabled,
       quietHoursStart: quietStart,
@@ -129,6 +153,12 @@ class SettingsNotifier extends Notifier<SettingsState> {
       notePrefix: settings.notePrefix,
       defaultFolderId: settings.defaultFolderId,
       voiceCommandsEnabled: settings.voiceCommandsEnabled,
+      textNotePrefix: settings.textNotePrefix,
+      actionItemsEnabled: settings.actionItemsEnabled,
+      todosEnabled: settings.todosEnabled,
+      whisperModel: settings.whisperModel,
+      noteOutputMode: settings.noteOutputMode,
+      keepScreenAwake: settings.keepScreenAwake,
     );
   }
 
@@ -201,6 +231,36 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setVoiceCommandsEnabled(bool enabled) async {
     await ref.read(settingsRepositoryProvider).setVoiceCommandsEnabled(enabled);
     state = state.copyWith(voiceCommandsEnabled: enabled);
+  }
+
+  Future<void> setTextNotePrefix(String prefix) async {
+    await ref.read(settingsRepositoryProvider).setTextNotePrefix(prefix);
+    state = state.copyWith(textNotePrefix: prefix);
+  }
+
+  Future<void> setActionItemsEnabled(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setActionItemsEnabled(enabled);
+    state = state.copyWith(actionItemsEnabled: enabled);
+  }
+
+  Future<void> setTodosEnabled(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setTodosEnabled(enabled);
+    state = state.copyWith(todosEnabled: enabled);
+  }
+
+  Future<void> setWhisperModel(String model) async {
+    await ref.read(settingsRepositoryProvider).setWhisperModel(model);
+    state = state.copyWith(whisperModel: model);
+  }
+
+  Future<void> setNoteOutputMode(String mode) async {
+    await ref.read(settingsRepositoryProvider).setNoteOutputMode(mode);
+    state = state.copyWith(noteOutputMode: mode);
+  }
+
+  Future<void> setKeepScreenAwake(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setKeepScreenAwake(enabled);
+    state = state.copyWith(keepScreenAwake: enabled);
   }
 }
 

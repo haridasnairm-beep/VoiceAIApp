@@ -8,6 +8,7 @@ import '../providers/folders_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/hive_service.dart';
 import '../services/whisper_service.dart';
+import '../widgets/download_progress_sheet.dart';
 
 const _languageOptions = <String?, String>{
   null: 'Automatic',
@@ -55,7 +56,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _scrollToWhisperSection() async {
-    // Wait for layout
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
 
@@ -70,7 +70,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
 
     if (!mounted) return;
-    // Flash highlight
     setState(() => _showHighlight = true);
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
@@ -84,7 +83,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final notes = ref.watch(notesProvider);
     final folders = ref.watch(foldersProvider);
 
-    // Derive display strings from state
     final languageDisplay =
         _languageOptions[settings.defaultLanguage] ?? 'Automatic';
     final languageSublabel = settings.defaultLanguage == null
@@ -168,7 +166,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     iconBg: const Color(0xFFFCE4EC),
                     iconColor: const Color(0xFFC62828),
                     label: "Your Name",
-                    sublabel: "Used as speaker label in transcriptions",
+                    sublabel: "Speaker label",
                     type: _SettingsType.value,
                     valueText: settings.speakerName,
                     hasSublabel: true,
@@ -213,7 +211,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     iconBg: const Color(0xFFE8F5E9),
                     iconColor: const Color(0xFF2E7D32),
                     label: "Note Prefix",
-                    sublabel: "Auto-name: ${settings.notePrefix}001, ${settings.notePrefix}002...",
+                    sublabel: "${settings.notePrefix}001, ${settings.notePrefix}002...",
                     type: _SettingsType.value,
                     valueText: settings.notePrefix,
                     hasSublabel: true,
@@ -252,6 +250,54 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         ref
                             .read(settingsProvider.notifier)
                             .setNotePrefix(result);
+                      }
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _SettingsItem(
+                    icon: Icons.edit_note_rounded,
+                    iconBg: const Color(0xFFFFF3E0),
+                    iconColor: const Color(0xFFE65100),
+                    label: "Text Prefix",
+                    sublabel: "${settings.textNotePrefix}001, ${settings.textNotePrefix}002...",
+                    type: _SettingsType.value,
+                    valueText: settings.textNotePrefix,
+                    hasSublabel: true,
+                    onTap: () async {
+                      final controller = TextEditingController(
+                          text: settings.textNotePrefix);
+                      final result = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Text Note Prefix'),
+                          content: TextField(
+                            controller: controller,
+                            autofocus: true,
+                            maxLength: 10,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(
+                              hintText: 'e.g. TXT, NOTE, MEMO',
+                              border: OutlineInputBorder(),
+                              counterText: 'Max 10 characters',
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () =>
+                                  Navigator.pop(ctx, controller.text.trim()),
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (result != null && result.isNotEmpty) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setTextNotePrefix(result);
                       }
                     },
                   ),
@@ -382,8 +428,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     iconColor: const Color(0xFFF57C00),
                     label: "Audio Quality",
                     sublabel: settings.audioQuality == 'high'
-                        ? "Lossless audio, larger files"
-                        : "Smaller file size, good quality",
+                        ? "Lossless, larger files"
+                        : "Smaller size, good quality",
                     type: _SettingsType.value,
                     valueText: audioQualityDisplay,
                     hasSublabel: true,
@@ -481,7 +527,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         return;
                       }
 
-                      // Whisper selected — check if model is downloaded
                       final modelReady = await WhisperService.instance.isModelDownloaded();
                       if (modelReady) {
                         if (!context.mounted) return;
@@ -489,7 +534,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         return;
                       }
 
-                      // Model not downloaded — ask user to download
                       if (!context.mounted) return;
                       final confirmDownload = await showDialog<bool>(
                         context: context,
@@ -515,12 +559,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                       if (confirmDownload != true || !context.mounted) return;
 
-                      // Show download progress dialog
-                      final success = await showDialog<bool>(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (ctx) => _WhisperDownloadDialog(),
-                      );
+                      final success = await showDownloadSheet(context, modelName: 'base');
 
                       if (success == true && context.mounted) {
                         ref.read(settingsProvider.notifier).setTranscriptionMode('whisper');
@@ -533,7 +572,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       } else if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Download failed. Please check your connection and try again.'),
+                            content: Text('Download couldn\'t be completed. Tap on Whisper Model to try again.'),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
@@ -570,7 +609,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       iconBg: const Color(0xFFE3F2FD),
                       iconColor: const Color(0xFF1565C0),
                       label: "Default Folder",
-                      sublabel: "New recordings are saved here",
+                      sublabel: "New recordings saved here",
                       type: _SettingsType.value,
                       valueText: folderName,
                       hasSublabel: true,
@@ -621,7 +660,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     iconColor: const Color(0xFF7B1FA2),
                     label: "Voice Commands",
                     sublabel:
-                        'Say "Folder/Project <name> Start" to auto-organize',
+                        'Say "Folder/Project <name> Start"',
                     type: _SettingsType.toggle,
                     switchValue: settings.voiceCommandsEnabled,
                     hasSublabel: true,
@@ -634,91 +673,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ],
               ),
 
-              // Storage Usage
-              Container(
-                margin: const EdgeInsets.only(bottom: 32),
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: Theme.of(context).dividerColor),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Local Storage",
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                        ),
-                        Text(
-                          "${notes.length} notes · ${folders.length} folders",
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.secondary,
-                              ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    FutureBuilder<String>(
-                      future: HiveService.getStorageUsage(),
-                      builder: (context, snapshot) {
-                        final usage = snapshot.data ?? 'Calculating...';
-                        return Row(
-                          children: [
-                            Icon(Icons.storage_rounded,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 16),
-                            const SizedBox(width: 8),
-                            Text(
-                              "Storage used: $usage",
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded,
-                            color: Theme.of(context).hintColor, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "Your voice notes are stored locally on this device.",
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color:
-                                      Theme.of(context).colorScheme.secondary,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              // Storage Usage — detailed breakdown
+              _StorageBreakdownSection(
+                noteCount: notes.length,
+                folderCount: folders.length,
               ),
 
               // Support Group
@@ -737,6 +695,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       context.push(AppRoutes.onboarding);
                     },
                   ),
+                  const Divider(height: 1, indent: 56),
+                  _SettingsItem(
+                    icon: Icons.feedback_outlined,
+                    iconBg: const Color(0xFFFFF3E0),
+                    iconColor: const Color(0xFFF57C00),
+                    label: "Send Feedback",
+                    sublabel: "Bug reports, ideas & suggestions",
+                    type: _SettingsType.chevron,
+                    hasSublabel: true,
+                    onTap: () {
+                      context.push(AppRoutes.feedback);
+                    },
+                  ),
+                ],
+              ),
+
+              // About
+              _SettingsGroup(
+                title: "ABOUT",
+                children: [
+                  _SettingsItem(
+                    icon: Icons.info_outline_rounded,
+                    iconBg: const Color(0xFFF3E5F5),
+                    iconColor: const Color(0xFF7B1FA2),
+                    label: "About VoiceNotes AI",
+                    sublabel: "App info, credits & support",
+                    type: _SettingsType.chevron,
+                    hasSublabel: true,
+                    onTap: () {
+                      context.push(AppRoutes.about);
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _SettingsItem(
+                    icon: Icons.shield_outlined,
+                    iconBg: const Color(0xFFE8F5E9),
+                    iconColor: const Color(0xFF2E7D32),
+                    label: "Privacy & Data Policy",
+                    sublabel: "How your data is handled",
+                    type: _SettingsType.chevron,
+                    hasSublabel: true,
+                    onTap: () {
+                      context.push(AppRoutes.privacyPolicy);
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _SettingsItem(
+                    icon: Icons.description_outlined,
+                    iconBg: const Color(0xFFE3F2FD),
+                    iconColor: const Color(0xFF1565C0),
+                    label: "Terms & Conditions",
+                    sublabel: "Usage terms and legal info",
+                    type: _SettingsType.chevron,
+                    hasSublabel: true,
+                    onTap: () {
+                      context.push(AppRoutes.termsConditions);
+                    },
+                  ),
                 ],
               ),
 
@@ -745,80 +761,161 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 title: "DANGER ZONE",
                 titleColor: Theme.of(context).colorScheme.error,
                 children: [
-                  _SettingsItem(
+                  _DangerItem(
+                    icon: Icons.delete_outline_rounded,
+                    label: "Delete Whisper Model",
+                    sublabel: "Free up ~140 MB of storage",
+                    onTap: () => _confirmDeleteWhisperModel(context),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _DangerItem(
+                    icon: Icons.graphic_eq_rounded,
+                    label: "Delete Voice Recordings",
+                    sublabel: "Remove all audio files, keep text",
+                    onTap: () => _confirmDeleteRecordings(context),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _DangerItem(
                     icon: Icons.delete_forever_rounded,
-                    iconBg: const Color(0xFFFFEBEE),
-                    iconColor: const Color(0xFFD32F2F),
                     label: "Delete All Data",
-                    sublabel: "Permanently remove all notes and settings",
-                    type: _SettingsType.chevron,
-                    hasSublabel: true,
-                    onTap: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) {
-                          return AlertDialog(
-                            title: const Text('Delete All Data'),
-                            content: const Text(
-                              'This will permanently delete all your voice notes, folders, and settings. This action cannot be undone.',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, true),
-                                style: TextButton.styleFrom(
-                                  foregroundColor:
-                                      Theme.of(context).colorScheme.error,
-                                ),
-                                child: const Text('Delete'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                      if (confirmed == true && context.mounted) {
-                        await HiveService.deleteAllData();
-                        if (context.mounted) {
-                          context.go(AppRoutes.home);
-                        }
-                      }
-                    },
+                    sublabel: "Remove everything permanently",
+                    isDestructive: true,
+                    onTap: () => _confirmDeleteAllData(context),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 16),
-              Center(
-                child: Column(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.asset(
-                        'assets/icons/logo.png',
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "VoiceNotes AI v1.0.0",
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(context).hintColor,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 32),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteWhisperModel(BuildContext context) async {
+    final isDownloaded = await WhisperService.instance.isModelDownloaded();
+    if (!isDownloaded) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No Whisper model to delete.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Whisper Model'),
+        content: const Text(
+          'This will delete the downloaded Whisper AI model (~140 MB). '
+          'You will need to re-download it to use Record & Transcribe mode.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await WhisperService.instance.deleteModel();
+      // Switch to live mode if currently using whisper
+      final settings = ref.read(settingsProvider);
+      if (settings.transcriptionMode == 'whisper') {
+        ref.read(settingsProvider.notifier).setTranscriptionMode('live');
+      }
+      if (mounted) {
+        setState(() {}); // Refresh storage
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Whisper model deleted.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteRecordings(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Voice Recordings'),
+        content: const Text(
+          'This will permanently delete all audio recording files. '
+          'Your text notes and transcriptions will be preserved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete Recordings'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await HiveService.deleteAllRecordings();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All voice recordings deleted.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteAllData(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Delete All Data'),
+          content: const Text(
+            'This will permanently delete all your voice notes, folders, and settings. This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true && context.mounted) {
+      await HiveService.deleteAllData();
+      if (context.mounted) {
+        context.go(AppRoutes.home);
+      }
+    }
   }
 }
 
@@ -900,6 +997,11 @@ class _SettingsItem extends StatelessWidget {
     this.onTap,
   });
 
+  String _truncateValue(String value) {
+    if (value.length <= 6) return value;
+    return '${value.substring(0, 6)}..';
+  }
+
   @override
   Widget build(BuildContext context) {
     final content = Padding(
@@ -934,6 +1036,7 @@ class _SettingsItem extends StatelessWidget {
                     sublabel!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.secondary,
+                          fontSize: 11,
                         ),
                   ),
               ],
@@ -949,19 +1052,12 @@ class _SettingsItem extends StatelessWidget {
             Icon(Icons.chevron_right_rounded,
                 color: Theme.of(context).hintColor, size: 20)
           else if (type == _SettingsType.value)
-            Row(
-              children: [
-                Text(
-                  valueText ?? "",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-                const SizedBox(width: 8),
-                Icon(Icons.chevron_right_rounded,
-                    color: Theme.of(context).hintColor, size: 20),
-              ],
+            Text(
+              _truncateValue(valueText ?? ""),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
         ],
       ),
@@ -976,6 +1072,250 @@ class _SettingsItem extends StatelessWidget {
     }
 
     return content;
+  }
+}
+
+/// Danger zone item with alarming red/orange tint.
+class _DangerItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String sublabel;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  const _DangerItem({
+    required this.icon,
+    required this.label,
+    required this.sublabel,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        color: isDestructive ? const Color(0x22FF5722) : const Color(0x10FF5722),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Center(
+                child: Icon(icon, color: const Color(0xFFD32F2F), size: 20),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                  ),
+                  Text(
+                    sublabel,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.secondary,
+                          fontSize: 11,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: Theme.of(context).hintColor, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Storage breakdown section showing Whisper model, recordings, and text data sizes.
+class _StorageBreakdownSection extends StatefulWidget {
+  final int noteCount;
+  final int folderCount;
+
+  const _StorageBreakdownSection({
+    required this.noteCount,
+    required this.folderCount,
+  });
+
+  @override
+  State<_StorageBreakdownSection> createState() =>
+      _StorageBreakdownSectionState();
+}
+
+class _StorageBreakdownSectionState extends State<_StorageBreakdownSection> {
+  Map<String, int>? _breakdown;
+  int _whisperBytes = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBreakdown();
+  }
+
+  Future<void> _loadBreakdown() async {
+    final breakdown = await HiveService.getStorageBreakdown();
+    final whisperSize = await WhisperService.instance.getModelSizeBytes();
+    if (mounted) {
+      setState(() {
+        _breakdown = breakdown;
+        _whisperBytes = whisperSize;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final total = (_breakdown?['total'] ?? 0) + _whisperBytes;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 32),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Local Storage",
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                "${widget.noteCount} notes · ${widget.folderCount} folders",
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Total
+          _StorageRow(
+            icon: Icons.storage_rounded,
+            color: theme.colorScheme.primary,
+            label: 'Total',
+            size: HiveService.formatBytes(total),
+          ),
+          const SizedBox(height: 10),
+          // Whisper Model
+          _StorageRow(
+            icon: Icons.downloading_rounded,
+            color: const Color(0xFFE65100),
+            label: 'Whisper Model',
+            size: _whisperBytes > 0
+                ? HiveService.formatBytes(_whisperBytes)
+                : 'Not installed',
+          ),
+          const SizedBox(height: 10),
+          // Voice Recordings
+          _StorageRow(
+            icon: Icons.graphic_eq_rounded,
+            color: const Color(0xFF2E7D32),
+            label: 'Voice Recordings',
+            size: HiveService.formatBytes(_breakdown?['recordings'] ?? 0),
+          ),
+          const SizedBox(height: 10),
+          // Text & Database
+          _StorageRow(
+            icon: Icons.text_snippet_rounded,
+            color: const Color(0xFF1565C0),
+            label: 'Notes & Database',
+            size: HiveService.formatBytes(_breakdown?['hive'] ?? 0),
+          ),
+          if ((_breakdown?['images'] ?? 0) > 0) ...[
+            const SizedBox(height: 10),
+            _StorageRow(
+              icon: Icons.image_rounded,
+              color: const Color(0xFF7B1FA2),
+              label: 'Images',
+              size: HiveService.formatBytes(_breakdown?['images'] ?? 0),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded,
+                  color: theme.hintColor, size: 14),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  "All data is stored locally on this device.",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.secondary,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StorageRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String size;
+
+  const _StorageRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+        ),
+        Text(
+          size,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.secondary,
+                fontWeight: FontWeight.w500,
+              ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1037,7 +1377,7 @@ class _WhisperModelStatusItemState extends State<_WhisperModelStatusItem> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content:
-              Text('Download failed. Please check your connection and retry.'),
+              Text('Download couldn\'t be completed. Tap on Whisper Model to try again.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -1060,7 +1400,7 @@ class _WhisperModelStatusItemState extends State<_WhisperModelStatusItem> {
       sublabel = 'Checking...';
     } else if (_isDownloading) {
       trailing = SizedBox(
-        width: 120,
+        width: 100,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1080,60 +1420,61 @@ class _WhisperModelStatusItemState extends State<_WhisperModelStatusItem> {
           ],
         ),
       );
-      sublabel = 'Downloading ~140 MB...';
+      sublabel = 'Downloading...';
     } else if (_isDownloaded) {
-      trailing = Icon(
+      trailing = const Icon(
         Icons.check_circle_rounded,
-        color: const Color(0xFF2E7D32),
+        color: Color(0xFF2E7D32),
         size: 22,
       );
       sublabel = 'Ready to use';
     } else {
-      trailing = FilledButton.tonal(
+      trailing = IconButton(
         onPressed: _startDownload,
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        child: const Text('Download'),
+        icon: const Icon(Icons.download_rounded),
+        color: theme.colorScheme.primary,
+        tooltip: 'Download (~140 MB)',
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
       );
-      sublabel = 'One-time download (~140 MB)';
+      sublabel = 'Not downloaded (~140 MB)';
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: const Color(0xFFFFF3E0),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: const Icon(
-              Icons.downloading_rounded,
-              color: Color(0xFFE65100),
-              size: 20,
+            child: const Center(
+              child: Icon(
+                Icons.downloading_rounded,
+                color: Color(0xFFE65100),
+                size: 20,
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Whisper Model',
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
                   sublabel,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.hintColor,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -1146,71 +1487,3 @@ class _WhisperModelStatusItemState extends State<_WhisperModelStatusItem> {
   }
 }
 
-/// Dialog that downloads the Whisper model with a progress indicator.
-class _WhisperDownloadDialog extends StatefulWidget {
-  @override
-  State<_WhisperDownloadDialog> createState() => _WhisperDownloadDialogState();
-}
-
-class _WhisperDownloadDialogState extends State<_WhisperDownloadDialog> {
-  double _progress = 0.0;
-  bool _downloading = true;
-  String _statusText = 'Connecting...';
-
-  @override
-  void initState() {
-    super.initState();
-    _startDownload();
-  }
-
-  Future<void> _startDownload() async {
-    final success = await WhisperService.instance.downloadModel(
-      onProgress: (progress) {
-        if (!mounted) return;
-        setState(() {
-          _progress = progress;
-          final percent = (progress * 100).toInt();
-          _statusText = 'Downloading... $percent%';
-        });
-      },
-    );
-
-    if (!mounted) return;
-    setState(() => _downloading = false);
-    Navigator.of(context).pop(success);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: const Text('Downloading Whisper Model'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            LinearProgressIndicator(
-              value: _downloading ? (_progress > 0 ? _progress : null) : 1.0,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _statusText,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '~140 MB',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).hintColor,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

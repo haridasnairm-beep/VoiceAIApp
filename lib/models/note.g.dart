@@ -36,13 +36,15 @@ class NoteAdapter extends TypeAdapter<Note> {
       hasFollowUpTrigger: fields[16] as bool,
       transcriptVersions: (fields[17] as List?)?.cast<TranscriptVersion>(),
       projectDocumentIds: (fields[18] as List?)?.cast<String>(),
+      imageAttachmentIds: (fields[19] as List?)?.cast<String>(),
+      contentFormat: fields[20] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Note obj) {
     writer
-      ..writeByte(19)
+      ..writeByte(21)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -80,7 +82,11 @@ class NoteAdapter extends TypeAdapter<Note> {
       ..writeByte(17)
       ..write(obj.transcriptVersions)
       ..writeByte(18)
-      ..write(obj.projectDocumentIds);
+      ..write(obj.projectDocumentIds)
+      ..writeByte(19)
+      ..write(obj.imageAttachmentIds)
+      ..writeByte(20)
+      ..write(obj.contentFormat);
   }
 
   @override

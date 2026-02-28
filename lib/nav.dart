@@ -7,12 +7,21 @@ import 'pages/recording_page.dart';
 import 'pages/note_detail_page.dart';
 import 'pages/folders_page.dart';
 import 'pages/folder_detail_page.dart';
-import 'pages/settings_page.dart';
+import 'pages/preferences_page.dart';
+import 'pages/audio_settings_page.dart';
+import 'pages/storage_page.dart';
+import 'pages/support_page.dart';
+import 'pages/danger_zone_page.dart';
 import 'pages/search_page.dart';
 import 'pages/project_documents_page.dart';
 import 'pages/project_document_detail_page.dart';
 import 'pages/note_picker_page.dart';
 import 'pages/version_history_page.dart';
+import 'pages/privacy_policy_page.dart';
+import 'pages/terms_conditions_page.dart';
+import 'pages/about_page.dart';
+import 'pages/feedback_page.dart';
+import 'pages/support_us_page.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -88,6 +97,11 @@ class AppRouter {
             final f = extra['folderId'];
             if (f is String && f.isNotEmpty) folderId = f;
           }
+          bool isNewTextNote = false;
+          if (extra is Map) {
+            final txt = extra['isNewTextNote'];
+            if (txt == true) isNewTextNote = true;
+          }
           return NoTransitionPage(
               child: NoteDetailPage(
             recordingPath: recordingPath,
@@ -96,6 +110,7 @@ class AppRouter {
             duration: duration,
             detectedLanguage: detectedLanguage,
             folderId: folderId,
+            isNewTextNote: isNewTextNote,
           ));
         },
       ),
@@ -121,8 +136,15 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: AppRoutes.settings,
-        name: 'settings',
+        path: AppRoutes.preferences,
+        name: 'preferences',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: PreferencesPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.audioSettings,
+        name: 'audio_settings',
         pageBuilder: (context, state) {
           final extra = state.extra;
           bool highlightWhisper = false;
@@ -131,16 +153,43 @@ class AppRouter {
             if (h == true) highlightWhisper = true;
           }
           return NoTransitionPage(
-            child: SettingsPage(highlightWhisper: highlightWhisper),
+            child: AudioSettingsPage(highlightWhisper: highlightWhisper),
           );
         },
       ),
       GoRoute(
+        path: AppRoutes.storage,
+        name: 'storage',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: StoragePage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.support,
+        name: 'support',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: SupportPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.dangerZone,
+        name: 'danger_zone',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: DangerZonePage(),
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.search,
         name: 'search',
-        pageBuilder: (context, state) => const NoTransitionPage(
-          child: SearchPage(),
-        ),
+        pageBuilder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return NoTransitionPage(
+            child: SearchPage(
+              initialFolderId: extras?['folderId'] as String?,
+              initialProjectId: extras?['projectId'] as String?,
+            ),
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.projectDocuments,
@@ -194,6 +243,41 @@ class AppRouter {
           );
         },
       ),
+      GoRoute(
+        path: AppRoutes.privacyPolicy,
+        name: 'privacy_policy',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: PrivacyPolicyPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.termsConditions,
+        name: 'terms_conditions',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: TermsConditionsPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.about,
+        name: 'about',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: AboutPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.feedback,
+        name: 'feedback',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: FeedbackPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.supportUs,
+        name: 'support_us',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: SupportUsPage(),
+        ),
+      ),
     ],
   );
 }
@@ -207,10 +291,19 @@ class AppRoutes {
   static const String noteDetail = '/note_detail';
   static const String folders = '/folders';
   static const String folderDetail = '/folder_detail';
-  static const String settings = '/settings';
+  static const String preferences = '/preferences';
+  static const String audioSettings = '/audio_settings';
+  static const String storage = '/storage';
+  static const String support = '/support';
+  static const String dangerZone = '/danger_zone';
   static const String search = '/search';
   static const String projectDocuments = '/project_documents';
   static const String projectDocumentDetail = '/project_document_detail';
   static const String notePickerRoute = '/note_picker';
   static const String versionHistory = '/version_history';
+  static const String privacyPolicy = '/privacy_policy';
+  static const String termsConditions = '/terms_conditions';
+  static const String about = '/about';
+  static const String feedback = '/feedback';
+  static const String supportUs = '/support_us';
 }

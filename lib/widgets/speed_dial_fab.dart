@@ -112,6 +112,9 @@ class _SpeedDialFabState extends State<SpeedDialFab>
         onItemTap: _closeImmediate,
         right: right,
         bottom: bottom,
+        fabRight: right,
+        fabBottom: screenSize.height - fabPos.dy - fabSize.height,
+        onFabTap: _toggle,
       ),
     );
     Overlay.of(context).insert(_overlayEntry!);
@@ -155,6 +158,9 @@ class _SpeedDialOverlay extends StatelessWidget {
   final VoidCallback onItemTap;
   final double right;
   final double bottom;
+  final double fabRight;
+  final double fabBottom;
+  final VoidCallback onFabTap;
 
   const _SpeedDialOverlay({
     required this.controller,
@@ -163,6 +169,9 @@ class _SpeedDialOverlay extends StatelessWidget {
     required this.onItemTap,
     required this.right,
     required this.bottom,
+    required this.fabRight,
+    required this.fabBottom,
+    required this.onFabTap,
   });
 
   @override
@@ -187,6 +196,29 @@ class _SpeedDialOverlay extends StatelessWidget {
                   child: ColoredBox(
                     color: Colors.black
                         .withValues(alpha: controller.value * 0.3),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Main FAB rendered above the blur scrim
+          Positioned(
+            right: fabRight,
+            bottom: fabBottom,
+            child: AnimatedBuilder(
+              animation: controller,
+              builder: (context, child) => FloatingActionButton(
+                heroTag: 'speed_dial_overlay',
+                elevation: 6,
+                backgroundColor: colorScheme.primary,
+                onPressed: onFabTap,
+                child: Transform.rotate(
+                  angle: controller.value * 0.785398,
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: colorScheme.onPrimary,
+                    size: 28,
                   ),
                 ),
               ),

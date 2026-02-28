@@ -13,6 +13,7 @@ import '../models/user_settings.dart';
 import '../models/project_document.dart';
 import '../models/project_block.dart';
 import '../models/transcript_version.dart';
+import '../models/image_attachment.dart';
 
 /// Central Hive database service.
 /// Handles initialization, encryption, and box management.
@@ -21,6 +22,7 @@ class HiveService {
   static const String _foldersBox = 'folders';
   static const String _settingsBox = 'settings';
   static const String _projectDocumentsBox = 'project_documents';
+  static const String _imageAttachmentsBox = 'image_attachments';
   static const String _encryptionKeyBox = 'encryption_key';
 
   static bool _initialized = false;
@@ -43,6 +45,7 @@ class HiveService {
     Hive.registerAdapter(ProjectBlockAdapter());
     Hive.registerAdapter(BlockTypeAdapter());
     Hive.registerAdapter(TranscriptVersionAdapter());
+    Hive.registerAdapter(ImageAttachmentAdapter());
 
     // Get or create encryption key
     final encryptionKey = await _getEncryptionKey();
@@ -56,6 +59,15 @@ class HiveService {
         encryptionCipher: HiveAesCipher(encryptionKey));
     await Hive.openBox<ProjectDocument>(_projectDocumentsBox,
         encryptionCipher: HiveAesCipher(encryptionKey));
+    await Hive.openBox<ImageAttachment>(_imageAttachmentsBox,
+        encryptionCipher: HiveAesCipher(encryptionKey));
+
+    // Ensure images directory exists
+    final appDir = await getApplicationDocumentsDirectory();
+    final imagesDir = Directory('${appDir.path}/images');
+    if (!await imagesDir.exists()) {
+      await imagesDir.create(recursive: true);
+    }
 
     _initialized = true;
     debugPrint('HiveService: initialized with encrypted boxes');
@@ -91,10 +103,96 @@ class HiveService {
   static Box<ProjectDocument> get projectDocumentsBox =>
       Hive.box<ProjectDocument>(_projectDocumentsBox);
 
+  /// Get the image attachments box.
+  static Box<ImageAttachment> get imageAttachmentsBox =>
+      Hive.box<ImageAttachment>(_imageAttachmentsBox);
+
   /// Close all boxes.
   static Future<void> close() async {
     await Hive.close();
     _initialized = false;
+  }
+
+  /// Get a breakdown of storage usage: {hive, recordings, images, total} in bytes.
+  static Future<Map<String, int>> getStorageBreakdown() async {
+    int hiveBytes = 0;
+    int recordingsBytes = 0;
+    int imagesBytes = 0;
+
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+
+      // Hive box files
+      final hiveDir = Directory(appDir.path);
+      if (await hiveDir.exists()) {
+        await for (final entity in hiveDir.list()) {
+          if (entity is File && entity.path.endsWith('.hive')) {
+            hiveBytes += await entity.length();
+          }
+        }
+      }
+
+      // Recordings
+      final recordingsDir = Directory('${appDir.path}/recordings');
+      if (await recordingsDir.exists()) {
+        await for (final entity in recordingsDir.list()) {
+          if (entity is File) {
+            recordingsBytes += await entity.length();
+          }
+        }
+      }
+
+      // Images
+      final imagesDir = Directory('${appDir.path}/images');
+      if (await imagesDir.exists()) {
+        await for (final entity in imagesDir.list()) {
+          if (entity is File) {
+            imagesBytes += await entity.length();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('HiveService.getStorageBreakdown failed: $e');
+    }
+
+    return {
+      'hive': hiveBytes,
+      'recordings': recordingsBytes,
+      'images': imagesBytes,
+      'total': hiveBytes + recordingsBytes + imagesBytes,
+    };
+  }
+
+  /// Format bytes into human-readable string.
+  static String formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  /// Delete all voice recording files (preserves notes/text data).
+  static Future<void> deleteAllRecordings() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final recordingsDir = Directory('${appDir.path}/recordings');
+      if (await recordingsDir.exists()) {
+        await recordingsDir.delete(recursive: true);
+        await recordingsDir.create(recursive: true);
+      }
+      // Mark notes as having no audio (set duration to 0)
+      for (final note in notesBox.values) {
+        if (note.audioFilePath.isNotEmpty) {
+          note.audioDurationSeconds = 0;
+          await note.save();
+        }
+      }
+      debugPrint('HiveService: all recordings deleted');
+    } catch (e) {
+      debugPrint('HiveService.deleteAllRecordings failed: $e');
+    }
   }
 
   /// Calculate total storage used by the app (Hive data + recordings).
@@ -117,6 +215,16 @@ class HiveService {
       final recordingsDir = Directory('${appDir.path}/recordings');
       if (await recordingsDir.exists()) {
         await for (final entity in recordingsDir.list()) {
+          if (entity is File) {
+            totalBytes += await entity.length();
+          }
+        }
+      }
+
+      // Images directory
+      final imagesDir = Directory('${appDir.path}/images');
+      if (await imagesDir.exists()) {
+        await for (final entity in imagesDir.list()) {
           if (entity is File) {
             totalBytes += await entity.length();
           }
@@ -185,10 +293,11 @@ class HiveService {
       return;
     }
 
-    // Create "General" folder
+    // Create "General" folder (protected from rename/delete)
     final folder = Folder(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: 'General',
+      isAutoGenerated: true,
     );
     await foldersBox.put(folder.id, folder);
     settings.defaultFolderId = folder.id;
@@ -203,6 +312,20 @@ class HiveService {
     await foldersBox.clear();
     await settingsBox.clear();
     await projectDocumentsBox.clear();
+    await imageAttachmentsBox.clear();
+
+    // Delete image files
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final imagesDir = Directory('${appDir.path}/images');
+      if (await imagesDir.exists()) {
+        await imagesDir.delete(recursive: true);
+        await imagesDir.create(recursive: true);
+      }
+    } catch (e) {
+      debugPrint('HiveService.deleteAllData: failed to delete images: $e');
+    }
+
     debugPrint('HiveService: all data deleted');
   }
 }

@@ -65,6 +65,12 @@ class Note extends HiveObject {
   @HiveField(18)
   List<String> projectDocumentIds;
 
+  @HiveField(19)
+  List<String> imageAttachmentIds;
+
+  @HiveField(20)
+  String? contentFormat; // null/'plain' = plain text, 'quill_delta' = rich text JSON
+
   Note({
     required this.id,
     required this.title,
@@ -85,6 +91,8 @@ class Note extends HiveObject {
     this.hasFollowUpTrigger = false,
     List<TranscriptVersion>? transcriptVersions,
     List<String>? projectDocumentIds,
+    List<String>? imageAttachmentIds,
+    this.contentFormat,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         topics = topics ?? [],
@@ -93,5 +101,6 @@ class Note extends HiveObject {
         reminders = reminders ?? [],
         generalNotes = generalNotes ?? [],
         transcriptVersions = transcriptVersions ?? [],
-        projectDocumentIds = projectDocumentIds ?? [];
+        projectDocumentIds = projectDocumentIds ?? [],
+        imageAttachmentIds = imageAttachmentIds ?? [];
 }

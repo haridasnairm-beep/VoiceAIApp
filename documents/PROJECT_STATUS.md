@@ -1,8 +1,8 @@
 # VoiceNotes AI - Project Status
 
-**Last Updated:** 2026-02-27
-**Current Version:** 1.4.0 (Phase 1 MVP + Project Documents + Voice Commands + Library Merge + Whisper UX)
-**Overall Progress:** Phase 1 Complete (100%) — Steps 4.6 (Tasks & Reminders) and 4.7 (Sharing, Rich Text & Images) approved
+**Last Updated:** 2026-03-01
+**Current Version:** 1.12.0 (Phase 1 MVP + rich text persistence fix + Whisper noise filters + project view rich text)
+**Overall Progress:** Phase 1 Complete (100%) — All features working. Rich text editing persists correctly. Whisper transcription filters noise artifacts. Project documents show rich text formatting. Model picker shows download status.
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -122,41 +122,41 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 
 ---
 
-## Step 4.6 — Interactive Tasks & Reminder Enhancement ⏳ APPROVED
+## Step 4.6 — Interactive Tasks & Reminder Enhancement ✅ COMPLETED
 
-**Status:** Approved for Development | **Effort:** Medium-Large | **Spec:** [FEATURE_TASKS_AND_REMINDERS.md](FEATURE_TASKS_AND_REMINDERS.md)
+**Status:** Complete | **Effort:** Medium-Large | **Spec:** [FEATURE_TASKS_AND_REMINDERS.md](FEATURE_TASKS_AND_REMINDERS.md)
 
 | Sub-step | Description | Status |
 |---|---|---|
-| A | Interactive Checkboxes on Note Detail (toggle, strikethrough, manual create, CRUD) | ⏳ Pending |
-| B | Checkboxes in Project Document Blocks (collapsible tasks sub-section) | ⏳ Pending |
-| C | Aggregated Tasks View (Home tab, tasksProvider, filters, sorting) | ⏳ Pending |
-| D | Reminder Enhancement (add_2_calendar, OS bridge, reschedule) | ⏳ Pending |
-| E | Polish & Integration (sync, testing, accessibility) | ⏳ Pending |
+| A | Data Layer — 8 CRUD methods in NotesRepository + NotesProvider + reschedule | ✅ Done |
+| B | Interactive Checkboxes on Note Detail (toggle, strikethrough, manual create, CRUD) | ✅ Done |
+| C | Checkboxes in Project Document Blocks (collapsible tasks sub-section) | ✅ Done |
+| D | Aggregated Tasks View (Home tab, tasksProvider, filters, sorting) | ✅ Done |
+| E | Dependency, OS reminder service, polish & build verified | ✅ Done |
 
-**New files to create:** 9 (task_item model, tasks_provider, 6 widgets, os_reminder_service)
-**Files to modify:** 7 (note_detail, home, note_reference_block, notes_repository, notes_provider, notification_service, pubspec.yaml)
-**New dependency:** `add_2_calendar` (cross-platform OS calendar event creation)
+**Created:** 6 files (task_item model, tasks_provider, tasks_tab, task_list_item, reminder_destination_sheet, os_reminder_service)
+**Modified:** 6 files (notes_repository, notes_provider, note_detail, home, project_document_detail, pubspec.yaml)
+**New dependency:** `add_2_calendar: ^3.0.1`
 
 ---
 
-## Step 4.7 — Sharing, Rich Text & Image Blocks ⏳ APPROVED
+## Step 4.7 — Sharing, Rich Text & Image Blocks ✅ COMPLETED
 
-**Status:** Approved for Development | **Effort:** Large | **Spec:** [FEATURE_PROJECT_DOCUMENTS.md — Addendum A](FEATURE_PROJECT_DOCUMENTS.md)
+**Status:** Complete | **Effort:** Large | **Spec:** [FEATURE_PROJECT_DOCUMENTS.md — Addendum A](FEATURE_PROJECT_DOCUMENTS.md)
 
 | Sub-step | Description | Status |
 |---|---|---|
-| A | Data Model & Storage Extensions (ImageAttachment model, BlockType update, HiveField additions) | ⏳ Pending |
-| B | Repository & Provider Extensions (ImageAttachmentRepository, SharingService) | ⏳ Pending |
-| C | UI — Sharing & Export (share notes/projects via share_plus, export .md/.txt) | ⏳ Pending |
-| D | UI — Rich Text Formatting (flutter_quill editor, formatting toolbar, Quill Delta storage) | ⏳ Pending |
-| E | UI — Image Blocks in Projects (image_picker, image_cropper, photo_view, full-screen viewer) | ⏳ Pending |
-| F | Note Detail — Photo Attachments (attachments section, add/view/delete photos) | ⏳ Pending |
-| G | Integration & Polish (cleanup on delete, storage display update, edge cases) | ⏳ Pending |
+| A | Data Model & Storage Extensions (ImageAttachment model, BlockType update, HiveField additions) | ✅ Done |
+| B | Repository & Provider Extensions (ImageAttachmentRepository, SharingService) | ✅ Done |
+| C | UI — Sharing & Export (share notes/projects via share_plus, export .md/.txt) | ✅ Done |
+| D | UI — Rich Text Formatting (flutter_quill editor, formatting toolbar, Quill Delta storage) | ✅ Done |
+| E | UI — Image Blocks in Projects (image_picker, photo_view, full-screen viewer) | ✅ Done |
+| F | Note Detail — Photo Attachments (attachments section, add/view/delete photos) | ✅ Done |
+| G | Integration & Polish (cleanup on delete, storage display update, build verified) | ✅ Done |
 
-**New files to create:** 8 (image_attachment model, image repo, sharing service, image processing service, 4 widgets/pages)
-**Files to modify:** 11 (project_block, note, hive_service, project_documents_repo, notes_repo, project_documents_provider, project_document_detail, note_detail, free_text_block, settings, pubspec.yaml)
-**New dependencies:** `share_plus`, `flutter_quill`, `delta_to_markdown`, `image_picker`, `image_cropper`, `photo_view`, `flutter_image_compress`
+**Created:** 6 files (image_attachment model, image repo, sharing service, image_block_widget, note_attachments_section, image_viewer_page)
+**Modified:** 10 files (project_block, note, hive_service, project_documents_repo, notes_repo, project_documents_provider, notes_provider, project_document_detail, note_detail, pubspec.yaml)
+**New dependencies:** `share_plus`, `flutter_quill`, `image_picker`, `image_cropper`, `photo_view`, `flutter_image_compress`
 
 ---
 
@@ -247,6 +247,28 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 31. Audio player hidden for live transcription notes (no audio file)
 32. Reminders section hidden when notifications disabled in settings
 33. Whisper transcription failure feedback (SnackBar warning)
+34. Interactive action item checkboxes on Note Detail (toggle complete with strikethrough)
+35. Interactive todo checkboxes on Note Detail with due date badges and overdue highlighting
+36. Manual task creation — "Add Action" and "Add Todo" buttons with creation dialogs
+37. Task overflow menus (Edit/Delete) on all action items, todos, and reminders
+38. Aggregated Tasks view on Home page (Notes/Tasks tab bar)
+39. Task filter chips (All/Todos/Actions/Reminders) and "Show completed" toggle
+40. Open task count badge on Tasks tab icon
+41. Reminder reschedule from overflow menu (cancel old + schedule new notification)
+42. "Also add to Calendar" bottom sheet after reminder creation (OS calendar bridge via add_2_calendar)
+43. Collapsible tasks sub-section in Project Document note reference blocks
+44. Cross-surface task state sync (Note Detail ↔ Project Document ↔ Tasks View)
+45. Share single note via OS share sheet (formatted text with actions/todos/reminders)
+46. Share project document via OS share sheet (assembled blocks with section headers)
+47. Export project document as Markdown (.md) file with heading/quote formatting
+48. Export project document as plain text (.txt) file
+49. Rich text formatting in free-text blocks (bold, italic, bullet lists, headings, links) via flutter_quill
+50. Quill Delta JSON storage for rich text with backward-compatible plain text fallback
+51. Image blocks in project documents (gallery/camera picker, compress, full-width display with caption)
+52. Full-screen image viewer with pinch-to-zoom and pan (photo_view)
+53. Image block overflow menu (view full screen, edit caption, move up/down, remove with cascade delete)
+54. Photo attachments on Note Detail (horizontal thumbnail row, add from gallery/camera, long-press delete)
+55. Storage calculation includes image files; Delete All Data clears images directory
 
 ---
 

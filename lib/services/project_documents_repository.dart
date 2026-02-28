@@ -113,6 +113,39 @@ class ProjectDocumentsRepository {
     return block;
   }
 
+  /// Add an image_block to a document.
+  Future<ProjectBlock> addImageBlock(
+      String documentId, String attachmentId, String? caption) async {
+    final doc = getProjectDocument(documentId);
+    if (doc == null) throw Exception('Document not found');
+
+    final block = ProjectBlock(
+      id: _uuid.v4(),
+      type: BlockType.imageBlock,
+      sortOrder: doc.blocks.length,
+      imageAttachmentId: attachmentId,
+      content: caption,
+    );
+    doc.blocks.add(block);
+    await updateProjectDocument(doc);
+    return block;
+  }
+
+  /// Update content format of a free_text block (for rich text).
+  Future<void> updateBlockContentFormat(
+      String documentId, String blockId, String content, String format) async {
+    final doc = getProjectDocument(documentId);
+    if (doc == null) return;
+
+    final block = doc.blocks.where((b) => b.id == blockId).firstOrNull;
+    if (block == null) return;
+
+    block.content = content;
+    block.contentFormat = format;
+    block.updatedAt = DateTime.now();
+    await updateProjectDocument(doc);
+  }
+
   /// Remove a block from a document.
   Future<void> removeBlock(String documentId, String blockId) async {
     final doc = getProjectDocument(documentId);

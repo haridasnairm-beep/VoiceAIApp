@@ -1,12 +1,304 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../models/project_block.dart';
 import '../models/note.dart';
 import '../providers/project_documents_provider.dart';
 import '../providers/notes_provider.dart';
+import '../services/sharing_service.dart';
+import '../services/image_attachment_repository.dart';
+import '../widgets/image_block_widget.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:convert';
+import 'package:flutter_quill/flutter_quill.dart';
+
+// Preset font colors for the color picker
+const _fontColors = <Color>[
+  Color(0xFFFFFFFF), // White
+  Color(0xFFE53E3E), // Red
+  Color(0xFFF6AD55), // Orange
+  Color(0xFFECC94B), // Yellow
+  Color(0xFF38A169), // Green
+  Color(0xFF4A90E2), // Blue
+  Color(0xFF9F7AEA), // Purple
+  Color(0xFFED64A6), // Pink
+];
+
+// Font size presets: small, normal, large
+const _fontSizes = <(String label, double? size)>[
+  ('S', 12),
+  ('M', null), // null = default/normal
+  ('L', 20),
+];
+
+/// Builds a custom rich-text toolbar with visible icons in all themes.
+Widget buildQuillToolbar(QuillController controller, ThemeData theme,
+    {bool showHeaders = true, bool showBullets = true, bool showColor = true, bool showSize = true}) {
+  return ListenableBuilder(
+    listenable: controller,
+    builder: (context, _) {
+      final style = controller.getSelectionStyle();
+      final isBold = style.attributes.containsKey(Attribute.bold.key);
+      final isItalic = style.attributes.containsKey(Attribute.italic.key);
+      final isBulletList = style.attributes[Attribute.list.key]?.value == 'bullet';
+      final headerLevel = style.attributes[Attribute.header.key]?.value;
+
+      // Current font color
+      final colorAttr = style.attributes[Attribute.color.key];
+      final currentColorHex = colorAttr?.value as String?;
+
+      // Current font size
+      final sizeAttr = style.attributes[Attribute.size.key];
+      final currentSize = sizeAttr?.value;
+
+      Widget btn(IconData icon, bool active, VoidCallback onTap) {
+        return InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: active ? theme.colorScheme.primaryContainer : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: active ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurface,
+            ),
+          ),
+        );
+      }
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              btn(Icons.format_bold, isBold, () {
+                controller.formatSelection(
+                  isBold ? Attribute.clone(Attribute.bold, null) : Attribute.bold,
+                );
+              }),
+              btn(Icons.format_italic, isItalic, () {
+                controller.formatSelection(
+                  isItalic ? Attribute.clone(Attribute.italic, null) : Attribute.italic,
+                );
+              }),
+              if (showBullets)
+                btn(Icons.format_list_bulleted, isBulletList, () {
+                  controller.formatSelection(
+                    isBulletList ? Attribute.clone(Attribute.list, null) : Attribute.ul,
+                  );
+                }),
+              if (showHeaders) ...[
+                btn(Icons.title, headerLevel == 1, () {
+                  controller.formatSelection(
+                    headerLevel == 1 ? Attribute.clone(Attribute.header, null) : Attribute.h1,
+                  );
+                }),
+                btn(Icons.format_size, headerLevel == 2, () {
+                  controller.formatSelection(
+                    headerLevel == 2 ? Attribute.clone(Attribute.header, null) : Attribute.h2,
+                  );
+                }),
+              ],
+              if (showSize) ...[
+                // Divider
+                Container(
+                  width: 1, height: 20, margin: const EdgeInsets.symmetric(horizontal: 4),
+                  color: theme.dividerColor,
+                ),
+                // Font size buttons: S / M / L
+                for (final entry in _fontSizes)
+                  _FontSizeButton(
+                    label: entry.$1,
+                    active: entry.$2 == null
+                        ? (currentSize == null || currentSize == 'null')
+                        : currentSize?.toString() == entry.$2.toString(),
+                    theme: theme,
+                    onTap: () {
+                      if (entry.$2 == null) {
+                        controller.formatSelection(Attribute.clone(Attribute.size, null));
+                      } else {
+                        controller.formatSelection(Attribute.fromKeyValue('size', entry.$2));
+                      }
+                    },
+                  ),
+              ],
+              if (showColor) ...[
+                // Divider
+                Container(
+                  width: 1, height: 20, margin: const EdgeInsets.symmetric(horizontal: 4),
+                  color: theme.dividerColor,
+                ),
+                // Color picker button
+                _ColorPickerButton(
+                  controller: controller,
+                  currentColorHex: currentColorHex,
+                  theme: theme,
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _FontSizeButton extends StatelessWidget {
+  final String label;
+  final bool active;
+  final ThemeData theme;
+  final VoidCallback onTap;
+
+  const _FontSizeButton({
+    required this.label,
+    required this.active,
+    required this.theme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? theme.colorScheme.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: active ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorPickerButton extends StatelessWidget {
+  final QuillController controller;
+  final String? currentColorHex;
+  final ThemeData theme;
+
+  const _ColorPickerButton({
+    required this.controller,
+    required this.currentColorHex,
+    required this.theme,
+  });
+
+  Color? _parseColor(String? hex) {
+    if (hex == null || hex == 'null') return null;
+    final clean = hex.replaceFirst('#', '').replaceFirst('ff', '');
+    try {
+      return Color(int.parse('ff$clean', radix: 16));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = _parseColor(currentColorHex);
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: () => _showColorMenu(context),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: activeColor != null ? theme.colorScheme.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          Icons.format_color_text_rounded,
+          size: 20,
+          color: activeColor ?? theme.colorScheme.onSurface,
+        ),
+      ),
+    );
+  }
+
+  // Sentinel color to represent "reset to default"
+  static const _resetSentinel = Color(0x00000001);
+
+  void _showColorMenu(BuildContext context) {
+    final RenderBox box = context.findRenderObject() as RenderBox;
+    final Offset offset = box.localToGlobal(Offset.zero);
+
+    showMenu<Color?>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        offset.dx,
+        offset.dy - 60,
+        offset.dx + box.size.width,
+        offset.dy,
+      ),
+      items: [
+        PopupMenuItem<Color?>(
+          value: _resetSentinel,
+          height: 48,
+          child: Row(
+            children: [
+              Icon(Icons.format_color_reset_rounded, size: 18, color: theme.colorScheme.onSurface),
+              const SizedBox(width: 8),
+              Text('Default', style: TextStyle(color: theme.colorScheme.onSurface)),
+            ],
+          ),
+        ),
+        PopupMenuItem<Color?>(
+          enabled: false,
+          height: 48,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _fontColors.map((c) {
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).pop(c);
+                },
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: c,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: theme.dividerColor, width: 1.5),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    ).then((color) {
+      if (color == null) return; // menu dismissed
+      if (color == _resetSentinel) {
+        controller.formatSelection(Attribute.clone(Attribute.color, null));
+      } else {
+        final hexStr = '#${color.toARGB32().toRadixString(16).padLeft(8, '0')}';
+        controller.formatSelection(Attribute.fromKeyValue('color', hexStr));
+      }
+    });
+  }
+}
 
 class ProjectDocumentDetailPage extends ConsumerStatefulWidget {
   final String? documentId;
@@ -77,13 +369,24 @@ class _ProjectDocumentDetailPageState
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: 'Share',
+            onPressed: () => _shareDocument(doc, allNotes),
+          ),
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'rename') _showRenameDialog(context, doc);
+              if (value == 'export_md') _exportDocument(doc, allNotes, 'md');
+              if (value == 'export_txt') _exportDocument(doc, allNotes, 'txt');
               if (value == 'delete') _showDeleteDialog(context, doc);
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'rename', child: Text('Rename')),
+              const PopupMenuItem(
+                  value: 'export_md', child: Text('Export as Markdown')),
+              const PopupMenuItem(
+                  value: 'export_txt', child: Text('Export as Plain Text')),
               const PopupMenuItem(value: 'delete', child: Text('Delete')),
             ],
           ),
@@ -224,6 +527,10 @@ class _ProjectDocumentDetailPageState
           onSave: (newContent) => ref
               .read(projectDocumentsProvider.notifier)
               .updateBlockContent(doc.id, block.id, newContent),
+          onSaveRichText: (content, format) => ref
+              .read(projectDocumentsProvider.notifier)
+              .updateBlockContentFormat(
+                  doc.id, block.id, content, format),
         );
       case BlockType.sectionHeader:
         return _SectionHeaderCard(
@@ -238,8 +545,55 @@ class _ProjectDocumentDetailPageState
           onSave: (newContent) => ref
               .read(projectDocumentsProvider.notifier)
               .updateBlockContent(doc.id, block.id, newContent),
+          onSaveRichText: (content, format) => ref
+              .read(projectDocumentsProvider.notifier)
+              .updateBlockContentFormat(doc.id, block.id, content, format),
+        );
+      case BlockType.imageBlock:
+        final repo = ImageAttachmentRepository();
+        final attachment = block.imageAttachmentId != null
+            ? repo.getImageAttachment(block.imageAttachmentId!)
+            : null;
+        final imageFile = block.imageAttachmentId != null
+            ? repo.getImageFile(block.imageAttachmentId!)
+            : null;
+        return ImageBlockWidget(
+          attachment: attachment,
+          imageFile: imageFile,
+          caption: block.content,
+          isFirst: isFirst,
+          isLast: isLast,
+          onMoveUp: onMoveUp,
+          onMoveDown: onMoveDown,
+          onRemove: () async {
+            // Cascade delete: remove image attachment + file
+            if (block.imageAttachmentId != null) {
+              await repo.deleteImageAttachment(block.imageAttachmentId!);
+            }
+            ref
+                .read(projectDocumentsProvider.notifier)
+                .removeBlock(doc.id, block.id);
+          },
+          onEditCaption: (newCaption) => ref
+              .read(projectDocumentsProvider.notifier)
+              .updateBlockContent(doc.id, block.id, newCaption),
         );
     }
+  }
+
+  void _shareDocument(dynamic doc, List<Note> allNotes) {
+    final text = SharingService().assembleDocumentText(doc, allNotes);
+    Share.share(text);
+  }
+
+  Future<void> _exportDocument(
+      dynamic doc, List<Note> allNotes, String format) async {
+    final service = SharingService();
+    final file = format == 'md'
+        ? await service.exportDocumentAsMarkdown(doc, allNotes)
+        : await service.exportDocumentAsPlainText(doc, allNotes);
+    await Share.shareXFiles([XFile(file.path)],
+        text: '${doc.title}.$format');
   }
 
   void _showAddBlockSheet(BuildContext context, String documentId) {
@@ -281,10 +635,57 @@ class _ProjectDocumentDetailPageState
                     .addSectionHeaderBlock(documentId, 'New Section');
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.image_rounded),
+              title: const Text('Add Image'),
+              subtitle: const Text('Photo from gallery or camera'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickAndAddImage(documentId);
+              },
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _pickAndAddImage(String documentId) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('Camera'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: source, imageQuality: 85);
+    if (picked == null || !mounted) return;
+
+    final repo = ImageAttachmentRepository();
+    final attachment = await repo.saveImage(
+      sourceFile: File(picked.path),
+      sourceType: source == ImageSource.gallery ? 'gallery' : 'camera',
+    );
+
+    ref
+        .read(projectDocumentsProvider.notifier)
+        .addImageBlock(documentId, attachment.id, null);
   }
 
   void _showRenameDialog(BuildContext context, dynamic doc) {
@@ -364,7 +765,7 @@ String _formatTimestamp(DateTime dt) {
 
 // --- Block Card Widgets ---
 
-class _NoteReferenceCard extends StatefulWidget {
+class _NoteReferenceCard extends ConsumerStatefulWidget {
   final ProjectBlock block;
   final List<Note> allNotes;
   final bool isFirst;
@@ -390,23 +791,135 @@ class _NoteReferenceCard extends StatefulWidget {
   });
 
   @override
-  State<_NoteReferenceCard> createState() => _NoteReferenceCardState();
+  ConsumerState<_NoteReferenceCard> createState() => _NoteReferenceCardState();
 }
 
-class _NoteReferenceCardState extends State<_NoteReferenceCard> {
+class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
   bool _editing = false;
+  bool _tasksExpanded = false;
   late TextEditingController _controller;
+
+  /// Build a read-only QuillEditor for notes with quill_delta format.
+  Widget _buildReadOnlyQuill(Note note) {
+    try {
+      final json = jsonDecode(note.rawTranscription) as List;
+      final controller = QuillController(
+        document: Document.fromJson(json),
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      return QuillEditor.basic(
+        controller: controller,
+        config: const QuillEditorConfig(
+          showCursor: false,
+          enableInteractiveSelection: false,
+        ),
+      );
+    } catch (_) {
+      return Text(
+        note.rawTranscription,
+        style: TextStyle(
+          fontSize: 14,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
+      );
+    }
+  }
+
+  /// Extract plain text from a note, handling quill_delta format.
+  String _plainText(Note note) {
+    if (note.contentFormat == 'quill_delta' && note.rawTranscription.isNotEmpty) {
+      try {
+        final json = jsonDecode(note.rawTranscription) as List;
+        return Document.fromJson(json).toPlainText().trim();
+      } catch (_) {
+        return note.rawTranscription;
+      }
+    }
+    return note.rawTranscription;
+  }
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
+    // Auto-expand if note has tasks
+    final note = widget.allNotes
+        .where((n) => n.id == widget.block.noteId)
+        .firstOrNull;
+    if (note != null &&
+        (note.todos.isNotEmpty || note.actions.isNotEmpty)) {
+      _tasksExpanded = true;
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  String _tasksSummary(Note note) {
+    final total = note.todos.length + note.actions.length;
+    final completed = note.todos.where((t) => t.isCompleted).length +
+        note.actions.where((a) => a.isCompleted).length;
+    return '$total tasks ($completed completed)';
+  }
+
+  Widget _buildTaskRow(
+    BuildContext context, {
+    required String text,
+    required bool checked,
+    DateTime? dueDate,
+    required VoidCallback onTap,
+  }) {
+    final isOverdue =
+        dueDate != null && !checked && dueDate.isBefore(DateTime.now());
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            Icon(
+              checked
+                  ? Icons.check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
+              size: 18,
+              color: checked
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.secondary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: checked
+                      ? Theme.of(context)
+                          .colorScheme
+                          .secondary
+                          .withValues(alpha: 0.7)
+                      : Theme.of(context).colorScheme.onSurface,
+                  decoration: checked ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            if (dueDate != null)
+              Text(
+                '${dueDate.month}/${dueDate.day}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isOverdue
+                      ? Colors.red
+                      : Theme.of(context).colorScheme.secondary,
+                  fontWeight: isOverdue ? FontWeight.bold : null,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showDetailsDialog(BuildContext context, Note note) {
@@ -541,22 +1054,102 @@ class _NoteReferenceCardState extends State<_NoteReferenceCard> {
                       ),
                     ],
                   )
-                : GestureDetector(
-                    onTap: () {
-                      _controller.text = note.rawTranscription;
-                      setState(() => _editing = true);
-                    },
-                    child: Text(
-                      note.rawTranscription.isEmpty
-                          ? 'No transcript — tap to add'
-                          : note.rawTranscription,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: note.rawTranscription.isEmpty
-                            ? Theme.of(context).hintColor
-                            : Theme.of(context).colorScheme.onSurface,
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          _controller.text = _plainText(note);
+                          setState(() => _editing = true);
+                        },
+                        child: note.rawTranscription.isEmpty
+                            ? Text(
+                                'No transcript — tap to add',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Theme.of(context).hintColor,
+                                ),
+                              )
+                            : note.contentFormat == 'quill_delta'
+                                ? _buildReadOnlyQuill(note)
+                                : Text(
+                                    note.rawTranscription,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                    ),
+                                  ),
                       ),
-                    ),
+                      // Collapsible Tasks sub-section
+                      if (note.todos.isNotEmpty ||
+                          note.actions.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        const Divider(height: 1),
+                        GestureDetector(
+                          onTap: () => setState(
+                              () => _tasksExpanded = !_tasksExpanded),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 6),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _tasksExpanded
+                                      ? Icons.expand_less
+                                      : Icons.expand_more,
+                                  size: 18,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .secondary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _tasksSummary(note),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_tasksExpanded) ...[
+                          ...note.actions.map((action) =>
+                              _buildTaskRow(
+                                context,
+                                text: action.text,
+                                checked: action.isCompleted,
+                                onTap: () => ref
+                                    .read(notesProvider.notifier)
+                                    .toggleActionCompleted(
+                                      noteId: note.id,
+                                      actionId: action.id,
+                                    ),
+                              )),
+                          ...note.todos.map((todo) =>
+                              _buildTaskRow(
+                                context,
+                                text: todo.text,
+                                checked: todo.isCompleted,
+                                dueDate: todo.dueDate,
+                                onTap: () => ref
+                                    .read(notesProvider.notifier)
+                                    .toggleTodoCompleted(
+                                      noteId: note.id,
+                                      todoId: todo.id,
+                                    ),
+                              )),
+                        ],
+                      ],
+                    ],
                   ),
           ),
 
@@ -570,6 +1163,7 @@ class _NoteReferenceCardState extends State<_NoteReferenceCard> {
               onSelected: (value) {
                 if (value == 'move_up') widget.onMoveUp();
                 if (value == 'move_down') widget.onMoveDown();
+                if (value == 'rich_edit') widget.onViewOriginal();
                 if (value == 'details') _showDetailsDialog(context, note);
                 if (value == 'original') widget.onViewOriginal();
                 if (value == 'history') widget.onViewHistory();
@@ -599,6 +1193,16 @@ class _NoteReferenceCardState extends State<_NoteReferenceCard> {
                   ),
                 ),
                 const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'rich_edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_note_rounded, size: 18),
+                      SizedBox(width: 8),
+                      Text('Rich text edit'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'details',
                   child: Row(
@@ -659,6 +1263,7 @@ class _FreeTextCard extends StatefulWidget {
   final VoidCallback onMoveDown;
   final VoidCallback onRemove;
   final void Function(String) onSave;
+  final void Function(String content, String format)? onSaveRichText;
 
   const _FreeTextCard({
     required this.block,
@@ -668,6 +1273,7 @@ class _FreeTextCard extends StatefulWidget {
     required this.onMoveDown,
     required this.onRemove,
     required this.onSave,
+    this.onSaveRichText,
   });
 
   @override
@@ -676,26 +1282,73 @@ class _FreeTextCard extends StatefulWidget {
 
 class _FreeTextCardState extends State<_FreeTextCard> {
   bool _editing = false;
-  late TextEditingController _controller;
+  late QuillController _quillController;
+
+  bool get _isRichText => widget.block.contentFormat == 'quill_delta';
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.block.content ?? '');
+    _quillController = _createController();
+  }
+
+  QuillController _createController() {
+    final content = widget.block.content ?? '';
+    if (_isRichText && content.isNotEmpty) {
+      try {
+        final json = jsonDecode(content) as List;
+        return QuillController(
+          document: Document.fromJson(json),
+          selection: const TextSelection.collapsed(offset: 0),
+        );
+      } catch (_) {
+        // Fallback to plain text
+      }
+    }
+    // Plain text — wrap in simple Document
+    final doc = Document()..insert(0, content);
+    return QuillController(
+      document: doc,
+      selection: const TextSelection.collapsed(offset: 0),
+    );
   }
 
   @override
   void didUpdateWidget(covariant _FreeTextCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_editing) {
-      _controller.text = widget.block.content ?? '';
+      _quillController.dispose();
+      _quillController = _createController();
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _quillController.dispose();
     super.dispose();
+  }
+
+  void _saveContent() {
+    final deltaJson = jsonEncode(_quillController.document.toDelta().toJson());
+    if (widget.onSaveRichText != null) {
+      widget.onSaveRichText!(deltaJson, 'quill_delta');
+    } else {
+      widget.onSave(_quillController.document.toPlainText().trim());
+    }
+    setState(() => _editing = false);
+  }
+
+  String _getPlainText() {
+    final content = widget.block.content ?? '';
+    if (_isRichText && content.isNotEmpty) {
+      try {
+        final json = jsonDecode(content) as List;
+        return Document.fromJson(json).toPlainText().trim();
+      } catch (_) {
+        return content;
+      }
+    }
+    return content;
   }
 
   void _showDetailsDialog(BuildContext context) {
@@ -708,6 +1361,10 @@ class _FreeTextCardState extends State<_FreeTextCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _DetailRow(label: 'Type', value: 'Free Text'),
+            const SizedBox(height: 8),
+            _DetailRow(
+                label: 'Format',
+                value: _isRichText ? 'Rich Text' : 'Plain Text'),
             const SizedBox(height: 8),
             _DetailRow(
                 label: 'Created',
@@ -734,135 +1391,164 @@ class _FreeTextCardState extends State<_FreeTextCard> {
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Content area
-          Expanded(
-            child: _editing
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextField(
-                        controller: _controller,
-                        maxLines: null,
-                        autofocus: true,
-                        style: const TextStyle(fontSize: 14),
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                          isDense: true,
-                          hintText: 'Type your text here...',
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Content area
+              Expanded(
+                child: _editing
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TextButton(
-                            onPressed: () =>
-                                setState(() => _editing = false),
-                            style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12),
-                                minimumSize: const Size(0, 32)),
-                            child: const Text('Cancel'),
+                          // Formatting toolbar
+                          buildQuillToolbar(_quillController, Theme.of(context)),
+                          const SizedBox(height: 6),
+                          Container(
+                            constraints: const BoxConstraints(
+                                minHeight: 80, maxHeight: 300),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                  color: Theme.of(context).dividerColor),
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.sm),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
+                            child: QuillEditor.basic(
+                              controller: _quillController,
+                              config: const QuillEditorConfig(
+                                autoFocus: true,
+                                minHeight: 60,
+                                placeholder: 'Type your text here...',
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 6),
-                          FilledButton(
-                            onPressed: () {
-                              widget.onSave(_controller.text);
-                              setState(() => _editing = false);
-                            },
-                            style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12),
-                                minimumSize: const Size(0, 32)),
-                            child: const Text('Save'),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () {
+                                  _quillController.dispose();
+                                  _quillController = _createController();
+                                  setState(() => _editing = false);
+                                },
+                                style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    minimumSize: const Size(0, 32)),
+                                child: const Text('Cancel'),
+                              ),
+                              const SizedBox(width: 6),
+                              FilledButton(
+                                onPressed: _saveContent,
+                                style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    minimumSize: const Size(0, 32)),
+                                child: const Text('Save'),
+                              ),
+                            ],
                           ),
                         ],
+                      )
+                    : GestureDetector(
+                        onTap: () => setState(() => _editing = true),
+                        child: _getPlainText().isEmpty
+                            ? Text(
+                                'Tap to add text...',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Theme.of(context).hintColor,
+                                ),
+                              )
+                            : _isRichText
+                                ? QuillEditor.basic(
+                                    controller: _quillController,
+                                    config: const QuillEditorConfig(
+                                      showCursor: false,
+                                      enableInteractiveSelection: false,
+                                    ),
+                                  )
+                                : Text(
+                                    _getPlainText(),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                    ),
+                                  ),
                       ),
-                    ],
-                  )
-                : GestureDetector(
-                    onTap: () => setState(() => _editing = true),
-                    child: Text(
-                      (widget.block.content ?? '').isEmpty
-                          ? 'Tap to add text...'
-                          : widget.block.content!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: (widget.block.content ?? '').isEmpty
-                            ? Theme.of(context).hintColor
-                            : Theme.of(context).colorScheme.onSurface,
+              ),
+
+              // 3-dot menu (top-right)
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  iconSize: 18,
+                  onSelected: (value) {
+                    if (value == 'move_up') widget.onMoveUp();
+                    if (value == 'move_down') widget.onMoveDown();
+                    if (value == 'details') _showDetailsDialog(context);
+                    if (value == 'remove') widget.onRemove();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'move_up',
+                      enabled: !widget.isFirst,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.arrow_upward_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text('Move up'),
+                        ],
                       ),
                     ),
-                  ),
-          ),
-
-          // 3-dot menu (top-right)
-          SizedBox(
-            width: 28,
-            height: 28,
-            child: PopupMenuButton<String>(
-              padding: EdgeInsets.zero,
-              iconSize: 18,
-              onSelected: (value) {
-                if (value == 'move_up') widget.onMoveUp();
-                if (value == 'move_down') widget.onMoveDown();
-                if (value == 'details') _showDetailsDialog(context);
-                if (value == 'remove') widget.onRemove();
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'move_up',
-                  enabled: !widget.isFirst,
-                  child: const Row(
-                    children: [
-                      Icon(Icons.arrow_upward_rounded, size: 18),
-                      SizedBox(width: 8),
-                      Text('Move up'),
-                    ],
-                  ),
+                    PopupMenuItem(
+                      value: 'move_down',
+                      enabled: !widget.isLast,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.arrow_downward_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text('Move down'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'details',
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 18),
+                          SizedBox(width: 8),
+                          Text('Details'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'remove',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline, size: 18),
+                          SizedBox(width: 8),
+                          Text('Remove'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  icon: Icon(Icons.more_vert,
+                      size: 18, color: Theme.of(context).hintColor),
                 ),
-                PopupMenuItem(
-                  value: 'move_down',
-                  enabled: !widget.isLast,
-                  child: const Row(
-                    children: [
-                      Icon(Icons.arrow_downward_rounded, size: 18),
-                      SizedBox(width: 8),
-                      Text('Move down'),
-                    ],
-                  ),
-                ),
-                const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'details',
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, size: 18),
-                      SizedBox(width: 8),
-                      Text('Details'),
-                    ],
-                  ),
-                ),
-                const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'remove',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline, size: 18),
-                      SizedBox(width: 8),
-                      Text('Remove'),
-                    ],
-                  ),
-                ),
-              ],
-              icon: Icon(Icons.more_vert,
-                  size: 18, color: Theme.of(context).hintColor),
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -878,6 +1564,7 @@ class _SectionHeaderCard extends StatefulWidget {
   final VoidCallback onMoveDown;
   final VoidCallback onRemove;
   final void Function(String) onSave;
+  final void Function(String content, String format)? onSaveRichText;
 
   const _SectionHeaderCard({
     required this.block,
@@ -887,6 +1574,7 @@ class _SectionHeaderCard extends StatefulWidget {
     required this.onMoveDown,
     required this.onRemove,
     required this.onSave,
+    this.onSaveRichText,
   });
 
   @override
@@ -895,26 +1583,57 @@ class _SectionHeaderCard extends StatefulWidget {
 
 class _SectionHeaderCardState extends State<_SectionHeaderCard> {
   bool _editing = false;
-  late TextEditingController _controller;
+  late QuillController _quillController;
+
+  bool get _isRichText => widget.block.contentFormat == 'quill_delta';
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.block.content ?? '');
+    _quillController = _createController();
+  }
+
+  QuillController _createController() {
+    final content = widget.block.content ?? '';
+    if (_isRichText && content.isNotEmpty) {
+      try {
+        final json = jsonDecode(content) as List;
+        return QuillController(
+          document: Document.fromJson(json),
+          selection: const TextSelection.collapsed(offset: 0),
+        );
+      } catch (_) {}
+    }
+    final doc = Document()..insert(0, content);
+    return QuillController(
+      document: doc,
+      selection: const TextSelection.collapsed(offset: 0),
+    );
   }
 
   @override
   void didUpdateWidget(covariant _SectionHeaderCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_editing) {
-      _controller.text = widget.block.content ?? '';
+      _quillController.dispose();
+      _quillController = _createController();
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _quillController.dispose();
     super.dispose();
+  }
+
+  void _saveContent() {
+    final deltaJson = jsonEncode(_quillController.document.toDelta().toJson());
+    if (widget.onSaveRichText != null) {
+      widget.onSaveRichText!(deltaJson, 'quill_delta');
+    } else {
+      widget.onSave(_quillController.document.toPlainText().trim());
+    }
+    setState(() => _editing = false);
   }
 
   void _showDetailsDialog(BuildContext context) {
@@ -962,19 +1681,14 @@ class _SectionHeaderCardState extends State<_SectionHeaderCard> {
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextField(
-                        controller: _controller,
-                        autofocus: true,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                          hintText: 'Section title',
+                      buildQuillToolbar(_quillController, Theme.of(context), showHeaders: false, showBullets: false),
+                      const SizedBox(height: 4),
+                      QuillEditor.basic(
+                        controller: _quillController,
+                        config: const QuillEditorConfig(
+                          autoFocus: true,
+                          minHeight: 36,
+                          placeholder: 'Section title',
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -982,8 +1696,11 @@ class _SectionHeaderCardState extends State<_SectionHeaderCard> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           TextButton(
-                            onPressed: () =>
-                                setState(() => _editing = false),
+                            onPressed: () {
+                              _quillController.dispose();
+                              _quillController = _createController();
+                              setState(() => _editing = false);
+                            },
                             style: TextButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12),
@@ -992,10 +1709,7 @@ class _SectionHeaderCardState extends State<_SectionHeaderCard> {
                           ),
                           const SizedBox(width: 6),
                           FilledButton(
-                            onPressed: () {
-                              widget.onSave(_controller.text);
-                              setState(() => _editing = false);
-                            },
+                            onPressed: _saveContent,
                             style: FilledButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12),
@@ -1008,13 +1722,21 @@ class _SectionHeaderCardState extends State<_SectionHeaderCard> {
                   )
                 : GestureDetector(
                     onTap: () => setState(() => _editing = true),
-                    child: Text(
-                      widget.block.content ?? 'Section Header',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
+                    child: _isRichText
+                        ? QuillEditor.basic(
+                            controller: _quillController,
+                            config: const QuillEditorConfig(
+                              showCursor: false,
+                              enableInteractiveSelection: false,
+                            ),
+                          )
+                        : Text(
+                            widget.block.content ?? 'Section Header',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
                   ),
           ),
 

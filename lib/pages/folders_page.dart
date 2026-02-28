@@ -308,11 +308,6 @@ class _FoldersPageState extends ConsumerState<FoldersPage> {
                 child: SpeedDialFab(
                   items: [
                     SpeedDialItem(
-                      icon: Icons.mic_rounded,
-                      label: 'Record Note',
-                      onTap: () => context.push(AppRoutes.recording),
-                    ),
-                    SpeedDialItem(
                       icon: Icons.create_new_folder_rounded,
                       label: 'New Folder',
                       onTap: () => _showNewFolderDialog(context),
@@ -321,6 +316,11 @@ class _FoldersPageState extends ConsumerState<FoldersPage> {
                       icon: Icons.article_rounded,
                       label: 'New Project',
                       onTap: () => _showNewProjectDialog(context),
+                    ),
+                    SpeedDialItem(
+                      icon: Icons.mic_rounded,
+                      label: 'Record Note',
+                      onTap: () => context.push(AppRoutes.recording),
                     ),
                   ],
                 ),

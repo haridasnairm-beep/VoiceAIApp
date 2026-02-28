@@ -81,4 +81,40 @@ class SettingsRepository {
     settings.voiceCommandsEnabled = enabled;
     await saveSettings(settings);
   }
+
+  Future<void> setTextNotePrefix(String prefix) async {
+    final settings = getSettings();
+    settings.textNotePrefix = prefix;
+    await saveSettings(settings);
+  }
+
+  Future<void> setActionItemsEnabled(bool enabled) async {
+    final settings = getSettings();
+    settings.actionItemsEnabled = enabled;
+    await saveSettings(settings);
+  }
+
+  Future<void> setTodosEnabled(bool enabled) async {
+    final settings = getSettings();
+    settings.todosEnabled = enabled;
+    await saveSettings(settings);
+  }
+
+  Future<void> setWhisperModel(String model) async {
+    final settings = getSettings();
+    settings.whisperModel = model;
+    await saveSettings(settings);
+  }
+
+  Future<void> setNoteOutputMode(String mode) async {
+    final settings = getSettings();
+    settings.noteOutputMode = mode;
+    await saveSettings(settings);
+  }
+
+  Future<void> setKeepScreenAwake(bool enabled) async {
+    final settings = getSettings();
+    settings.keepScreenAwake = enabled;
+    await saveSettings(settings);
+  }
 }

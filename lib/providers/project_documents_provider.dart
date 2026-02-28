@@ -73,6 +73,22 @@ class ProjectDocumentsNotifier extends Notifier<List<ProjectDocument>> {
     refresh();
   }
 
+  Future<void> addImageBlock(
+      String documentId, String attachmentId, String? caption) async {
+    await ref
+        .read(projectDocumentsRepositoryProvider)
+        .addImageBlock(documentId, attachmentId, caption);
+    refresh();
+  }
+
+  Future<void> updateBlockContentFormat(
+      String documentId, String blockId, String content, String format) async {
+    await ref
+        .read(projectDocumentsRepositoryProvider)
+        .updateBlockContentFormat(documentId, blockId, content, format);
+    refresh();
+  }
+
   Future<void> removeBlock(String documentId, String blockId) async {
     await ref
         .read(projectDocumentsRepositoryProvider)

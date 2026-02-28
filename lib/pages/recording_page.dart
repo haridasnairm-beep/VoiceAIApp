@@ -10,6 +10,7 @@ import 'package:voicenotes_ai/providers/settings_provider.dart';
 import 'package:voicenotes_ai/services/audio_recorder_service.dart';
 import 'package:voicenotes_ai/services/transcription_service.dart';
 import 'package:voicenotes_ai/services/whisper_service.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:voicenotes_ai/theme.dart';
 import 'package:voicenotes_ai/providers/notes_provider.dart';
 import 'package:voicenotes_ai/providers/folders_provider.dart';
@@ -54,6 +55,9 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
     super.initState();
     _selectedFolderId =
         widget.folderId ?? ref.read(settingsProvider).defaultFolderId;
+    // Ensure WhisperService uses the user's selected model
+    final selectedModel = ref.read(settingsProvider).whisperModel;
+    WhisperService.instance.switchModel(selectedModel);
     _startRecording();
   }
 
@@ -61,6 +65,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   void dispose() {
     _timer?.cancel();
     _scrollController.dispose();
+    WakelockPlus.disable(); // Safety net — always release wakelock
     if (!_useWhisperMode) {
       _transcription.onTranscriptionUpdate = null;
       _transcription.onLanguageDetected = null;
@@ -96,9 +101,34 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
     });
   }
 
+  /// Map ISO 639-1 language code to BCP-47 locale ID for speech_to_text.
+  String? _mapToLocaleId(String? isoCode) {
+    if (isoCode == null) return null; // auto-detect → use OS default
+    const mapping = {
+      'en': 'en-US',
+      'es': 'es-ES',
+      'fr': 'fr-FR',
+      'de': 'de-DE',
+      'hi': 'hi-IN',
+      'ar': 'ar-SA',
+      'pt': 'pt-BR',
+      'zh': 'zh-CN',
+      'ja': 'ja-JP',
+      'ko': 'ko-KR',
+      'ru': 'ru-RU',
+      'it': 'it-IT',
+    };
+    return mapping[isoCode] ?? isoCode;
+  }
+
   Future<void> _startRecording() async {
     final settings = ref.read(settingsProvider);
     _useWhisperMode = settings.transcriptionMode == 'whisper';
+
+    // Keep screen awake during recording if enabled
+    if (settings.keepScreenAwake) {
+      WakelockPlus.enable();
+    }
 
     setState(() {
       _isStarting = true;
@@ -114,27 +144,48 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       final modelReady = await _whisper.isModelDownloaded();
       if (!modelReady) {
         if (!mounted) return;
-        // Navigate to settings and highlight whisper download
-        await showDialog<void>(
+        final choice = await showDialog<String>(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            title: const Text('Whisper Model Required'),
+            title: const Text('Whisper Model Not Ready'),
             content: const Text(
-              'The Whisper AI model needs to be downloaded first (~140 MB).\n\n'
-              'Tap OK to go to Settings where you can download it.',
+              'The Whisper AI model is still downloading or has not been downloaded yet.\n\n'
+              'You can wait for the download to finish in Settings, or switch to Live Transcription mode to start recording now.',
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
+                onPressed: () => Navigator.pop(ctx, 'cancel'),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'download'),
+                child: const Text('Go to Settings'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, 'live'),
+                child: const Text('Use Live Mode'),
               ),
             ],
           ),
         );
         if (!mounted) return;
-        context.push(AppRoutes.settings, extra: {'highlightWhisper': true});
-        return;
+        if (choice == 'download') {
+          context.pushReplacement(AppRoutes.audioSettings, extra: {'highlightWhisper': true});
+          return;
+        } else if (choice == 'live') {
+          // Switch to live mode for this session only
+          _useWhisperMode = false;
+          // Continue below to start live transcription
+        } else {
+          // Cancel — go back
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+          return;
+        }
       }
     }
 
@@ -172,7 +223,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       if (_speechAvailable) {
         _transcription.onTranscriptionUpdate = _onTranscriptionUpdate;
         _transcription.onStatusChanged = _onStatusChanged;
-        await _transcription.startListening();
+        final langCode = ref.read(settingsProvider).defaultLanguage;
+        await _transcription.startListening(localeId: _mapToLocaleId(langCode));
 
         // Create a placeholder audio file path for the note
         final appDir = await getApplicationDocumentsDirectory();
@@ -269,6 +321,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
 
   Future<void> _discard() async {
     _timer?.cancel();
+    WakelockPlus.disable();
     if (_useWhisperMode) {
       await _recorder.cancelAndDelete();
     } else if (_speechAvailable) {
@@ -287,6 +340,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   Future<void> _saveAndProcess() async {
     if (_isStarting) return;
     _timer?.cancel();
+    WakelockPlus.disable();
 
     if (_useWhisperMode) {
       // Whisper mode: save note immediately, transcribe in background
@@ -297,11 +351,12 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       final folderId = _selectedFolderId ?? widget.folderId;
 
       // Create note with empty transcription — mark as unprocessed
+      final lang = ref.read(settingsProvider).defaultLanguage;
       final note = await ref.read(notesProvider.notifier).addNote(
             audioFilePath: path,
             audioDurationSeconds: _elapsed.inSeconds,
             rawTranscription: '',
-            detectedLanguage: 'auto',
+            detectedLanguage: lang ?? 'auto',
             folderId: folderId,
             isProcessed: false,
           );
@@ -323,6 +378,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       ref.read(notesProvider.notifier).transcribeInBackground(
             note.id,
             path,
+            language: lang ?? 'en',
             hasManualFolder: folderId != null,
             hasManualProject: _selectedProjectId != null,
           );
@@ -346,15 +402,26 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       }
       if (!mounted) return;
 
+      // Default to General folder if no folder selected
+      String? folderId = _selectedFolderId ?? widget.folderId;
+      if (folderId == null) {
+        final folders = ref.read(foldersProvider);
+        final generalFolder = folders
+            .where((f) => f.name.toLowerCase() == 'general')
+            .firstOrNull;
+        if (generalFolder != null) {
+          folderId = generalFolder.id;
+        }
+      }
+
       context.pushReplacement(AppRoutes.noteDetail, extra: {
         'recordingPath': path ?? _activePath,
         'transcription': transcription,
         'duration': _elapsed.inSeconds,
         'detectedLanguage': _transcription.detectedLanguage.isNotEmpty
             ? _transcription.detectedLanguage
-            : 'en',
-        if (_selectedFolderId != null || widget.folderId != null)
-          'folderId': _selectedFolderId ?? widget.folderId,
+            : (ref.read(settingsProvider).defaultLanguage ?? 'en'),
+        if (folderId != null) 'folderId': folderId,
       });
     }
   }
@@ -380,7 +447,12 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24.0),
-                child: Column(
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: IntrinsicHeight(
+                        child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Top Bar
@@ -463,22 +535,20 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                               ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _isStarting
-                              ? 'Starting…'
-                              : _isPaused
-                                  ? 'Paused'
-                                  : 'Recording in progress',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                color:
-                                    Theme.of(context).colorScheme.secondary,
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
+                        if (_isStarting || _isPaused) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _isStarting ? 'Starting…' : 'Paused',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.secondary,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ],
                     ),
 
@@ -524,10 +594,13 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
+                      // Keep Screen Awake toggle
+                      _buildScreenAwakeToggle(context),
+                      const SizedBox(height: 12),
                       // Folder & Project selection
                       _buildFolderProjectSelection(context),
-                    ] else
+                    ] else ...[
                       Container(
                         height: 240,
                         padding: const EdgeInsets.all(24),
@@ -546,12 +619,15 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                         ),
                         child: _buildLiveModeBox(context, hasTranscription),
                       ),
+                      const SizedBox(height: 12),
+                      _buildScreenAwakeToggle(context),
+                    ],
 
-                    const Spacer(),
+                    const SizedBox(height: 24),
 
                     // Controls
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.only(bottom: 16),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -663,6 +739,10 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                   ],
                 ),
               ),
+              ),
+              ),
+              ),
+              ),
 
             ],
           ),
@@ -739,6 +819,68 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   }
 
   /// Folder & Project selection UI for whisper mode
+  Widget _buildScreenAwakeToggle(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: () async {
+        final newVal = !settings.keepScreenAwake;
+        await ref.read(settingsProvider.notifier).setKeepScreenAwake(newVal);
+        if (newVal) {
+          await WakelockPlus.enable();
+        } else {
+          await WakelockPlus.disable();
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: theme.dividerColor),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              settings.keepScreenAwake
+                  ? Icons.lock_open_rounded
+                  : Icons.screen_lock_portrait_rounded,
+              size: 18,
+              color: settings.keepScreenAwake
+                  ? AppColors.lightSuccess
+                  : theme.colorScheme.secondary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Keep Screen Awake',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.secondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 24,
+              child: Switch(
+                value: settings.keepScreenAwake,
+                onChanged: (val) async {
+                  await ref.read(settingsProvider.notifier).setKeepScreenAwake(val);
+                  if (val) {
+                    await WakelockPlus.enable();
+                  } else {
+                    await WakelockPlus.disable();
+                  }
+                },
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFolderProjectSelection(BuildContext context) {
     final folders = ref.watch(foldersProvider);
     final projects = ref.watch(projectDocumentsProvider);

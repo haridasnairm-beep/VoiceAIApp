@@ -27,6 +27,9 @@ class TranscriptionService {
   /// Whether the service should auto-restart after a session ends.
   bool _shouldAutoRestart = false;
 
+  /// Locale ID for speech recognition (BCP-47 format, e.g. 'hi-IN').
+  String? _localeId;
+
   /// Callback for transcription updates (finalText, interimText).
   void Function(String finalText, String interimText)? onTranscriptionUpdate;
 
@@ -65,13 +68,14 @@ class TranscriptionService {
   }
 
   /// Start listening for speech. Audio recording should already be active.
-  Future<void> startListening() async {
+  Future<void> startListening({String? localeId}) async {
     if (!_isInitialized) {
       final ok = await initialize();
       if (!ok) return;
     }
 
     _shouldAutoRestart = true;
+    _localeId = localeId;
     _finalizedText = '';
     _currentSessionText = '';
     _detectedLanguage = '';
@@ -129,6 +133,7 @@ class TranscriptionService {
       _isListening = true;
       await _speech.listen(
         onResult: _handleResult,
+        localeId: _localeId,
         listenFor: const Duration(seconds: 59),
         pauseFor: const Duration(seconds: 10),
         listenOptions: SpeechListenOptions(
@@ -137,7 +142,7 @@ class TranscriptionService {
           partialResults: true,
         ),
       );
-      debugPrint('TranscriptionService: session started');
+      debugPrint('TranscriptionService: session started (locale: ${_localeId ?? "system default"})');
     } catch (e) {
       debugPrint('TranscriptionService: listen failed: $e');
       _isListening = false;

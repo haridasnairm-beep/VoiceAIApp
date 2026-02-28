@@ -12,6 +12,9 @@ enum BlockType {
 
   @HiveField(2)
   sectionHeader,
+
+  @HiveField(3)
+  imageBlock,
 }
 
 @HiveType(typeId: 7)
@@ -37,6 +40,12 @@ class ProjectBlock extends HiveObject {
   @HiveField(6)
   DateTime updatedAt;
 
+  @HiveField(7)
+  String? imageAttachmentId;
+
+  @HiveField(8)
+  String? contentFormat; // 'plain' or 'quill_delta'
+
   ProjectBlock({
     required this.id,
     required this.type,
@@ -45,6 +54,8 @@ class ProjectBlock extends HiveObject {
     this.content,
     DateTime? createdAt,
     DateTime? updatedAt,
+    this.imageAttachmentId,
+    this.contentFormat,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 }

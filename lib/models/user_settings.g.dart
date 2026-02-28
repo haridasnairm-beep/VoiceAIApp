@@ -29,13 +29,19 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       notePrefix: fields[9] as String,
       defaultFolderId: fields[10] as String?,
       voiceCommandsEnabled: fields[11] as bool,
+      textNotePrefix: fields[12] as String,
+      actionItemsEnabled: fields[13] as bool,
+      todosEnabled: fields[14] as bool,
+      whisperModel: fields[15] as String,
+      noteOutputMode: fields[16] as String,
+      keepScreenAwake: fields[17] == null ? true : fields[17] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -59,7 +65,19 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(10)
       ..write(obj.defaultFolderId)
       ..writeByte(11)
-      ..write(obj.voiceCommandsEnabled);
+      ..write(obj.voiceCommandsEnabled)
+      ..writeByte(12)
+      ..write(obj.textNotePrefix)
+      ..writeByte(13)
+      ..write(obj.actionItemsEnabled)
+      ..writeByte(14)
+      ..write(obj.todosEnabled)
+      ..writeByte(15)
+      ..write(obj.whisperModel)
+      ..writeByte(16)
+      ..write(obj.noteOutputMode)
+      ..writeByte(17)
+      ..write(obj.keepScreenAwake);
   }
 
   @override

@@ -1,6 +1,6 @@
 # VoiceNotes AI - Project Specification
 
-**Version:** 2.4
+**Version:** 2.5
 **Last Updated:** 2026-02-27
 **Platform:** Cross-platform (iOS + Android) via Flutter
 **Dart SDK:** ^3.6.0
@@ -121,25 +121,58 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - Full-text search across all notes
 - Filter by keyword, date, language, category, conversation/topic
 
-### 4.9 Settings Screen
-- **PREFERENCES section:**
-  - Your Name — speaker label for transcription timestamps
-  - Note Prefix — prefix for auto-generated note names (e.g., "VOICE" → VOICE001)
-  - Language Detection — 13 languages + Automatic (auto-detect)
-  - Theme — System / Light / Dark with live switching
-- **AUDIO section:**
-  - Audio Quality — Standard / High Quality picker
-  - Transcription Mode — Live Transcription or Record & Transcribe (Whisper)
-  - Whisper Model Status — download status/progress (visible only when Whisper mode selected); supports auto-scroll + flash highlight when navigated from recording popup or onboarding
-  - Default Folder — picker to choose default folder for new recordings
-  - Voice Commands — toggle for "Folder/Project \<name\> Start" voice command parsing (Whisper mode only)
-- **NOTIFICATIONS section:**
-  - Enable/disable reminders
-- **STORAGE section:**
-  - Storage utilization showing actual disk usage (Hive data + recordings)
-- **DANGER ZONE section:**
-  - Delete All Data — with confirmation dialog, clears all notes, folders, projects, settings, and cancels notifications
-- **Quick Guide** — button to re-open onboarding pages
+### 4.9 App Menu (3-dot Overflow Menu)
+> The monolithic Settings page has been replaced with a 3-dot overflow menu on the Home AppBar. Each menu item opens a dedicated sub-page.
+
+**Menu items:**
+| Menu Item | Icon | Route | Page |
+|---|---|---|---|
+| Preferences | `tune_rounded` | `/preferences` | PreferencesPage |
+| Audio & Recording | `mic_rounded` | `/audio_settings` | AudioSettingsPage |
+| Storage | `storage_rounded` | `/storage` | StoragePage |
+| Help & Support | `help_outline_rounded` | `/support` | SupportPage |
+| About | `info_outline_rounded` | `/about` | AboutPage |
+| Danger Zone | `warning_amber_rounded` | `/danger_zone` | DangerZonePage |
+
+**Preferences page** (`/preferences`):
+- Your Name — speaker label for transcription timestamps
+- Note Prefix — prefix for auto-generated note names (e.g., "VOICE" → VOICE001)
+- Text Prefix — prefix for text note names (e.g., "TXT" → TXT001)
+- Language Detection — 13 languages + Automatic (auto-detect)
+- Reminders — enable/disable notifications
+- Action Items — enable/disable action items section in note detail
+- To-Dos — enable/disable to-dos section in note detail
+- Appearance — System / Light / Dark with live switching
+
+**Audio & Recording page** (`/audio_settings`):
+- Audio Quality — Standard / High Quality picker
+- Transcription Mode — Live Transcription or Record & Transcribe (Whisper)
+- Whisper Model Status — download status/progress (visible only when Whisper mode selected); supports auto-scroll + flash highlight when navigated from recording popup or onboarding
+- Default Folder — picker to choose default folder for new recordings
+- Voice Commands — toggle for "Folder/Project \<name\> Start" voice command parsing (Whisper mode only)
+
+**Storage page** (`/storage`):
+- Storage breakdown: Whisper model, voice recordings, notes & database, images
+- Note/folder counts
+- "All data is stored locally" info banner
+
+**Help & Support page** (`/support`):
+- Quick Guide — re-open onboarding pages
+- Send Feedback — opens Feedback page (category selector, text field with 20-char minimum, sends via share sheet)
+
+**About page** (`/about`):
+- App logo, version, description
+- Development credits (HDMPixels + Claude Code)
+- Coming Soon (Phase 2 roadmap)
+- Feature request tile → links to Feedback page
+- Support Development (Buy Me a Coffee)
+- Legal (Privacy Policy + Terms & Conditions)
+- Technical details
+
+**Danger Zone page** (`/danger_zone`):
+- Delete Whisper Model — free up ~140 MB
+- Delete Voice Recordings — remove audio files, keep text
+- Delete All Data — with confirmation dialog, clears all notes, folders, projects, settings, and cancels notifications
 
 ### 4.10 Project Documents List Screen
 - **"New Project" button** — prominent FAB or top button
@@ -244,9 +277,9 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 
 ### 6.3 Navigation
 - **go_router** for declarative routing with extras for data passing
-- Active routes: splash, onboarding, home, recording, note_detail, folders, folder_detail, settings, search, project_documents, project_document_detail, note_picker, version_history
+- Active routes: splash, onboarding, home, recording, note_detail, folders, folder_detail, preferences, audio_settings, storage, support, danger_zone, search, project_documents, project_document_detail, note_picker, version_history, privacy_policy, terms_conditions, about, feedback
 - Inactive route (Phase 2): login
-- Settings route accepts `highlightWhisper` extra for auto-scroll + flash highlight
+- Audio settings route accepts `highlightWhisper` extra for auto-scroll + flash highlight
 
 ### 6.4 Audio Recording
 - **record** package (>=5.1.2) for audio capture
@@ -363,8 +396,11 @@ UserSettings
 ├── transcriptionMode: String (live / whisper)
 ├── speakerName: String (default: "Speaker 1")
 ├── notePrefix: String (default: "VOICE" → VOICE001, VOICE002...)
+├── textNotePrefix: String (default: "TXT" → TXT001, TXT002...)
 ├── defaultFolderId: String? (ID of default folder for new recordings)
-└── voiceCommandsEnabled: bool (parse voice commands in Whisper mode)
+├── voiceCommandsEnabled: bool (parse voice commands in Whisper mode)
+├── actionItemsEnabled: bool (show action items section in note detail, default: true)
+└── todosEnabled: bool (show todos section in note detail, default: true)
 
 ProjectDocument
 ├── id: String (UUID)
@@ -393,7 +429,7 @@ TranscriptVersion
 ├── createdAt: DateTime
 └── isOriginal: bool (true only for the first version from STT)
 
-ImageAttachment (planned — Step 4.7)
+ImageAttachment (implemented)
 ├── id: String (UUID)
 ├── filePath: String (local path: Documents/images/[uuid].jpg)
 ├── fileName: String (original or generated filename)
@@ -426,8 +462,8 @@ TaskItem (UI view model — NOT stored in Hive)
 | Microphone | Android, iOS | Voice recording |
 | Storage | Android | Save recordings locally |
 | Notifications | Android, iOS | Reminder alerts |
-| Camera | Android, iOS | Photo capture for image blocks/attachments (planned — Step 4.7) |
-| Photo Library | Android, iOS | Gallery access for image picker (planned — Step 4.7) |
+| Camera | Android, iOS | Photo capture for image blocks/attachments (implemented) |
+| Photo Library | Android, iOS | Gallery access for image picker (implemented) |
 | Internet | Android, iOS | Transcription and AI processing (transactional only) |
 
 ---
@@ -499,13 +535,13 @@ Both coexist — folders organize, projects compose.
 | Speech-to-text (live) | speech_to_text (on-device, free) |
 | Speech-to-text (whisper) | whisper_flutter_new (on-device, ggml-base model) |
 | Notifications | flutter_local_notifications |
-| OS calendar bridge | add_2_calendar (planned — Step 4.6) |
-| Sharing | share_plus (planned — Step 4.7) |
-| Rich text editor | flutter_quill (planned — Step 4.7) |
-| Image picker | image_picker (planned — Step 4.7) |
-| Image cropping | image_cropper (planned — Step 4.7) |
-| Image viewer | photo_view (planned — Step 4.7) |
-| Image compression | flutter_image_compress (planned — Step 4.7) |
+| OS calendar bridge | add_2_calendar (implemented) |
+| Sharing | share_plus (implemented) |
+| Rich text editor | flutter_quill (implemented) |
+| Image picker | image_picker (implemented) |
+| Image cropping | image_cropper (implemented) |
+| Image viewer | photo_view (implemented) |
+| Image compression | flutter_image_compress (implemented) |
 | Typography | Google Fonts (Plus Jakarta Sans, Inter) |
 | App icon | assets/icons/logo.png (launcher + in-app branding) |
 
@@ -529,12 +565,12 @@ Both coexist — folders organize, projects compose.
 | uuid | Unique ID generation | Active |
 | connectivity_plus | Network status monitoring | Active |
 | cupertino_icons | iOS-style icons | Active |
-| add_2_calendar | OS calendar event creation for hybrid reminders | Planned (Step 4.6) |
-| share_plus | Native OS share sheet for notes and project documents | Planned (Step 4.7) |
-| flutter_quill | Rich text editing and viewing for free-text blocks | Planned (Step 4.7) |
-| delta_to_markdown | Convert Quill Delta → Markdown for export | Planned (Step 4.7) |
-| image_picker | Gallery and camera photo selection | Planned (Step 4.7) |
-| image_cropper | Crop and resize UI before saving | Planned (Step 4.7) |
-| photo_view | Full-screen image viewer with pinch-to-zoom | Planned (Step 4.7) |
-| flutter_image_compress | Image compression and resizing | Planned (Step 4.7) |
+| add_2_calendar | OS calendar event creation for hybrid reminders | Active |
+| share_plus | Native OS share sheet for notes and project documents | Active |
+| flutter_quill | Rich text editing and viewing for free-text blocks | Active |
+| delta_to_markdown | Convert Quill Delta → Markdown for export | Active |
+| image_picker | Gallery and camera photo selection | Active |
+| image_cropper | Crop and resize UI before saving | Active |
+| photo_view | Full-screen image viewer with pinch-to-zoom | Active |
+| flutter_image_compress | Image compression and resizing | Active |
 | hive_generator + build_runner | Hive model code generation (dev) | Active |

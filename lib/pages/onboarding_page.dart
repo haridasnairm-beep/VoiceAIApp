@@ -196,7 +196,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       _WhisperSetupPage(
         onSetupTap: () {
           // Navigate to settings with highlight
-          context.push(AppRoutes.settings, extra: {'highlightWhisper': true});
+          context.push(AppRoutes.audioSettings, extra: {'highlightWhisper': true});
         },
       ),
 

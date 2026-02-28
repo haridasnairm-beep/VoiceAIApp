@@ -24,13 +24,15 @@ class ProjectBlockAdapter extends TypeAdapter<ProjectBlock> {
       content: fields[4] as String?,
       createdAt: fields[5] as DateTime?,
       updatedAt: fields[6] as DateTime?,
+      imageAttachmentId: fields[7] as String?,
+      contentFormat: fields[8] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ProjectBlock obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +46,11 @@ class ProjectBlockAdapter extends TypeAdapter<ProjectBlock> {
       ..writeByte(5)
       ..write(obj.createdAt)
       ..writeByte(6)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(7)
+      ..write(obj.imageAttachmentId)
+      ..writeByte(8)
+      ..write(obj.contentFormat);
   }
 
   @override
@@ -71,6 +77,8 @@ class BlockTypeAdapter extends TypeAdapter<BlockType> {
         return BlockType.freeText;
       case 2:
         return BlockType.sectionHeader;
+      case 3:
+        return BlockType.imageBlock;
       default:
         return BlockType.noteReference;
     }
@@ -87,6 +95,9 @@ class BlockTypeAdapter extends TypeAdapter<BlockType> {
         break;
       case BlockType.sectionHeader:
         writer.writeByte(2);
+        break;
+      case BlockType.imageBlock:
+        writer.writeByte(3);
         break;
     }
   }

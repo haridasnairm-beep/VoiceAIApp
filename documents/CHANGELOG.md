@@ -4,19 +4,557 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - Steps 4.6 & 4.7: Tasks, Reminders, Sharing, Rich Text & Images
+## [1.12.0] - 2026-03-01 - Rich Text Persistence Fix + Whisper Noise Filters + Project View Rich Text
 
-### Documentation
-- Added **FEATURE_TASKS_AND_REMINDERS.md** — full feature spec for interactive checkboxes, aggregated tasks view, and hybrid reminder model
-- Added **FEATURE_PROJECT_DOCUMENTS.md Addendum A** — feature spec for sharing/export (A1), rich text formatting (A2), and image blocks/photo attachments (A3)
-- Updated **PROJECT_SPECIFICATION.md** (v2.3 → v2.4):
-  - Step 4.6: added sections 4.15 (Aggregated Tasks View), 4.16 (Reminder Enhancement), updated Note Detail with interactive checkboxes/manual task creation, updated Home with Tasks tab, added TaskItem view model, added `add_2_calendar`
-  - Step 4.7: updated Note Detail with photo attachments and share button, updated Project Document Detail with image blocks/rich text/share/export, added section 4.14 (Image Viewer), added ImageAttachment model, updated ProjectBlock with `imageAttachmentId`/`contentFormat`, added 7 new packages, updated permissions (Camera, Photo Library), updated key behaviors and Out of Scope
-- Updated **IMPLEMENTATION_PLAN.md** (v2.3 → v2.4):
-  - Added Step 4.6 with 5 sub-steps (A-E): checkboxes, tasks view, reminder enhancement
-  - Added Step 4.7 with 7 sub-steps (A-G): data models, sharing/export, rich text, image blocks, note photos, polish; 8 new files, 11 modified files, 7 new packages
-  - Updated phase summary diagram with both new steps
-- Updated **PROJECT_STATUS.md** — added Step 4.6 and 4.7 status tables, updated Next Steps
+### Fixed
+- **CRITICAL: Rich text formatting now persists after save** — `addTranscriptVersion()` in `notes_repository.dart` was overwriting `rawTranscription` (delta JSON) with plain text after every save. Fixed by skipping the overwrite for `quill_delta` format notes.
+- **Keep Screen Awake toggle** — added `await` to `WakelockPlus.enable()`/`disable()` calls so the toggle actually takes effect immediately.
+- **Note card preview** — notes with rich text (quill_delta) now show plain text preview on home page instead of raw JSON.
+- **Folder detail page** — same plain text extraction fix for note previews.
+- **Search page** — same fix for search result previews.
+- **Sharing service** — sharing/exporting notes now strips delta JSON to plain text for note references.
+
+### Added
+- **Whisper transcription noise filter** — strips common Whisper artifacts from transcriptions:
+  - Bracketed markers: `[inaudible]`, `[BLANK_AUDIO]`, `[MUSIC]`, `[SILENCE]`, `[NOISE]`, `[STATIC]`, etc.
+  - Parenthesized markers: `(speaking in foreign language)`, `(soft music)`, `(background noise)`, `(unintelligible)`, etc.
+  - Hallucination loops: repeated "Thank you", "Thanks for watching", "Please subscribe" patterns.
+- **Rich text display in project view** — note reference cards in project documents now render rich formatting (bold, italic, colors, font sizes, newlines) via read-only QuillEditor instead of plain text.
+- **"Rich text edit" menu option** in note reference card 3-dot menu — navigates to note detail page for full toolbar editing, back returns to project.
+- **Model picker download status icons** — 4 distinct states: filled check (selected+downloaded), radio button (selected+not downloaded), outline check (not selected+downloaded), download icon (not selected+not downloaded). Also shows "Not downloaded" subtitle.
+
+### Changed
+- **Recording page** — removed redundant "Recording in progress" text (whisper indicator already shows status). Now only shows "Starting…" or "Paused" when relevant.
+
+---
+
+## [1.11.0] - 2026-02-28 - Animated Download Experience + Recording Screen Toggle
+
+### Added
+- **Animated download experience** — Whisper model download now shows a full-screen branded experience with animated waveform bars, app logo, progress bar with percentage, and rotating feature tips (Privacy First, No Cloud Required, On-Device AI, No Ads/Tracking, Rich Text Notes). Replaces the plain AlertDialog progress bar.
+- **Keep Screen Awake toggle on recording screen** — toggle is now directly accessible on the recording page (both whisper and live modes) so users can enable/disable mid-recording without leaving the screen.
+- New `lib/widgets/download_progress_sheet.dart` — reusable animated download widget.
+
+### Changed
+- **Custom rich text toolbar** — replaced `QuillSimpleToolbar` (invisible icons in dark theme) with custom Flutter `IconButton` toolbar that properly shows Bold, Italic, Bullets, H1, H2 with correct theme colors in both light and dark modes. Applied to note editing, free text blocks, and section headers.
+- Consolidated all download dialogs (`_ModelDownloadDialog`, `WhisperDownloadDialog`, `_WhisperDownloadDialog`) into single `DownloadProgressSheet` widget.
+
+### Removed
+- `_ModelDownloadDialog` from `audio_settings_page.dart`
+- `WhisperDownloadDialog` from `settings_widgets.dart`
+- `_WhisperDownloadDialog` from `settings_page.dart`
+
+---
+
+## [1.10.0] - 2026-02-28 - Keep Screen Awake + Rich Text Editing + Support Us Page
+
+### Added
+- **Keep Screen Awake** toggle in Audio & Recording settings — prevents screen from locking during long recordings (meetings, lectures). Default: ON. Uses `wakelock_plus` to keep screen on while recording, disables on save/discard.
+- **Rich text editing for regular notes** — note transcription edit now uses `flutter_quill` editor with formatting toolbar (Bold, Italic, Bullet Lists, Headers, Links). Rich text stored as Quill Delta JSON in new `contentFormat` field on Note model. Backward compatible — existing plain text notes still display normally.
+- **Rich text editing for Section Headers** in Project Documents — section headers now support Bold and Italic formatting via Quill editor.
+- **Support Us page** — dedicated page accessible from Help & Support, with promises (free, no ads, no tracking, on-device), "Buy Me a Coffee" button, and share encouragement.
+- New `contentFormat` field on Note model (HiveField 20) for rich text format tracking.
+- New `keepScreenAwake` field on UserSettings model (HiveField 17).
+- New `/support_us` route and `SupportUsPage`.
+
+### Changed
+- **About page** "Support Development" section — rephrased from "AI Free & Ad-Free" to clearer "completely free to use with no ads, no subscriptions, and no data tracking" wording.
+- **Whisper download cancel** now properly stops the HTTP connection (added `cancelDownload()` to WhisperService).
+- All "Tap the download button to resume" messages updated to "Tap on Whisper Model to try again."
+
+---
+
+## [1.9.4] - 2026-02-28 - Whisper Model Status Capsule Badge + Download Re-trigger Fix
+
+### Changed
+- **Whisper Model item** now shows a **capsule status badge** next to the label:
+  - **Red "Not Downloaded"** badge when model needs downloading
+  - **Green "Ready"** badge when model is downloaded
+  - **Grey "Checking..."** badge while verifying status
+- **Download re-trigger fix** — tapping Whisper Model when current model is not downloaded now correctly triggers the download dialog (was silently returning because `picked == currentModel`)
+- All **"Download failed"** SnackBar messages replaced with resume-friendly wording: `"Download couldn't be completed. Tap the download button to resume."`
+- Updated across `audio_settings_page.dart` (3 locations) and `settings_page.dart` (2 locations)
+
+---
+
+## [1.9.2] - 2026-02-28 - Default Folder Moved + Download Resume & Wakelock
+
+### Changed
+- **Default Folder** setting moved from Audio & Recording page to **Preferences** page (better UX grouping)
+- **Whisper model download** now keeps screen awake via `wakelock_plus` during download — prevents OS from killing the connection when screen dims
+- **HTTP resume support** added to model download — if download is interrupted (app minimized, network drop), the next attempt **resumes from where it left off** instead of starting from scratch
+- Download dialog messages updated: "Keep the app open — screen will stay on."
+- Partial `.tmp` download files are preserved for resume (no longer deleted on failure)
+
+### Added
+- `wakelock_plus` package dependency for screen wakelock during downloads
+
+---
+
+## [1.9.1] - 2026-02-28 - Speaking Language for All Modes + Mixed-Language Guidance
+
+### Changed
+- **Speaking Language** picker now visible for **both** Whisper and Live transcription modes (was Whisper-only)
+- **Dynamic sublabel** adapts based on mode and language:
+  - English (any mode): "Language you speak during recording"
+  - Whisper + non-English: "Language you speak — choose note output below"
+  - Live + non-English: "Output will be in this language (no translation)"
+- **Transcription Mode picker** updated descriptions:
+  - Whisper: mentions "Supports English translation for other languages"
+  - Live: mentions "Output is always in the speaking language — no translation"
+- **Note Output** remains Whisper-only (Live mode has no translation capability)
+
+---
+
+## [1.9.0] - 2026-02-28 - Speaking Language + Note Output Mode (Two-Part Language UX)
+
+### Added
+- **Speaking Language picker** in Audio & Recording — user selects the language they speak during recording (English default). No more "Auto" mode.
+- **Note Output picker** — when speaking language is not English, user chooses between:
+  - **English Translation** — speech translated to English notes (`isTranslate: true`), works on Standard model
+  - **Native Script** — notes in native script (e.g. हिन्दी, العربية, 中文), requires Enhanced model
+- **`noteOutputMode` setting** — persisted in Hive (HiveField 16), defaults to `'english'`
+- **`isTranslate` parameter** added to `WhisperService.transcribe()` — enables Whisper translation mode
+- **Automatic Enhanced model enforcement** — selecting "Native Script" output triggers download if Enhanced model not present
+
+### Changed
+- **Removed "Auto/Automatic"** from language options — unreliable on Standard model, confusing for users
+- **Default language changed** from Auto (`null`) to English (`'en'`) — existing users with Auto migrated to English
+- **Moved language setting** from Preferences page to Audio & Recording page (where it belongs with transcription settings)
+- **Removed old language recommendation dialog** from Preferences (replaced by inline Note Output enforcement in Audio Settings)
+
+### How It Works
+Whisper's `isTranslate` param translates any language to English text output. This enables:
+- Hindi speaker wanting English notes → `language: 'hi', isTranslate: true` (Standard model works fine)
+- Hindi speaker wanting Devanagari notes → `language: 'hi', isTranslate: false` (Enhanced model required)
+
+---
+
+## [1.8.5] - 2026-02-28 - Unified Whisper Model Item
+
+### Changed
+- **Unified Whisper Model item** in Audio Settings — merged the separate "Whisper Model" (download status) and "Transcription Model" (Standard/Enhanced picker) into ONE item showing model name + size + download status in the sublabel (e.g. "Standard (142 MB) · Ready")
+- **Removed** old `WhisperModelStatusItem` widget from `settings_widgets.dart`
+
+---
+
+## [1.8.4] - 2026-02-28 - Selectable Whisper Model (Standard / Enhanced)
+
+### Added
+- **Transcription Model picker** in Audio Settings — users can choose between:
+  - **Standard (142 MB)** — `ggml-base.bin`, fast transcription, best for English
+  - **Enhanced (466 MB)** — `ggml-small.bin`, better accuracy, supports Hindi and other languages in native script (Devanagari, Arabic, CJK, etc.)
+- **Dynamic model switching** in `WhisperService` — supports loading any model at runtime (`switchModel()`, `isSpecificModelDownloaded()`, `deleteSpecificModel()`, `getSpecificModelSizeBytes()`)
+- **Download flow** for Enhanced model — confirmation dialog with size warning, progress bar, auto-switch on completion
+- **`whisperModel` setting** — persisted in Hive (HiveField 15), defaults to `'base'`
+
+### Changed
+- `WhisperService` — refactored from hardcoded `ggml-base.bin` to configurable model selection
+- `recording_page.dart` — reads `settings.whisperModel` and applies it before transcription starts
+
+### Why
+The Whisper `base` model (74M parameters) cannot reliably output non-Latin scripts like Devanagari for Hindi. It romanizes instead (e.g., "Mera naam Haridas hai" instead of "मेरा नाम हरिदास है"). The `small` model (244M parameters) has enough capacity for native script output and significantly better multilingual accuracy.
+
+---
+
+## [1.8.3] - 2026-02-28 - Fix: Wire Language Setting to Transcription Engines
+
+### Fixed
+- **CRITICAL: Language setting was completely disconnected** — the "Detection Language" preference was stored but never forwarded to either transcription engine. All recordings used engine defaults regardless of user selection.
+- **Whisper engine** — now passes `language:` param to `TranscribeRequest` (e.g. `'hi'` for Hindi, `'auto'` for auto-detect). Previously always auto-detected, causing wrong results on mixed-language speech.
+- **Live STT engine** — now passes `localeId:` to `speech_to_text.listen()` with BCP-47 locale (e.g. `'hi-IN'` for Hindi). Previously used OS default locale only.
+- **Note detectedLanguage field** — now stores the actual language setting instead of hardcoded `'auto'` (Whisper) or `'en'` (Live).
+- **ISO → BCP-47 mapping** — added locale mapping for all 12 supported languages (speech_to_text requires `'hi-IN'` format, not `'hi'`).
+
+### Changed
+- `WhisperService.transcribe()` — new `language` parameter (default: `'auto'`)
+- `TranscriptionService.startListening()` — new `localeId` parameter (default: `null` = OS default)
+- `NotesNotifier.transcribeInBackground()` — new `language` parameter forwarded to Whisper
+- `recording_page.dart` — reads `settings.defaultLanguage` and passes to both engines
+
+---
+
+## [1.8.2] - 2026-02-28 - Audio Settings UX + Preferences Toggles
+
+### Changed
+- **Transcription mode picker** — "Record & Transcribe" now listed first with "(Recommended)" label; on-device privacy messaging added ("nothing leaves your phone"); Live Transcription moved to second option with clearer description
+- **Transcription sublabel** — shows "On-device Whisper AI — high accuracy" (whisper) or "Real-time text, no audio saved" (live) instead of generic descriptions
+- **Voice Commands** — sublabel changed to "Organize recordings by voice — tap to learn more"; tapping now shows a detailed info dialog with format, examples, and tips
+- **Default Folder picker** — removed "None" option; General folder is always the mandatory default; users can only switch between existing folders
+
+### Added
+- **Action Items toggle** in Preferences — enables/disables action items section in note detail (`actionItemsEnabled`, HiveField 13)
+- **To-Dos toggle** in Preferences — enables/disables to-dos section in note detail (`todosEnabled`, HiveField 14)
+- **Note detail page** — Action Items and To-Dos sections now conditionally hidden when disabled in Preferences (both voice notes and text notes)
+
+---
+
+## [1.8.1] - 2026-02-27 - About Page Fixes + Spec Update
+
+### Fixed
+- **About page: Support Development section** — now uses theme-aware colors (`errorContainer`, `error`) instead of hardcoded `Colors.red.shade50` / `Colors.pink.shade50` that clashed with dark mode
+- **About page: "Have a feature in mind?" tile** — now tappable, navigates directly to Feedback page with chevron indicator
+- **About page: Legal info text** — updated from "visit Settings > About" to "Review below"
+- **About page: Phase 2 roadmap** — updated to match actual implementation plan (Whisper API, AI categorization, AI task extraction, AI project summaries, semantic search, n8n)
+
+### Updated
+- `documents/PROJECT_SPECIFICATION.md` — v2.5: Settings → App Menu (3-dot menu + sub-pages), all routes updated, "planned" statuses changed to "implemented/active", TextNotePrefix added to UserSettings model
+
+---
+
+## [1.8.0] - 2026-02-27 - Settings Redesign: 3-dot Menu + Sub-pages
+
+### Changed
+- **Home AppBar**: Replaced gear icon with 3-dot overflow menu (`PopupMenuButton`)
+- **Settings page split** into 5 focused sub-pages:
+  - **Preferences** (`/preferences`) — name, note prefix, text prefix, detection language, reminders, appearance
+  - **Audio & Recording** (`/audio_settings`) — audio quality, transcription mode, whisper model, default folder, voice commands
+  - **Storage** (`/storage`) — storage breakdown (whisper, recordings, notes, images)
+  - **Help & Support** (`/support`) — quick guide, send feedback
+  - **Danger Zone** (`/danger_zone`) — delete whisper model, delete recordings, delete all data
+- **About page** remains unchanged, accessible from 3-dot menu
+- **Feedback page**: Send button now requires minimum 20 characters (anti-spam)
+- Deep links from onboarding and recording pages updated to point to Audio & Recording page
+
+### Added
+- `lib/widgets/settings_widgets.dart` — shared settings UI components (SettingsGroup, SettingsItem, DangerItem, StorageBreakdownSection, WhisperModelStatusItem, WhisperDownloadDialog)
+- `lib/pages/preferences_page.dart` — Preferences sub-page
+- `lib/pages/audio_settings_page.dart` — Audio & Recording sub-page
+- `lib/pages/storage_page.dart` — Storage sub-page
+- `lib/pages/support_page.dart` — Help & Support sub-page
+- `lib/pages/danger_zone_page.dart` — Danger Zone sub-page
+
+### Modified
+- `lib/nav.dart` — replaced `/settings` route with 5 new routes
+- `lib/pages/home_page.dart` — gear icon → 3-dot PopupMenuButton
+- `lib/pages/feedback_page.dart` — 20-char minimum for send button
+- `lib/pages/onboarding_page.dart` — updated deep link to `/audio_settings`
+- `lib/pages/recording_page.dart` — updated deep link to `/audio_settings`
+
+### Removed
+- `/settings` route (replaced by sub-page routes)
+- `lib/pages/settings_page.dart` is no longer used as a route destination
+
+---
+
+## [1.7.2] - 2026-02-27 - Send Feedback Page
+
+### Added
+- **Send Feedback page** — category dropdown (Bug Report, Feature Request, General Feedback), text field with 1000 char limit, sends via share sheet to hdmpixels@gmail.com
+- Accessible from Settings > Support > Send Feedback
+
+### Files Added
+- `lib/pages/feedback_page.dart` — feedback page
+
+### Files Modified
+- `lib/nav.dart` — added `/feedback` route
+- `lib/pages/settings_page.dart` — added "Send Feedback" item in SUPPORT group
+
+---
+
+## [1.7.1] - 2026-02-27 - About Page
+
+### Added
+- **About VoiceNotes AI page** — full about screen with app logo, version, description, development credits (HDMPixels + Claude Code), Phase 2 roadmap, "Buy Me a Coffee" support section, legal links (Privacy Policy & Terms), and technical details
+- Accessible from Settings > About > About VoiceNotes AI
+
+### Files Added
+- `lib/pages/about_page.dart` — About page
+
+### Files Modified
+- `lib/nav.dart` — added `/about` route
+- `lib/pages/settings_page.dart` — added "About VoiceNotes AI" item in ABOUT group
+
+---
+
+## [1.7.0] - 2026-02-27 - Privacy Policy & Terms and Conditions Pages
+
+### Added
+- **Privacy & Data Policy page** — comprehensive privacy policy accessible from Settings > About
+- **Terms & Conditions page** — full legal terms accessible from Settings > About
+- Both pages cover local-first architecture, copyright, user rights, and HDMPixels branding
+- Styled with section headers, bullet lists, highlight boxes, and copyright footer
+- New routes `/privacy_policy` and `/terms_conditions` added to GoRouter
+- "ABOUT" settings group with both links (shield icon + document icon)
+
+### Files Added
+- `lib/pages/privacy_policy_page.dart` — privacy policy page
+- `lib/pages/terms_conditions_page.dart` — terms & conditions page
+
+### Files Modified
+- `lib/nav.dart` — added privacy policy and terms & conditions routes
+- `lib/pages/settings_page.dart` — added "About" settings group with both links
+
+---
+
+## [1.6.9] - 2026-02-27 - Strip [BLANK_AUDIO] from Whisper Transcriptions
+
+### Fixed
+- **[BLANK_AUDIO] tag removal** — Whisper transcriptions no longer contain `[BLANK_AUDIO]` or `[BLANK AUDIO]` tags that appeared when the user paused during recording
+- Tags are stripped in WhisperService before text is returned, and any resulting double-spaces are collapsed
+
+### Files Modified
+- `lib/services/whisper_service.dart` — added regex cleanup for Whisper artifacts after transcription
+
+---
+
+## [1.6.8] - 2026-02-27 - Whisper Download Popup & General Folder Fix
+
+### Changed
+- **Whisper model not ready popup** — when user tries to record in whisper mode without the model downloaded, shows a 3-option dialog: "Go to Settings" (download), "Use Live Mode" (switch to live transcription for this session), or "Cancel"
+- Previously redirected to settings page with no alternative
+
+### Fixed
+- **Live transcript notes now go to General folder** — live mode recordings that had no folder selected are automatically assigned to the General folder
+- **Folder noteIds sync** — live mode note creation in note_detail_page now properly calls `addNoteToFolder` to update the folder's noteIds list
+
+### Files Modified
+- `lib/pages/recording_page.dart` — 3-option whisper popup, auto-General folder for live mode
+- `lib/pages/note_detail_page.dart` — add `addNoteToFolder` call when creating note with folderId
+
+---
+
+## [1.6.7] - 2026-02-27 - Text Note Prefix & Auto-General Folder
+
+### Added
+- **Text Note Prefix setting** — separate prefix for text notes (default "TXT"), configurable in Settings
+- Auto-sequence: TXT001, TXT002, TXT003... (independent from voice note sequence)
+- **Auto-assign General folder** — text notes automatically placed in General folder when created
+- New "Text Prefix" setting in Preferences section with orange edit_note icon
+- `textNotePrefix` HiveField(12) on UserSettings model
+
+### Changed
+- `_generateTitle()` refactored into `_generateTitleWithPrefix()` shared helper
+- `addNote()` detects text notes (empty audioFilePath) and uses text prefix + General folder
+
+### Files Modified
+- `lib/models/user_settings.dart` — added `textNotePrefix` HiveField(12), default "TXT"
+- `lib/models/user_settings.g.dart` — regenerated Hive adapter
+- `lib/providers/settings_provider.dart` — added `textNotePrefix` to SettingsState + `setTextNotePrefix()`
+- `lib/services/settings_repository.dart` — added `setTextNotePrefix()` method
+- `lib/providers/notes_provider.dart` — added `_generateTextNoteTitle()`, auto-assign General folder for text notes
+- `lib/pages/settings_page.dart` — added Text Prefix setting item in Preferences group
+
+---
+
+## [1.6.6] - 2026-02-27 - Text Notes Support
+
+### Added
+- **Text Note creation** — new "Text Note" option in speed dial FAB on home page
+- Creates a note with no audio file, opens directly in edit mode (title + transcription editable)
+- **Note card differentiation** — text notes show pen icon (orange chip) vs voice notes with mic icon (green chip)
+- Same swipe gestures, long-press menu, and detail page experience as voice notes
+- Audio player section automatically hidden for text-only notes
+
+### Files Modified
+- `lib/pages/home_page.dart` — added Text Note speed dial item
+- `lib/pages/note_detail_page.dart` — added `isNewTextNote` flag, auto-enter edit mode for new text notes
+- `lib/nav.dart` — pass `isNewTextNote` extra to note detail route
+- `lib/widgets/note_card.dart` — differentiate icon/color for text vs voice notes
+
+---
+
+## [1.6.5] - 2026-02-27 - Issue #5: Voice Notes Detail Page Redesign
+
+### Changed
+- **AppBar title** — editable inline with pen icon (tap title to edit, check to save)
+- **Removed bottom edit bar** — no more fixed "Edit Note" / "Save Note" button at bottom
+- **Transcription editing** — pen icon on section header for inline editing with save/cancel
+- **Each save creates a new version** — uses `addTranscriptVersion` to track edits
+- **Inline version history** — collapsible section below transcription, newest first
+- **Version selection mode** — long press versions to enter selection, select all, bulk delete
+- **Original version protection** — deleting original triggers double confirmation (deletes entire note)
+- **Audio player moved below transcription** — treated as secondary content
+- **Audio waveform animation** — animated bar visualization during playback (30 bars, progress-colored)
+- **Usage section** — shows which folders and projects the note belongs to (colored chips)
+- **Delete moved to bottom** — red outlined button at bottom of scrollable content
+- **Delete confirmation** — warns about removal from folders/projects with names listed
+- **3-dot menu simplified** — only Share remains (delete removed from overflow menu)
+
+### Files Modified
+- `lib/pages/note_detail_page.dart` — complete redesign with all changes above
+
+---
+
+## [1.6.4] - 2026-02-27 - Issue #4: Speed Dial FAB Overlay Fix
+
+### Fixed
+- **Main FAB button** now renders above the blur overlay when speed dial is open
+- Previously the blur scrim covered the FAB making it appear blurry/unfocused
+- Added a duplicate FAB in the overlay layer so it sits on top of the backdrop filter
+
+### Files Modified
+- `lib/widgets/speed_dial_fab.dart` — render main FAB above blur scrim in overlay
+
+---
+
+## [1.6.3] - 2026-02-27 - Issue #3: General Folder Protection
+
+### Changed
+- **General folder** — rename and delete options hidden for the "General" folder
+- **New installs** — General folder created with `isAutoGenerated: true` flag
+- **Existing installs** — also guarded by folder name check for backward compatibility
+
+### Files Modified
+- `lib/pages/folder_detail_page.dart` — hide overflow menu for General folder
+- `lib/services/hive_service.dart` — set `isAutoGenerated: true` on General folder creation
+
+---
+
+## [1.6.2] - 2026-02-27 - Issue #2: Search Notes Page
+
+### Changed
+- **Removed recording FAB** from search page — search is now purely for finding notes
+- **AppBar header** — replaced manual padded header with standard AppBar for consistent spacing/alignment
+- **Removed search bar** from home dashboard — was just redirecting to search page
+- **Folder/project filter chips** — scrollable chips for every folder and project, tap to filter results
+- **Contextual search** — searching from folder detail page pre-selects that folder filter
+- **Search route** — accepts optional `folderId`/`projectId` extras for contextual filtering
+
+### Files Modified
+- `lib/pages/search_page.dart` — full rewrite
+- `lib/pages/home_page.dart` — removed search bar
+- `lib/pages/folder_detail_page.dart` — passes folderId to search
+- `lib/nav.dart` — search route accepts extras
+
+---
+
+## [1.6.1] - 2026-02-27 - Issue #1: Voice Note Tile Redesign
+
+### Added
+- **Compact NoteCard widget** (`lib/widgets/note_card.dart`) — extracted and redesigned note tile from home page into reusable widget
+- **Metadata row** — timestamp, duration (Xm Ys format), and language displayed with icons and dot separators
+- **Folder labels** — colored chips showing all folders containing the note (reverse-lookup from folder noteIds)
+- **Project labels** — colored chips showing linked project document titles
+- **Photo count indicator** — badge showing number of attached images
+- **Swipe gestures** — left swipe to delete (red, with confirmation), right swipe to open note (blue)
+- **Long-press context menu** — bottom sheet with: Open, Edit Title, Add to Folder, Add to Project, Delete
+- **Edit Title dialog** — inline title editing from long-press menu
+- **Folder picker** — scrollable bottom sheet to toggle folder membership, with "Create New" option
+- **Project picker** — scrollable bottom sheet to link note to projects, with "Create New" option
+
+### Changed
+- **Note tile layout** — compact design with 16px padding (was 24px), 8px margin (was 16px), regular weight title (was bold)
+- **Title width** — full width with ellipsis (was capped at 150px)
+- **Tags** — use `Wrap` for better multi-tag layout (was fixed `Row`)
+- **Removed** — old inline `_NoteCard`, `_NoteTag`, `_TranscribingProgress` classes from home_page.dart (moved to note_card.dart)
+
+### Files Created
+- `lib/widgets/note_card.dart`
+
+### Files Modified
+- `lib/pages/home_page.dart`
+
+---
+
+## [1.5.0] - 2026-02-27 - Step 4.6: Interactive Tasks & Reminder Enhancement
+
+### Added
+- **Interactive checkboxes on Note Detail** — action items and todos are now tappable; checkbox toggles `isCompleted` with strikethrough + muted styling
+- **Todos section on Note Detail** — previously missing; now rendered with interactive checkboxes, due date badges, and overdue highlighting
+- **Manual task creation** — "Add Action" and "Add Todo" buttons on Note Detail with inline creation dialogs (text + optional due date for todos)
+- **Task overflow menus** — Edit and Delete options on every action item, todo, and reminder via 3-dot PopupMenuButton
+- **Aggregated Tasks View** — new "Tasks" tab on Home page (SegmentedButton) showing all todos, actions, and reminders from every note in one sorted, filterable list
+- **Task filter chips** — All / Todos / Actions / Reminders filter on Tasks tab
+- **Show completed toggle** — hide/show completed tasks with count indicator
+- **Open task count badge** — badge on Tasks tab icon showing number of open tasks
+- **Reminder reschedule** — reschedule any reminder via date/time picker from overflow menu; cancels old notification, schedules new one
+- **Overdue highlighting** — todos and reminders with past due dates shown in red across all surfaces
+- **OS calendar bridge** — "Also add to Calendar" bottom sheet after creating a reminder; uses `add_2_calendar` to create pre-filled OS calendar event
+- **Reminder destination sheet** — bottom sheet widget offering "Keep in VoiceNotes AI" or "Also add to Calendar" after reminder creation
+- **Collapsible tasks in Project Documents** — note reference blocks now show a collapsible "Tasks" sub-section with interactive checkboxes for the linked note's todos and actions
+- **Task count summary** — collapsed state shows "N tasks (M completed)" in note reference blocks
+- **TaskItem view model** — `lib/models/task_item.dart` with `TaskType` enum (todo/action/reminder) for aggregated tasks
+- **tasksProvider** — derived Riverpod provider aggregating all tasks from all notes with sorting (overdue first → due date → creation date)
+- **OsReminderService** — `lib/services/os_reminder_service.dart` wrapping `add_2_calendar` for OS calendar event creation
+
+### Changed
+- **Home page** — converted from `ConsumerWidget` to `ConsumerStatefulWidget` to hold tab state
+- **NoteReferenceCard** — converted from `StatefulWidget` to `ConsumerStatefulWidget` for Riverpod access
+- **NotesRepository** — added 8 new CRUD methods: toggleTodoCompleted, toggleActionCompleted, addTodoItem, addActionItem, updateTodoItem, updateActionItem, deleteTodoItem, deleteActionItem, plus rescheduleReminder
+- **NotesProvider** — exposed all 8 repository methods + rescheduleReminder with notification cancel/reschedule logic
+- **Action Items section** — now always visible (not gated by `isNotEmpty`) to allow adding new actions
+
+### Dependencies
+- Added `add_2_calendar: ^3.0.1` for cross-platform OS calendar event creation
+
+### Files Created (7 new)
+- `lib/models/task_item.dart` — TaskItem view model + TaskType enum
+- `lib/providers/tasks_provider.dart` — derived provider aggregating all tasks
+- `lib/widgets/tasks_tab.dart` — Tasks tab content for Home page
+- `lib/widgets/task_list_item.dart` — reusable task row widget
+- `lib/widgets/reminder_destination_sheet.dart` — bottom sheet for reminder destination
+- `lib/services/os_reminder_service.dart` — OS calendar bridge
+
+### Files Modified (6)
+- `lib/services/notes_repository.dart` — 8 CRUD methods + rescheduleReminder
+- `lib/providers/notes_provider.dart` — exposed all new methods
+- `lib/pages/note_detail_page.dart` — interactive todos/actions, create buttons, reschedule, OS reminder sheet
+- `lib/pages/home_page.dart` — Notes/Tasks tab bar, ConsumerStatefulWidget conversion
+- `lib/pages/project_document_detail_page.dart` — collapsible tasks in note reference blocks
+- `pubspec.yaml` — added add_2_calendar
+
+---
+
+## [1.6.0] - 2026-02-27 - Step 4.7: Sharing, Rich Text & Image Blocks
+
+### Added
+- **Share single note** — share button in Note Detail overflow menu assembles formatted note text and opens OS share sheet via `share_plus`
+- **Share project document** — share icon in Project Document AppBar assembles all blocks into shareable text
+- **Export as Markdown** — overflow menu option generates `.md` file with proper heading/quote formatting and shares via OS sheet
+- **Export as Plain Text** — overflow menu option generates `.txt` file and shares via OS sheet
+- **Rich text formatting** — free-text blocks in Project Documents now use `flutter_quill` editor with formatting toolbar (Bold, Italic, Bullet List, H1, H2, Link)
+- **Quill Delta storage** — rich text stored as Quill Delta JSON in `block.content` with `contentFormat: "quill_delta"`; plain text blocks auto-wrapped on first edit
+- **Image blocks** — new block type `imageBlock` for Project Documents; pick from gallery or camera, compress/save, display full-width with caption
+- **Image block overflow menu** — View full screen, Edit caption, Move up/down, Remove (cascade deletes file + metadata)
+- **Full-screen image viewer** — `photo_view` based viewer with pinch-to-zoom and pan
+- **Note photo attachments** — new Attachments section on Note Detail with horizontal scrollable thumbnails, Add Photo button (gallery/camera), long-press to delete
+- **ImageAttachment Hive model** — `lib/models/image_attachment.dart` (typeId: 10) with id, filePath, fileName, caption, dimensions, fileSize, sourceType
+- **Image attachment repository** — `lib/services/image_attachment_repository.dart` with save/get/delete/updateCaption methods + `flutter_image_compress` for optimization
+- **Sharing service** — `lib/services/sharing_service.dart` for assembling note/document text and generating export files
+- **Image block widget** — `lib/widgets/image_block_widget.dart` with full-width image, caption, overlay menu
+- **Note attachments widget** — `lib/widgets/note_attachments_section.dart` with thumbnail row and photo management
+
+### Changed
+- **BlockType enum** — added `imageBlock` (HiveField 3)
+- **ProjectBlock model** — added `imageAttachmentId` (HiveField 7) and `contentFormat` (HiveField 8) fields
+- **Note model** — added `imageAttachmentIds` (HiveField 19) field
+- **HiveService** — registered `ImageAttachmentAdapter`, opened `imageAttachmentsBox`, creates images directory on init, includes images in storage calculation, clears images on Delete All Data
+- **Free-text blocks** — replaced plain `TextField` with `QuillEditor` + `QuillSimpleToolbar` for rich text editing
+- **Project Document detail** — added image block rendering, "Add Image" option in add block sheet, share/export buttons
+- **Note Detail page** — added share button, photo attachments section
+- **NotesRepository** — added `addImageAttachment` and `removeImageAttachment` methods
+- **NotesProvider** — exposed image attachment methods
+- **ProjectDocumentsRepository** — added `addImageBlock` and `updateBlockContentFormat` methods
+- **ProjectDocumentsProvider** — exposed image block and content format methods
+
+### Dependencies
+- Added `share_plus: ^10.1.4` — OS share sheet
+- Added `flutter_quill: ^11.5.0` — rich text editing
+- Added `image_picker: ^1.1.2` — gallery/camera photo selection
+- Added `image_cropper: ^8.0.2` — crop and resize UI
+- Added `photo_view: ^0.15.0` — full-screen image viewer with zoom
+- Added `flutter_image_compress: ^2.3.0` — image compression
+
+### Files Created (6 new)
+- `lib/models/image_attachment.dart` — ImageAttachment Hive model (typeId: 10)
+- `lib/services/image_attachment_repository.dart` — image CRUD + file management
+- `lib/services/sharing_service.dart` — share text assembly + export file generation
+- `lib/widgets/image_block_widget.dart` — image block card for Project Documents
+- `lib/widgets/note_attachments_section.dart` — photo section on Note Detail
+- `lib/pages/image_viewer_page.dart` — full-screen image viewer with pinch-to-zoom
+
+### Files Modified (10)
+- `lib/models/project_block.dart` — added imageBlock enum, imageAttachmentId, contentFormat fields
+- `lib/models/note.dart` — added imageAttachmentIds field
+- `lib/services/hive_service.dart` — ImageAttachment adapter, box, images dir, storage, deleteAll
+- `lib/services/project_documents_repository.dart` — addImageBlock, updateBlockContentFormat
+- `lib/services/notes_repository.dart` — addImageAttachment, removeImageAttachment
+- `lib/providers/project_documents_provider.dart` — addImageBlock, updateBlockContentFormat
+- `lib/providers/notes_provider.dart` — addImageAttachment, removeImageAttachment
+- `lib/pages/project_document_detail_page.dart` — image blocks, rich text, share/export
+- `lib/pages/note_detail_page.dart` — share button, attachments section
+- `pubspec.yaml` — added 6 new packages
 
 ---
 

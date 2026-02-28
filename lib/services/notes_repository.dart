@@ -1,5 +1,7 @@
 import 'package:uuid/uuid.dart';
+import '../models/action_item.dart';
 import '../models/note.dart';
+import '../models/todo_item.dart';
 import '../models/transcript_version.dart';
 import 'hive_service.dart';
 
@@ -106,7 +108,12 @@ class NotesRepository {
     );
 
     note.transcriptVersions = [...note.transcriptVersions, version];
-    note.rawTranscription = newText;
+    // Only overwrite rawTranscription for plain-text notes.
+    // Rich-text (quill_delta) notes store delta JSON in rawTranscription,
+    // which must not be clobbered with plain text.
+    if (note.contentFormat != 'quill_delta') {
+      note.rawTranscription = newText;
+    }
     note.updatedAt = DateTime.now();
     await HiveService.notesBox.put(note.id, note);
   }
@@ -172,5 +179,138 @@ class NotesRepository {
       note.updatedAt = DateTime.now();
       await HiveService.notesBox.put(note.id, note);
     }
+  }
+
+  // --- Todo Item CRUD ---
+
+  /// Toggle a todo item's completed state.
+  Future<void> toggleTodoCompleted(String noteId, String todoId) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    final idx = note.todos.indexWhere((t) => t.id == todoId);
+    if (idx == -1) return;
+    note.todos[idx].isCompleted = !note.todos[idx].isCompleted;
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Add a new todo item to a note.
+  Future<void> addTodoItem(String noteId, String text,
+      {DateTime? dueDate}) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    final todo = TodoItem(
+      id: _uuid.v4(),
+      text: text,
+      dueDate: dueDate,
+    );
+    note.todos = [...note.todos, todo];
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Update a todo item's text and/or due date.
+  Future<void> updateTodoItem(String noteId, String todoId,
+      {String? text, DateTime? dueDate, bool clearDueDate = false}) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    final idx = note.todos.indexWhere((t) => t.id == todoId);
+    if (idx == -1) return;
+    if (text != null) note.todos[idx].text = text;
+    if (dueDate != null) note.todos[idx].dueDate = dueDate;
+    if (clearDueDate) note.todos[idx].dueDate = null;
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Delete a todo item from a note.
+  Future<void> deleteTodoItem(String noteId, String todoId) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    note.todos = note.todos.where((t) => t.id != todoId).toList();
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  // --- Action Item CRUD ---
+
+  /// Toggle an action item's completed state.
+  Future<void> toggleActionCompleted(String noteId, String actionId) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    final idx = note.actions.indexWhere((a) => a.id == actionId);
+    if (idx == -1) return;
+    note.actions[idx].isCompleted = !note.actions[idx].isCompleted;
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Add a new action item to a note.
+  Future<void> addActionItem(String noteId, String text) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    final action = ActionItem(
+      id: _uuid.v4(),
+      text: text,
+    );
+    note.actions = [...note.actions, action];
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Update an action item's text.
+  Future<void> updateActionItem(
+      String noteId, String actionId, String text) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    final idx = note.actions.indexWhere((a) => a.id == actionId);
+    if (idx == -1) return;
+    note.actions[idx].text = text;
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Delete an action item from a note.
+  Future<void> deleteActionItem(String noteId, String actionId) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    note.actions = note.actions.where((a) => a.id != actionId).toList();
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  // --- Reminder Enhancement ---
+
+  /// Reschedule a reminder to a new time.
+  Future<void> rescheduleReminder(
+      String noteId, String reminderId, DateTime newTime) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    final idx = note.reminders.indexWhere((r) => r.id == reminderId);
+    if (idx == -1) return;
+    note.reminders[idx].reminderTime = newTime;
+    note.reminders[idx].isCompleted = false;
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Add an image attachment ID to a note.
+  Future<void> addImageAttachment(String noteId, String attachmentId) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    if (!note.imageAttachmentIds.contains(attachmentId)) {
+      note.imageAttachmentIds.add(attachmentId);
+      note.updatedAt = DateTime.now();
+      await HiveService.notesBox.put(note.id, note);
+    }
+  }
+
+  /// Remove an image attachment ID from a note.
+  Future<void> removeImageAttachment(String noteId, String attachmentId) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    note.imageAttachmentIds.remove(attachmentId);
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
   }
 }

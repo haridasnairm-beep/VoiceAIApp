@@ -5,7 +5,7 @@ part 'user_settings.g.dart';
 @HiveType(typeId: 5)
 class UserSettings extends HiveObject {
   @HiveField(0)
-  String? defaultLanguage; // null = auto-detect
+  String? defaultLanguage; // speaking language code (e.g. 'en', 'hi') — null migrated to 'en'
 
   @HiveField(1)
   String audioQuality; // 'standard' or 'high'
@@ -40,8 +40,26 @@ class UserSettings extends HiveObject {
   @HiveField(11)
   bool voiceCommandsEnabled; // Parse "Folder/Project <name> Start" in whisper mode
 
+  @HiveField(12)
+  String textNotePrefix; // Prefix for auto-generated text note names (e.g. "TXT" → TXT001)
+
+  @HiveField(13)
+  bool actionItemsEnabled; // Show action items section in note detail
+
+  @HiveField(14)
+  bool todosEnabled; // Show todos section in note detail
+
+  @HiveField(15)
+  String whisperModel; // 'base', 'small', 'medium' — which Whisper model to use
+
+  @HiveField(16)
+  String noteOutputMode; // 'english' or 'native' — note output language mode
+
+  @HiveField(17, defaultValue: true)
+  bool keepScreenAwake; // Keep screen on during recording (for long recordings)
+
   UserSettings({
-    this.defaultLanguage,
+    this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
     this.notificationsEnabled = true,
     this.quietHoursStartMinutes,
@@ -53,5 +71,11 @@ class UserSettings extends HiveObject {
     this.notePrefix = 'VOICE',
     this.defaultFolderId,
     this.voiceCommandsEnabled = true,
+    this.textNotePrefix = 'TXT',
+    this.actionItemsEnabled = true,
+    this.todosEnabled = true,
+    this.whisperModel = 'base',
+    this.noteOutputMode = 'english',
+    this.keepScreenAwake = true,
   });
 }
