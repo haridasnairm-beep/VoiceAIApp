@@ -19,10 +19,15 @@ import '../services/audio_player_service.dart';
 import '../nav.dart';
 import '../services/os_reminder_service.dart';
 import '../services/sharing_service.dart';
+import '../services/whisper_service.dart';
 import '../theme.dart';
 import '../widgets/reminder_destination_sheet.dart';
-import '../widgets/note_attachments_section.dart';
-import 'package:share_plus/share_plus.dart';
+import '../widgets/find_replace_bar.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
+import '../services/image_attachment_repository.dart';
+import 'image_viewer_page.dart';
+import '../widgets/share_preview_sheet.dart';
 
 class NoteDetailPage extends ConsumerStatefulWidget {
   final String? recordingPath;
@@ -55,9 +60,19 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
   late TextEditingController _titleController;
   QuillController? _quillController;
   bool _versionsExpanded = false;
+  // Word/char count for live updates during editing
+  int _liveWordCount = 0;
+  int _liveCharCount = 0;
+  // Find & Replace
+  bool _showFindReplace = false;
+  String _findQuery = '';
+  int _findCurrentIndex = 0;
+  List<int> _findMatchPositions = [];
   // Version selection mode
   bool _versionSelectionMode = false;
   final Set<String> _selectedVersionIds = {};
+  // Detail tab (0=Actions, 1=Todos, 2=Reminders, 3=Photos)
+  int _detailTab = 0;
 
   // Audio player state
   final AudioPlayerService _playerService = AudioPlayerService.instance;
@@ -195,6 +210,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     _waveformTimer?.cancel();
     _playerService.stop();
     _titleController.dispose();
+    _quillController?.removeListener(_updateWordCount);
     _quillController?.dispose();
     super.dispose();
   }
@@ -246,7 +262,126 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     setState(() => _isEditingTitle = true);
   }
 
+  // --- Find & Replace logic ---
+
+  String _getPlainText(Note note) {
+    if (_isEditingTranscription && _quillController != null) {
+      return _quillController!.document.toPlainText();
+    }
+    if (note.rawTranscription.isEmpty) return '';
+    if (note.contentFormat == 'quill_delta') {
+      try {
+        final json = jsonDecode(note.rawTranscription) as List;
+        return Document.fromJson(json).toPlainText();
+      } catch (_) {
+        return note.rawTranscription;
+      }
+    }
+    return note.rawTranscription;
+  }
+
+  void _onFindSearch(String query, Note note) {
+    _findQuery = query;
+    if (query.isEmpty) {
+      setState(() {
+        _findMatchPositions = [];
+        _findCurrentIndex = 0;
+      });
+      return;
+    }
+    final text = _getPlainText(note).toLowerCase();
+    final lower = query.toLowerCase();
+    final positions = <int>[];
+    int start = 0;
+    while (true) {
+      final idx = text.indexOf(lower, start);
+      if (idx == -1) break;
+      positions.add(idx);
+      start = idx + 1;
+    }
+    setState(() {
+      _findMatchPositions = positions;
+      _findCurrentIndex = positions.isEmpty ? 0 : 0;
+    });
+    if (positions.isNotEmpty) {
+      _selectMatch(positions[0], query.length);
+    }
+  }
+
+  void _onFindNext() {
+    if (_findMatchPositions.isEmpty) return;
+    setState(() {
+      _findCurrentIndex = (_findCurrentIndex + 1) % _findMatchPositions.length;
+    });
+    _selectMatch(_findMatchPositions[_findCurrentIndex], _findQuery.length);
+  }
+
+  void _onFindPrevious() {
+    if (_findMatchPositions.isEmpty) return;
+    setState(() {
+      _findCurrentIndex = (_findCurrentIndex - 1 + _findMatchPositions.length) %
+          _findMatchPositions.length;
+    });
+    _selectMatch(_findMatchPositions[_findCurrentIndex], _findQuery.length);
+  }
+
+  void _selectMatch(int offset, int length) {
+    if (_quillController == null || !_isEditingTranscription) return;
+    _quillController!.updateSelection(
+      TextSelection(baseOffset: offset, extentOffset: offset + length),
+      ChangeSource.local,
+    );
+  }
+
+  void _onReplace(String replacement, Note note) {
+    if (_findMatchPositions.isEmpty || _quillController == null) return;
+    final offset = _findMatchPositions[_findCurrentIndex];
+    final length = _findQuery.length;
+    _quillController!.replaceText(offset, length, replacement, null);
+    _onFindSearch(_findQuery, note);
+  }
+
+  void _onReplaceAll(String replacement, Note note) {
+    if (_findMatchPositions.isEmpty || _quillController == null) return;
+    // Replace from end to start to preserve offsets
+    final sorted = List<int>.from(_findMatchPositions)..sort((a, b) => b.compareTo(a));
+    for (final offset in sorted) {
+      _quillController!.replaceText(offset, _findQuery.length, replacement, null);
+    }
+    _onFindSearch(_findQuery, note);
+  }
+
+  void _toggleFindReplace(Note note) {
+    if (!_isEditingTranscription) {
+      _startEditTranscription(note);
+    }
+    setState(() {
+      _showFindReplace = !_showFindReplace;
+      if (!_showFindReplace) {
+        _findQuery = '';
+        _findMatchPositions = [];
+        _findCurrentIndex = 0;
+      }
+    });
+  }
+
+  void _updateWordCount() {
+    if (_quillController == null) return;
+    final text = _quillController!.document.toPlainText().trim();
+    final wc = text.isEmpty
+        ? 0
+        : text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    final cc = text.length;
+    if (wc != _liveWordCount || cc != _liveCharCount) {
+      setState(() {
+        _liveWordCount = wc;
+        _liveCharCount = cc;
+      });
+    }
+  }
+
   void _startEditTranscription(Note note) {
+    _quillController?.removeListener(_updateWordCount);
     _quillController?.dispose();
     final content = note.rawTranscription;
     if (note.contentFormat == 'quill_delta' && content.isNotEmpty) {
@@ -271,6 +406,8 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
         selection: const TextSelection.collapsed(offset: 0),
       );
     }
+    _quillController!.addListener(_updateWordCount);
+    _updateWordCount();
     setState(() => _isEditingTranscription = true);
   }
 
@@ -279,6 +416,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     final deltaJson = jsonEncode(_quillController!.document.toDelta().toJson());
     final plainText = _quillController!.document.toPlainText().trim();
 
+    _quillController?.removeListener(_updateWordCount);
     _quillController?.dispose();
     _quillController = null;
 
@@ -292,10 +430,11 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
       await ref.read(notesProvider.notifier).updateNote(note);
     }
 
-    // Save plain text version for version history (does NOT overwrite rawTranscription
-    // for quill_delta notes — see notes_repository.dart)
+    // Save version with both plain text and rich content JSON
     if (plainText.isNotEmpty) {
-      await ref.read(notesProvider.notifier).addTranscriptVersion(note.id, plainText, 'Manual edit');
+      await ref.read(notesProvider.notifier).addTranscriptVersion(
+            note.id, plainText, 'Manual edit',
+            richContentJson: deltaJson);
     }
 
     ref.read(notesProvider.notifier).refresh();
@@ -312,6 +451,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
   }
 
   void _cancelEditTranscription() {
+    _quillController?.removeListener(_updateWordCount);
     _quillController?.dispose();
     _quillController = null;
     setState(() => _isEditingTranscription = false);
@@ -322,8 +462,466 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
   }
 
   void _shareNote(Note note) {
-    final text = SharingService().assembleNoteText(note);
-    Share.share(text);
+    final service = SharingService();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, controller) => SharePreviewSheet(
+          title: note.title,
+          isProject: false,
+          assembleText: (options) =>
+              service.assembleNoteText(note, options: options),
+          onExportPdf: (options) =>
+              service.exportNoteAsPdf(note, options: options),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _retranscribeNote(Note note) async {
+    // Check audio file exists
+    final audioFile = File(note.audioFilePath);
+    if (!await audioFile.exists()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Audio file not found. Cannot re-transcribe.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Check model is ready
+    if (!await WhisperService.instance.isModelDownloaded()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Whisper model not downloaded. Go to Audio settings to download.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final currentModel = WhisperService.instance.currentModelName;
+    final modelLabel = currentModel == 'small' ? 'Enhanced' : 'Standard';
+    final oldModel = note.transcriptionModel ?? 'Unknown';
+    final oldModelLabel = oldModel == 'small'
+        ? 'Enhanced'
+        : (oldModel == 'base' ? 'Standard' : oldModel);
+
+    final isRichText = note.contentFormat == 'quill_delta';
+    final richTextWarning = isRichText
+        ? '\n\nNote: Rich text formatting will be reset to plain text.'
+        : '';
+
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Re-transcribe'),
+        content: Text(
+          'Re-transcribe this note using the $modelLabel model?\n\n'
+          'Previous transcription (model: $oldModelLabel) will be saved in version history.'
+          '$richTextWarning',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Re-transcribe'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Re-transcribing...'),
+          ],
+        ),
+      ),
+    );
+
+    await WhisperService.instance.ensureModelReady();
+    final success =
+        await ref.read(notesProvider.notifier).retranscribeNote(note.id);
+
+    if (!mounted) return;
+    Navigator.of(context).pop(); // dismiss loading
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Re-transcription complete ($modelLabel model).'
+            : 'Re-transcription failed. Please try again.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // === Tab section builders ===
+
+  Widget _buildActionItemsSection(Note note) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SectionHeader(
+            icon: Icons.checklist_rounded,
+            title: 'Action Items',
+            color: AppColors.lightSuccess,
+          ),
+          ...note.actions.map(
+            (action) => GestureDetector(
+              onTap: () => ref
+                  .read(notesProvider.notifier)
+                  .toggleActionCompleted(
+                    noteId: note.id,
+                    actionId: action.id,
+                  ),
+              child: _TaskItem(
+                content: action.text,
+                checked: action.isCompleted,
+                onEdit: () => _showEditActionDialog(
+                    note.id, action.id, action.text),
+                onDelete: () => _confirmDeleteAction(
+                    note.id, action.id, action.text),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _showAddActionDialog(note),
+            icon: const Icon(Icons.add_task_rounded, size: 20),
+            label: const Text('Add Action'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTodosSection(Note note) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SectionHeader(
+            icon: Icons.task_alt_rounded,
+            title: 'Todos',
+            color: AppColors.lightPrimary,
+          ),
+          ...note.todos.map(
+            (todo) => GestureDetector(
+              onTap: () => ref
+                  .read(notesProvider.notifier)
+                  .toggleTodoCompleted(
+                    noteId: note.id,
+                    todoId: todo.id,
+                  ),
+              child: _TaskItem(
+                content: todo.text,
+                checked: todo.isCompleted,
+                hasMeta: todo.dueDate != null,
+                metaIcon: Icons.event_rounded,
+                metaText: todo.dueDate != null
+                    ? _formatReminderTime(todo.dueDate!)
+                    : null,
+                isOverdue: todo.dueDate != null &&
+                    !todo.isCompleted &&
+                    todo.dueDate!.isBefore(DateTime.now()),
+                onEdit: () => _showEditTodoDialog(
+                    note.id, todo.id, todo.text, todo.dueDate),
+                onDelete: () =>
+                    _confirmDeleteTodo(note.id, todo.id, todo.text),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _showAddTodoDialog(note),
+            icon: const Icon(Icons.playlist_add_rounded, size: 20),
+            label: const Text('Add Todo'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemindersSection(Note note) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SectionHeader(
+            icon: Icons.alarm_rounded,
+            title: 'Reminders',
+            color: AppColors.lightAccent,
+          ),
+          ...note.reminders.map(
+            (reminder) => GestureDetector(
+              onTap: () => ref
+                  .read(notesProvider.notifier)
+                  .toggleReminderCompleted(
+                    noteId: note.id,
+                    reminderId: reminder.id,
+                  ),
+              child: _TaskItem(
+                content: reminder.text,
+                checked: reminder.isCompleted,
+                hasMeta: reminder.reminderTime != null,
+                metaIcon: Icons.schedule,
+                metaText: reminder.reminderTime != null
+                    ? _formatReminderTime(reminder.reminderTime!)
+                    : null,
+                isOverdue: reminder.reminderTime != null &&
+                    !reminder.isCompleted &&
+                    reminder.reminderTime!.isBefore(DateTime.now()),
+                onEdit: () =>
+                    _showRescheduleReminderDialog(note.id, reminder),
+                onDelete: () =>
+                    _confirmDeleteReminder(note.id, reminder),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _showAddReminderDialog(note),
+            icon: const Icon(Icons.alarm_add_rounded, size: 20),
+            label: const Text('Add Reminder'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentsTab(Note note) {
+    final repo = ImageAttachmentRepository();
+    final attachmentIds = note.imageAttachmentIds;
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.photo_library_rounded,
+                  size: 18, color: theme.colorScheme.secondary),
+              const SizedBox(width: 8),
+              Text(
+                'Photos${attachmentIds.isNotEmpty ? ' (${attachmentIds.length})' : ''}',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _addPhoto(note),
+                icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
+                label: const Text('Add Photo'),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: const Size(0, 32),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (attachmentIds.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: theme.dividerColor),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.add_a_photo_rounded,
+                      size: 48, color: theme.hintColor),
+                  const SizedBox(height: 12),
+                  Text('No photos yet',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: theme.hintColor)),
+                  const SizedBox(height: 4),
+                  Text('Tap "Add Photo" to attach images',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.hintColor)),
+                ],
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.0,
+              ),
+              itemCount: attachmentIds.length,
+              itemBuilder: (context, index) {
+                final id = attachmentIds[index];
+                final attachment = repo.getImageAttachment(id);
+                final file = repo.getImageFile(id);
+                return GestureDetector(
+                  onTap: () {
+                    if (file != null && file.existsSync()) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ImageViewerPage(
+                            imageFile: file,
+                            caption: attachment?.caption,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  onLongPress: () =>
+                      _confirmDeletePhoto(note.id, id),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: file != null && file.existsSync()
+                        ? Image.file(file, fit: BoxFit.cover)
+                        : Container(
+                            color:
+                                theme.colorScheme.surfaceContainerHighest,
+                            child: Icon(Icons.broken_image_rounded,
+                                color: theme.hintColor),
+                          ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addPhoto(Note note) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('Camera'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: source, imageQuality: 85);
+    if (picked == null || !mounted) return;
+
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Image',
+          toolbarColor: Theme.of(context).colorScheme.surface,
+          toolbarWidgetColor: Theme.of(context).colorScheme.onSurface,
+          lockAspectRatio: false,
+        ),
+      ],
+    );
+    if (cropped == null || !mounted) return;
+
+    final repo = ImageAttachmentRepository();
+    final attachment = await repo.saveImage(
+      sourceFile: File(cropped.path),
+      sourceType: source == ImageSource.gallery ? 'gallery' : 'camera',
+    );
+
+    ref.read(notesProvider.notifier).addImageAttachment(
+          noteId: note.id,
+          attachmentId: attachment.id,
+        );
+  }
+
+  Future<void> _confirmDeletePhoto(
+      String noteId, String attachmentId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Photo'),
+        content: const Text('Remove this photo? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final repo = ImageAttachmentRepository();
+      await repo.deleteImageAttachment(attachmentId);
+      ref.read(notesProvider.notifier).removeImageAttachment(
+            noteId: noteId,
+            attachmentId: attachmentId,
+          );
+    }
   }
 
   Future<void> _confirmDelete(Note note) async {
@@ -607,11 +1205,39 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                         color: theme.colorScheme.primary),
                     onPressed: () => _saveTitle(note),
                   )
-                else
+                else ...[
+                  IconButton(
+                    icon: Icon(
+                      Icons.search_rounded,
+                      color: _showFindReplace ? theme.colorScheme.primary : null,
+                    ),
+                    onPressed: () => _toggleFindReplace(note),
+                    tooltip: 'Find & Replace',
+                  ),
                   IconButton(
                     icon: const Icon(Icons.share_rounded),
                     onPressed: () => _shareNote(note),
                   ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert_rounded),
+                    onSelected: (value) {
+                      if (value == 'retranscribe') _retranscribeNote(note);
+                    },
+                    itemBuilder: (context) => [
+                      if (note.audioFilePath.isNotEmpty)
+                        const PopupMenuItem(
+                          value: 'retranscribe',
+                          child: Row(
+                            children: [
+                              Icon(Icons.refresh_rounded, size: 20),
+                              SizedBox(width: 8),
+                              Text('Re-transcribe'),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
       body: SingleChildScrollView(
@@ -619,49 +1245,92 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Metadata row
+            // Metadata — timestamp on row 1, details on row 2
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.access_time_rounded,
-                      size: 14, color: theme.hintColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    _formatNoteTimestamp(note.createdAt),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.secondary,
-                    ),
-                  ),
-                  if (note.audioDurationSeconds > 0) ...[
-                    Text(' · ',
-                        style: TextStyle(color: theme.hintColor, fontSize: 12)),
-                    Icon(Icons.timer_outlined,
-                        size: 14, color: theme.hintColor),
-                    const SizedBox(width: 2),
-                    Text(
-                      _formatDuration(note.audioDurationSeconds),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.hintColor,
+                  // Row 1: timestamp
+                  Row(
+                    children: [
+                      Icon(Icons.access_time_rounded,
+                          size: 14, color: theme.hintColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatNoteTimestamp(note.createdAt),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.secondary,
+                        ),
                       ),
-                    ),
-                  ],
-                  Text(' · ',
-                      style: TextStyle(color: theme.hintColor, fontSize: 12)),
-                  Icon(Icons.language_rounded,
-                      size: 14, color: theme.hintColor),
-                  const SizedBox(width: 2),
-                  Text(
-                    note.detectedLanguage,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.hintColor,
-                    ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Row 2: duration, language, model
+                  Row(
+                    children: [
+                      if (note.audioDurationSeconds > 0) ...[
+                        Icon(Icons.timer_outlined,
+                            size: 14, color: theme.hintColor),
+                        const SizedBox(width: 2),
+                        Text(
+                          _formatDuration(note.audioDurationSeconds),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                        ),
+                        Text(' \u00b7 ',
+                            style: TextStyle(
+                                color: theme.hintColor, fontSize: 12)),
+                      ],
+                      Icon(Icons.language_rounded,
+                          size: 14, color: theme.hintColor),
+                      const SizedBox(width: 2),
+                      Text(
+                        note.detectedLanguage,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.hintColor,
+                        ),
+                      ),
+                      if (note.transcriptionModel != null) ...[
+                        Text(' \u00b7 ',
+                            style: TextStyle(
+                                color: theme.hintColor, fontSize: 12)),
+                        Icon(Icons.psychology_rounded,
+                            size: 14, color: theme.hintColor),
+                        const SizedBox(width: 2),
+                        Text(
+                          note.transcriptionModel == 'small'
+                              ? 'Enhanced'
+                              : 'Standard',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
+
+            // === FIND & REPLACE BAR ===
+            if (_showFindReplace)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: FindReplaceBar(
+                  onSearch: (query) => _onFindSearch(query, note),
+                  onReplace: (replacement) => _onReplace(replacement, note),
+                  onReplaceAll: (replacement) => _onReplaceAll(replacement, note),
+                  onNext: _onFindNext,
+                  onPrevious: _onFindPrevious,
+                  onClose: () => _toggleFindReplace(note),
+                  currentMatch: _findCurrentIndex,
+                  totalMatches: _findMatchPositions.length,
+                ),
+              ),
 
             // === TRANSCRIPTION SECTION ===
             Padding(
@@ -780,6 +1449,42 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                   ),
                 ],
               ),
+            ),
+
+            // === WORD & CHARACTER COUNT ===
+            Padding(
+              padding: const EdgeInsets.fromLTRB(32, 6, 32, 0),
+              child: Builder(builder: (_) {
+                int wordCount;
+                int charCount;
+                if (_isEditingTranscription && _quillController != null) {
+                  wordCount = _liveWordCount;
+                  charCount = _liveCharCount;
+                } else {
+                  final plainText = note.rawTranscription.isEmpty
+                      ? ''
+                      : (note.contentFormat == 'quill_delta'
+                          ? (() {
+                              try {
+                                final json = jsonDecode(note.rawTranscription) as List;
+                                return Document.fromJson(json).toPlainText().trim();
+                              } catch (_) {
+                                return note.rawTranscription;
+                              }
+                            })()
+                          : note.rawTranscription);
+                  wordCount = plainText.isEmpty
+                      ? 0
+                      : plainText.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+                  charCount = plainText.length;
+                }
+                return Text(
+                  'Words: $wordCount  ·  Characters: $charCount',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                );
+              }),
             ),
 
             // === VERSION HISTORY (inline collapsible) ===
@@ -953,122 +1658,84 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                         borderRadius: BorderRadius.circular(AppRadius.lg),
                         border: Border.all(color: theme.dividerColor),
                       ),
-                      child: Column(
+                      child: Row(
                         children: [
-                          // Waveform visualization
-                          SizedBox(
-                            height: 48,
-                            child: _PlaybackWaveform(
-                              level: _waveformLevel,
-                              progress: _playerDuration.inMilliseconds > 0
-                                  ? _playerPosition.inMilliseconds /
-                                      _playerDuration.inMilliseconds
-                                  : 0.0,
-                              isPlaying: _isPlaying,
+                          // Play/pause button
+                          GestureDetector(
+                            onTap: _togglePlayback,
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _isPlaying
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                color: theme.colorScheme.onPrimary,
+                                size: 24,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          // Controls
-                          Row(
-                            children: [
-                              GestureDetector(
-                                onTap: _togglePlayback,
-                                child: Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _isPlaying
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                    color: theme.colorScheme.onPrimary,
-                                    size: 24,
-                                  ),
+                          const SizedBox(width: 8),
+                          // Current time
+                          Text(
+                            _formatDuration(_playerPosition.inSeconds),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.secondary,
+                              fontFeatures: [const FontFeature.tabularFigures()],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Tappable waveform (replaces slider)
+                          Expanded(
+                            child: GestureDetector(
+                              onTapDown: (details) {
+                                if (_playerDuration.inMilliseconds > 0) {
+                                  final box = context.findRenderObject()
+                                      as RenderBox?;
+                                  if (box == null) return;
+                                  // Calculate tap position relative to waveform width
+                                  final waveformWidth = box.size.width - 44 - 8 - 8 - 8 - 40;
+                                  final localX = details.localPosition.dx;
+                                  final fraction =
+                                      (localX / waveformWidth).clamp(0.0, 1.0);
+                                  _playerService.seek(Duration(
+                                    milliseconds:
+                                        (fraction *
+                                                _playerDuration
+                                                    .inMilliseconds)
+                                            .toInt(),
+                                  ));
+                                }
+                              },
+                              child: SizedBox(
+                                height: 48,
+                                child: _PlaybackWaveform(
+                                  level: _waveformLevel,
+                                  progress:
+                                      _playerDuration.inMilliseconds > 0
+                                          ? _playerPosition.inMilliseconds /
+                                              _playerDuration.inMilliseconds
+                                          : 0.0,
+                                  isPlaying: _isPlaying,
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  children: [
-                                    SliderTheme(
-                                      data: SliderThemeData(
-                                        trackHeight: 4,
-                                        thumbShape:
-                                            const RoundSliderThumbShape(
-                                                enabledThumbRadius: 6),
-                                        overlayShape:
-                                            const RoundSliderOverlayShape(
-                                                overlayRadius: 12),
-                                        activeTrackColor:
-                                            theme.colorScheme.primary,
-                                        inactiveTrackColor: theme
-                                            .colorScheme.primary
-                                            .withValues(alpha: 0.2),
-                                        thumbColor:
-                                            theme.colorScheme.primary,
-                                      ),
-                                      child: Slider(
-                                        value:
-                                            _playerDuration.inMilliseconds > 0
-                                                ? _playerPosition
-                                                    .inMilliseconds
-                                                    .clamp(0,
-                                                        _playerDuration
-                                                            .inMilliseconds)
-                                                    .toDouble()
-                                                : 0,
-                                        max: _playerDuration.inMilliseconds >
-                                                0
-                                            ? _playerDuration.inMilliseconds
-                                                .toDouble()
-                                            : 1,
-                                        onChanged: (value) {
-                                          _playerService.seek(Duration(
-                                              milliseconds: value.toInt()));
-                                        },
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 4),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            _formatDuration(
-                                                _playerPosition.inSeconds),
-                                            style: theme
-                                                .textTheme.labelSmall
-                                                ?.copyWith(
-                                              color: theme
-                                                  .colorScheme.secondary,
-                                            ),
-                                          ),
-                                          Text(
-                                            _formatDuration(
-                                                _playerDuration.inSeconds > 0
-                                                    ? _playerDuration
-                                                        .inSeconds
-                                                    : note
-                                                        .audioDurationSeconds),
-                                            style: theme
-                                                .textTheme.labelSmall
-                                                ?.copyWith(
-                                              color: theme
-                                                  .colorScheme.secondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Total duration
+                          Text(
+                            _formatDuration(
+                                _playerDuration.inSeconds > 0
+                                    ? _playerDuration.inSeconds
+                                    : note.audioDurationSeconds),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.secondary,
+                              fontFeatures: [const FontFeature.tabularFigures()],
+                            ),
                           ),
                         ],
                       ),
@@ -1079,169 +1746,138 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
 
             const SizedBox(height: 20),
 
-            // === ACTION ITEMS ===
-            if (ref.watch(settingsProvider).actionItemsEnabled) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _SectionHeader(
-                      icon: Icons.checklist_rounded,
-                      title: 'Action Items',
-                      color: AppColors.lightSuccess,
-                    ),
-                    ...note.actions.map(
-                      (action) => GestureDetector(
-                        onTap: () => ref
-                            .read(notesProvider.notifier)
-                            .toggleActionCompleted(
-                              noteId: note.id,
-                              actionId: action.id,
-                            ),
-                        child: _TaskItem(
-                          content: action.text,
-                          checked: action.isCompleted,
-                          onEdit: () => _showEditActionDialog(
-                              note.id, action.id, action.text),
-                          onDelete: () => _confirmDeleteAction(
-                              note.id, action.id, action.text),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () => _showAddActionDialog(note),
-                      icon: const Icon(Icons.add_task_rounded, size: 20),
-                      label: const Text('Add Action'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
+            // === TABBED SECTIONS (Actions / Todos / Reminders / Photos) ===
+            Builder(builder: (context) {
+              final settings = ref.watch(settingsProvider);
+              final tabs = <_DetailTabInfo>[];
+              if (settings.actionItemsEnabled) {
+                tabs.add(_DetailTabInfo(
+                  index: 0,
+                  label: 'Actions',
+                  icon: Icons.checklist_rounded,
+                  badgeCount: note.actions.where((a) => !a.isCompleted).length,
+                ));
+              }
+              if (settings.todosEnabled) {
+                tabs.add(_DetailTabInfo(
+                  index: 1,
+                  label: 'Todos',
+                  icon: Icons.task_alt_rounded,
+                  badgeCount: note.todos.where((t) => !t.isCompleted).length,
+                ));
+              }
+              if (settings.notificationsEnabled) {
+                tabs.add(_DetailTabInfo(
+                  index: 2,
+                  label: 'Reminders',
+                  icon: Icons.alarm_rounded,
+                  badgeCount:
+                      note.reminders.where((r) => !r.isCompleted).length,
+                ));
+              }
+              tabs.add(_DetailTabInfo(
+                index: 3,
+                label: 'Photos',
+                icon: Icons.photo_library_rounded,
+                badgeCount: note.imageAttachmentIds.length,
+              ));
 
-            // === TODO ITEMS ===
-            if (ref.watch(settingsProvider).todosEnabled) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _SectionHeader(
-                      icon: Icons.task_alt_rounded,
-                      title: 'Todos',
-                      color: AppColors.lightPrimary,
-                    ),
-                    ...note.todos.map(
-                      (todo) => GestureDetector(
-                        onTap: () => ref
-                            .read(notesProvider.notifier)
-                            .toggleTodoCompleted(
-                              noteId: note.id,
-                              todoId: todo.id,
-                            ),
-                        child: _TaskItem(
-                          content: todo.text,
-                          checked: todo.isCompleted,
-                          hasMeta: todo.dueDate != null,
-                          metaIcon: Icons.event_rounded,
-                          metaText: todo.dueDate != null
-                              ? _formatReminderTime(todo.dueDate!)
-                              : null,
-                          isOverdue: todo.dueDate != null &&
-                              !todo.isCompleted &&
-                              todo.dueDate!.isBefore(DateTime.now()),
-                          onEdit: () => _showEditTodoDialog(
-                              note.id, todo.id, todo.text, todo.dueDate),
-                          onDelete: () =>
-                              _confirmDeleteTodo(note.id, todo.id, todo.text),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () => _showAddTodoDialog(note),
-                      icon: const Icon(Icons.playlist_add_rounded, size: 20),
-                      label: const Text('Add Todo'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
+              // Clamp selected tab if it's no longer available
+              if (!tabs.any((t) => t.index == _detailTab)) {
+                _detailTab = tabs.first.index;
+              }
 
-            // === REMINDERS ===
-            if (ref.watch(settingsProvider).notificationsEnabled) ...[
-              Padding(
+              return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _SectionHeader(
-                      icon: Icons.alarm_rounded,
-                      title: 'Reminders',
-                      color: AppColors.lightAccent,
-                    ),
-                    ...note.reminders.map(
-                      (reminder) => GestureDetector(
-                        onTap: () => ref
-                            .read(notesProvider.notifier)
-                            .toggleReminderCompleted(
-                              noteId: note.id,
-                              reminderId: reminder.id,
-                            ),
-                        child: _TaskItem(
-                          content: reminder.text,
-                          checked: reminder.isCompleted,
-                          hasMeta: reminder.reminderTime != null,
-                          metaIcon: Icons.schedule,
-                          metaText: reminder.reminderTime != null
-                              ? _formatReminderTime(reminder.reminderTime!)
-                              : null,
-                          isOverdue: reminder.reminderTime != null &&
-                              !reminder.isCompleted &&
-                              reminder.reminderTime!
-                                  .isBefore(DateTime.now()),
-                          onEdit: () => _showRescheduleReminderDialog(
-                              note.id, reminder),
-                          onDelete: () =>
-                              _confirmDeleteReminder(note.id, reminder),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(color: theme.dividerColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Tab selector row
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+                        child: Row(
+                          children: tabs.map((tab) {
+                            final isSelected = tab.index == _detailTab;
+                            return Expanded(
+                              child: GestureDetector(
+                                onTap: () =>
+                                    setState(() => _detailTab = tab.index),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? theme.colorScheme.primary
+                                            .withValues(alpha: 0.12)
+                                        : Colors.transparent,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.md),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Badge(
+                                        isLabelVisible: tab.badgeCount > 0,
+                                        label: Text('${tab.badgeCount}',
+                                            style:
+                                                const TextStyle(fontSize: 10)),
+                                        child: Icon(tab.icon,
+                                            size: 18,
+                                            color: isSelected
+                                                ? theme.colorScheme.primary
+                                                : theme.hintColor),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        tab.label,
+                                        style:
+                                            theme.textTheme.labelSmall?.copyWith(
+                                          fontSize: 11,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                          color: isSelected
+                                              ? theme.colorScheme.primary
+                                              : theme.hintColor,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () => _showAddReminderDialog(note),
-                      icon: const Icon(Icons.alarm_add_rounded, size: 20),
-                      label: const Text('Add Reminder'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.md),
+                      Divider(height: 1, color: theme.dividerColor),
+                      // Tab content inside the container
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                        child: Column(
+                          children: [
+                            if (_detailTab == 0 && settings.actionItemsEnabled)
+                              _buildActionItemsSection(note),
+                            if (_detailTab == 1 && settings.todosEnabled)
+                              _buildTodosSection(note),
+                            if (_detailTab == 2 &&
+                                settings.notificationsEnabled)
+                              _buildRemindersSection(note),
+                            if (_detailTab == 3) _buildAttachmentsTab(note),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
-
-            // === ATTACHMENTS ===
-            NoteAttachmentsSection(note: note),
+              );
+            }),
             const SizedBox(height: 20),
 
             // === USAGE SECTION ===
@@ -2189,4 +2825,17 @@ class _PlaybackWaveform extends StatelessWidget {
       }),
     );
   }
+}
+
+class _DetailTabInfo {
+  final int index;
+  final String label;
+  final IconData icon;
+  final int badgeCount;
+  const _DetailTabInfo({
+    required this.index,
+    required this.label,
+    required this.icon,
+    required this.badgeCount,
+  });
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../nav.dart';
 import '../theme.dart';
@@ -12,7 +13,7 @@ import '../providers/notes_provider.dart';
 import '../services/sharing_service.dart';
 import '../services/image_attachment_repository.dart';
 import '../widgets/image_block_widget.dart';
-import 'package:share_plus/share_plus.dart';
+import '../widgets/share_preview_sheet.dart';
 import 'dart:convert';
 import 'package:flutter_quill/flutter_quill.dart';
 
@@ -377,16 +378,10 @@ class _ProjectDocumentDetailPageState
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'rename') _showRenameDialog(context, doc);
-              if (value == 'export_md') _exportDocument(doc, allNotes, 'md');
-              if (value == 'export_txt') _exportDocument(doc, allNotes, 'txt');
               if (value == 'delete') _showDeleteDialog(context, doc);
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'rename', child: Text('Rename')),
-              const PopupMenuItem(
-                  value: 'export_md', child: Text('Export as Markdown')),
-              const PopupMenuItem(
-                  value: 'export_txt', child: Text('Export as Plain Text')),
               const PopupMenuItem(value: 'delete', child: Text('Delete')),
             ],
           ),
@@ -513,6 +508,19 @@ class _ProjectDocumentDetailPageState
                   );
             }
           },
+          onSaveRichEdit: (content, format) {
+            if (block.noteId != null) {
+              ref
+                  .read(projectDocumentsProvider.notifier)
+                  .editNoteTranscriptRich(
+                    documentId: doc.id,
+                    noteId: block.noteId!,
+                    newContent: content,
+                    contentFormat: format,
+                    documentTitle: doc.title,
+                  );
+            }
+          },
         );
       case BlockType.freeText:
         return _FreeTextCard(
@@ -582,18 +590,27 @@ class _ProjectDocumentDetailPageState
   }
 
   void _shareDocument(dynamic doc, List<Note> allNotes) {
-    final text = SharingService().assembleDocumentText(doc, allNotes);
-    Share.share(text);
-  }
-
-  Future<void> _exportDocument(
-      dynamic doc, List<Note> allNotes, String format) async {
     final service = SharingService();
-    final file = format == 'md'
-        ? await service.exportDocumentAsMarkdown(doc, allNotes)
-        : await service.exportDocumentAsPlainText(doc, allNotes);
-    await Share.shareXFiles([XFile(file.path)],
-        text: '${doc.title}.$format');
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, controller) => SharePreviewSheet(
+          title: doc.title,
+          isProject: true,
+          assembleText: (options) =>
+              service.assembleDocumentText(doc, allNotes, options: options),
+          onExportPdf: (options) =>
+              service.exportDocumentAsPdf(doc, allNotes, options: options),
+          onExportMarkdown: () =>
+              service.exportDocumentAsMarkdown(doc, allNotes),
+        ),
+      ),
+    );
   }
 
   void _showAddBlockSheet(BuildContext context, String documentId) {
@@ -677,9 +694,23 @@ class _ProjectDocumentDetailPageState
     final picked = await picker.pickImage(source: source, imageQuality: 85);
     if (picked == null || !mounted) return;
 
+    // Offer crop before saving
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Image',
+          toolbarColor: Theme.of(context).colorScheme.surface,
+          toolbarWidgetColor: Theme.of(context).colorScheme.onSurface,
+          lockAspectRatio: false,
+        ),
+      ],
+    );
+    if (cropped == null || !mounted) return;
+
     final repo = ImageAttachmentRepository();
     final attachment = await repo.saveImage(
-      sourceFile: File(picked.path),
+      sourceFile: File(cropped.path),
       sourceType: source == ImageSource.gallery ? 'gallery' : 'camera',
     );
 
@@ -776,6 +807,7 @@ class _NoteReferenceCard extends ConsumerStatefulWidget {
   final VoidCallback onViewOriginal;
   final VoidCallback onViewHistory;
   final void Function(String) onSaveEdit;
+  final void Function(String content, String format)? onSaveRichEdit;
 
   const _NoteReferenceCard({
     required this.block,
@@ -788,6 +820,7 @@ class _NoteReferenceCard extends ConsumerStatefulWidget {
     required this.onViewOriginal,
     required this.onViewHistory,
     required this.onSaveEdit,
+    this.onSaveRichEdit,
   });
 
   @override
@@ -798,6 +831,9 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
   bool _editing = false;
   bool _tasksExpanded = false;
   late TextEditingController _controller;
+  QuillController? _quillController;
+
+  bool _isRichText(Note note) => note.contentFormat == 'quill_delta';
 
   /// Build a read-only QuillEditor for notes with quill_delta format.
   Widget _buildReadOnlyQuill(Note note) {
@@ -807,11 +843,21 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
         document: Document.fromJson(json),
         selection: const TextSelection.collapsed(offset: 0),
       );
+      final onSurface = Theme.of(context).colorScheme.onSurface;
       return QuillEditor.basic(
         controller: controller,
-        config: const QuillEditorConfig(
+        config: QuillEditorConfig(
           showCursor: false,
           enableInteractiveSelection: false,
+          customStyles: DefaultStyles(
+            paragraph: DefaultTextBlockStyle(
+              TextStyle(fontSize: 14, color: onSurface),
+              const HorizontalSpacing(0, 0),
+              const VerticalSpacing(0, 0),
+              const VerticalSpacing(0, 0),
+              null,
+            ),
+          ),
         ),
       );
     } catch (_) {
@@ -821,6 +867,23 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
           fontSize: 14,
           color: Theme.of(context).colorScheme.onSurface,
         ),
+      );
+    }
+  }
+
+  /// Create a QuillController from a note's rich text content.
+  QuillController _createQuillController(Note note) {
+    try {
+      final json = jsonDecode(note.rawTranscription) as List;
+      return QuillController(
+        document: Document.fromJson(json),
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+    } catch (_) {
+      final doc = Document()..insert(0, note.rawTranscription);
+      return QuillController(
+        document: doc,
+        selection: const TextSelection.collapsed(offset: 0),
       );
     }
   }
@@ -855,6 +918,7 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
   @override
   void dispose() {
     _controller.dispose();
+    _quillController?.dispose();
     super.dispose();
   }
 
@@ -1014,24 +1078,44 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextField(
-                        controller: _controller,
-                        maxLines: null,
-                        style: const TextStyle(fontSize: 14),
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                          isDense: true,
+                      if (_isRichText(note) && _quillController != null) ...[
+                        buildQuillToolbar(
+                            _quillController!, Theme.of(context)),
+                        const SizedBox(height: 6),
+                        Container(
+                          constraints: const BoxConstraints(
+                              minHeight: 80, maxHeight: 300),
+                          child: QuillEditor.basic(
+                            controller: _quillController!,
+                            config: const QuillEditorConfig(
+                              autoFocus: true,
+                              minHeight: 60,
+                              placeholder: 'Edit transcription...',
+                            ),
+                          ),
                         ),
-                      ),
+                      ] else
+                        TextField(
+                          controller: _controller,
+                          maxLines: null,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
+                            isDense: true,
+                          ),
+                        ),
                       const SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           TextButton(
-                            onPressed: () =>
-                                setState(() => _editing = false),
+                            onPressed: () {
+                              _quillController?.dispose();
+                              _quillController = null;
+                              setState(() => _editing = false);
+                            },
                             style: TextButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12),
@@ -1041,7 +1125,26 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
                           const SizedBox(width: 6),
                           FilledButton(
                             onPressed: () {
-                              widget.onSaveEdit(_controller.text);
+                              if (_isRichText(note) &&
+                                  _quillController != null) {
+                                final deltaJson = jsonEncode(
+                                    _quillController!.document
+                                        .toDelta()
+                                        .toJson());
+                                if (widget.onSaveRichEdit != null) {
+                                  widget.onSaveRichEdit!(
+                                      deltaJson, 'quill_delta');
+                                } else {
+                                  widget.onSaveEdit(
+                                      _quillController!.document
+                                          .toPlainText()
+                                          .trim());
+                                }
+                                _quillController?.dispose();
+                                _quillController = null;
+                              } else {
+                                widget.onSaveEdit(_controller.text);
+                              }
                               setState(() => _editing = false);
                             },
                             style: FilledButton.styleFrom(
@@ -1059,7 +1162,12 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
                     children: [
                       GestureDetector(
                         onTap: () {
-                          _controller.text = _plainText(note);
+                          if (_isRichText(note)) {
+                            _quillController =
+                                _createQuillController(note);
+                          } else {
+                            _controller.text = _plainText(note);
+                          }
                           setState(() => _editing = true);
                         },
                         child: note.rawTranscription.isEmpty

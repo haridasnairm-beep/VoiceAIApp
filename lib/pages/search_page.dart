@@ -9,6 +9,7 @@ import '../providers/notes_provider.dart';
 import '../providers/folders_provider.dart';
 import '../providers/project_documents_provider.dart';
 import '../models/note.dart';
+import '../widgets/settings_widgets.dart' show friendlyLanguageName;
 
 class SearchPage extends ConsumerStatefulWidget {
   /// Optional pre-selected folder ID for contextual search.
@@ -285,6 +286,17 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     );
   }
 
+  String _plainText(Note note) {
+    String rawText = note.rawTranscription;
+    if (note.contentFormat == 'quill_delta' && rawText.isNotEmpty) {
+      try {
+        final json = jsonDecode(rawText) as List;
+        rawText = Document.fromJson(json).toPlainText().trim();
+      } catch (_) {}
+    }
+    return rawText;
+  }
+
   Widget _buildResultsBody(
       BuildContext context, List<Note> allNotes, List<Note> results) {
     if (allNotes.isEmpty) {
@@ -322,7 +334,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               const SizedBox(height: 16),
               Text(
                 _query.isNotEmpty
-                    ? "No notes found for '$_query'"
+                    ? "No results found for '$_query'"
                     : "No notes in this filter",
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -335,59 +347,272 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       );
     }
 
-    final countLabel = _query.isEmpty
-        ? "Found ${results.length} notes"
-        : "Found ${results.length} notes matching '$_query'";
+    // When no query, show flat note list (no sectioning needed)
+    if (_query.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            "${results.length} notes",
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+          ),
+          const SizedBox(height: 12),
+          ...results.map((note) {
+            final rawText = _plainText(note);
+            final preview =
+                rawText.length > 100 ? rawText.substring(0, 100) : rawText;
+            return _SearchResultCard(
+              title: note.title,
+              lang: friendlyLanguageName(note.detectedLanguage),
+              preview: preview,
+              catLabel: "NOTE",
+              catIcon: Icons.description_rounded,
+              catBg: const Color(0xFFE3F2FD),
+              catColor: const Color(0xFF1976D2),
+              date: _formatDate(note.createdAt),
+              onTap: () => context.push(AppRoutes.noteDetail,
+                  extra: {'noteId': note.id}),
+            );
+          }),
+        ],
+      );
+    }
+
+    // Sectioned results: categorize matches
+    final lower = _query.toLowerCase();
+
+    // Notes section: title or transcription match
+    final noteMatches = results.where((n) =>
+        n.title.toLowerCase().contains(lower) ||
+        _plainText(n).toLowerCase().contains(lower) ||
+        n.topics.any((t) => t.toLowerCase().contains(lower)));
+
+    // Action items section
+    final actionMatches = <({Note note, String text})>[];
+    for (final n in results) {
+      for (final a in n.actions) {
+        if (a.text.toLowerCase().contains(lower)) {
+          actionMatches.add((note: n, text: a.text));
+        }
+      }
+    }
+
+    // Todos section
+    final todoMatches = <({Note note, String text, bool done})>[];
+    for (final n in results) {
+      for (final t in n.todos) {
+        if (t.text.toLowerCase().contains(lower)) {
+          todoMatches.add((note: n, text: t.text, done: t.isCompleted));
+        }
+      }
+    }
+
+    // Reminders section
+    final reminderMatches =
+        <({Note note, String text, DateTime? time})>[];
+    for (final n in results) {
+      for (final r in n.reminders) {
+        if (r.text.toLowerCase().contains(lower)) {
+          reminderMatches
+              .add((note: n, text: r.text, time: r.reminderTime));
+        }
+      }
+    }
+
+    final totalCount = noteMatches.length +
+        actionMatches.length +
+        todoMatches.length +
+        reminderMatches.length;
 
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         Text(
-          countLabel,
+          "$totalCount results for '$_query'",
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.secondary,
               ),
         ),
         const SizedBox(height: 12),
-        ...results.map((note) {
-          String rawText = note.rawTranscription;
-          if (note.contentFormat == 'quill_delta' && rawText.isNotEmpty) {
-            try {
-              final json = jsonDecode(rawText) as List;
-              rawText = Document.fromJson(json).toPlainText().trim();
-            } catch (_) {}
-          }
-          final preview = rawText.length > 100 ? rawText.substring(0, 100) : rawText;
-          return _SearchResultCard(
-            title: note.title,
-            lang: note.detectedLanguage,
-            preview: preview,
-            catLabel: "NOTE",
-            catIcon: Icons.description_rounded,
-            catBg: const Color(0xFFE3F2FD),
-            catColor: const Color(0xFF1976D2),
-            date: _formatDate(note.createdAt),
-            onTap: () => context.push(AppRoutes.noteDetail,
-                extra: {'noteId': note.id}),
-          );
-        }),
-        if (results.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Column(
-              children: [
-                Icon(Icons.check_circle_outline_rounded,
-                    color: Theme.of(context).hintColor, size: 32),
-                const SizedBox(height: 8),
-                Text(
-                  "End of search results",
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).hintColor,
-                      ),
-                ),
-              ],
-            ),
+
+        // Notes section
+        if (noteMatches.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.description_rounded,
+            label: 'Notes',
+            count: noteMatches.length,
+            color: const Color(0xFF1976D2),
           ),
+          const SizedBox(height: 8),
+          ...noteMatches.map((note) {
+            final rawText = _plainText(note);
+            final preview =
+                rawText.length > 100 ? rawText.substring(0, 100) : rawText;
+            return _SearchResultCard(
+              title: note.title,
+              lang: friendlyLanguageName(note.detectedLanguage),
+              preview: preview,
+              catLabel: "NOTE",
+              catIcon: Icons.description_rounded,
+              catBg: const Color(0xFFE3F2FD),
+              catColor: const Color(0xFF1976D2),
+              date: _formatDate(note.createdAt),
+              onTap: () => context.push(AppRoutes.noteDetail,
+                  extra: {'noteId': note.id}),
+            );
+          }),
+          const SizedBox(height: 8),
+        ],
+
+        // Actions section
+        if (actionMatches.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.flash_on_rounded,
+            label: 'Action Items',
+            count: actionMatches.length,
+            color: const Color(0xFF2E7D32),
+          ),
+          const SizedBox(height: 8),
+          ...actionMatches.map((m) => _SearchResultCard(
+                title: m.text,
+                lang: friendlyLanguageName(m.note.detectedLanguage),
+                preview: 'From: ${m.note.title}',
+                catLabel: "ACTION",
+                catIcon: Icons.flash_on_rounded,
+                catBg: const Color(0xFFE8F5E9),
+                catColor: const Color(0xFF2E7D32),
+                date: _formatDate(m.note.createdAt),
+                onTap: () => context.push(AppRoutes.noteDetail,
+                    extra: {'noteId': m.note.id}),
+              )),
+          const SizedBox(height: 8),
+        ],
+
+        // Todos section
+        if (todoMatches.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.check_circle_outline_rounded,
+            label: 'Todos',
+            count: todoMatches.length,
+            color: const Color(0xFF1565C0),
+          ),
+          const SizedBox(height: 8),
+          ...todoMatches.map((m) => _SearchResultCard(
+                title: '${m.done ? '✓ ' : ''}${m.text}',
+                lang: friendlyLanguageName(m.note.detectedLanguage),
+                preview: 'From: ${m.note.title}',
+                catLabel: "TODO",
+                catIcon: Icons.check_circle_outline_rounded,
+                catBg: const Color(0xFFE3F2FD),
+                catColor: const Color(0xFF1565C0),
+                date: _formatDate(m.note.createdAt),
+                onTap: () => context.push(AppRoutes.noteDetail,
+                    extra: {'noteId': m.note.id}),
+              )),
+          const SizedBox(height: 8),
+        ],
+
+        // Reminders section
+        if (reminderMatches.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.alarm_rounded,
+            label: 'Reminders',
+            count: reminderMatches.length,
+            color: const Color(0xFFEF6C00),
+          ),
+          const SizedBox(height: 8),
+          ...reminderMatches.map((m) {
+            final timeStr = m.time != null
+                ? ' · ${_formatDate(m.time!)}'
+                : '';
+            return _SearchResultCard(
+              title: m.text,
+              lang: friendlyLanguageName(m.note.detectedLanguage),
+              preview: 'From: ${m.note.title}$timeStr',
+              catLabel: "REMINDER",
+              catIcon: Icons.alarm_rounded,
+              catBg: const Color(0xFFFFF3E0),
+              catColor: const Color(0xFFEF6C00),
+              date: _formatDate(m.note.createdAt),
+              onTap: () => context.push(AppRoutes.noteDetail,
+                  extra: {'noteId': m.note.id}),
+            );
+          }),
+          const SizedBox(height: 8),
+        ],
+
+        // End marker
+        Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            children: [
+              Icon(Icons.check_circle_outline_rounded,
+                  color: Theme.of(context).hintColor, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                "End of search results",
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).hintColor,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final Color color;
+
+  const _SectionHeader({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withAlpha(30),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+        ),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withAlpha(25),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            '$count',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ),
       ],
     );
   }

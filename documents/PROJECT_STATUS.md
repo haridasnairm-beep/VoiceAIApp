@@ -1,8 +1,8 @@
 # VoiceNotes AI - Project Status
 
-**Last Updated:** 2026-03-01
-**Current Version:** 1.12.0 (Phase 1 MVP + rich text persistence fix + Whisper noise filters + project view rich text)
-**Overall Progress:** Phase 1 Complete (100%) — All features working. Rich text editing persists correctly. Whisper transcription filters noise artifacts. Project documents show rich text formatting. Model picker shows download status.
+**Last Updated:** 2026-03-02
+**Current Version:** 1.0.0 (Phase 1 — Release)
+**Overall Progress:** Phase 1 core complete (100%). All features production-ready. **Next:** Phase 1 Value Proposition Gaps (Steps 8–10.7, 8 features) — pinned notes, AMOLED dark theme, auto-title generation, note templates, trash/soft delete, app lock, home screen widget, and local backup & restore. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -10,11 +10,11 @@
 
 ## Status Summary
 
-Phase 1 core is fully complete with bonus features beyond original scope. All 7 implementation steps are done: branding, Riverpod state management, Hive encrypted database, UI wired to data, on-device speech-to-text, audio playback + reminder notifications, and testing/polish. Additional features added: splash screen with animated branding, multi-page quick guide (onboarding), interactive settings (language picker, audio quality picker, storage display), compact AppBar headers across all pages, and HDMPixels branding.
-
-**New feature approved:** **Project Documents** (Step 4.5) — rich composite documents assembled from individual voice notes. Includes free-text blocks, section headers, drag-and-drop reordering, bi-directional transcript editing with version history. All on-device, no AI. See [FEATURE_PROJECT_DOCUMENTS.md](FEATURE_PROJECT_DOCUMENTS.md) for full spec.
+Phase 1 core is fully complete and production-ready. All 7 implementation steps are done: branding, Riverpod state management, Hive encrypted database, UI wired to data, on-device speech-to-text, audio playback + reminder notifications, and testing/polish. Additional features: splash screen with animated branding, multi-page quick guide (onboarding), interactive settings, compact AppBar headers, HDMPixels branding, project documents, interactive tasks, sharing/export with PDF, rich text editing, photo attachments, voice commands for task creation, and post-release UI polish.
 
 **Phase 1 = No AI.** All AI-related UI elements have been removed or replaced. See the AI exclusion table in CLAUDE.md.
+
+**Next phase:** 8 value proposition gap features (Steps 8–10.7) to match competitor expectations before Play Store release. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 
 ---
 
@@ -160,6 +160,59 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 
 ---
 
+## Post-Release Enhancements (GitHub Issues #7–#12)
+
+### Issue #7: Home Dashboard Tiles ✅ COMPLETED
+- Multi-select mode (long-press to enter, tap to toggle, select all/deselect all)
+- Single-select bottom action bar (Open, Edit Title, Folder, Project, Delete)
+- Bulk actions (Add to Folder, Add to Project, Delete) for multi-select
+- Folder/project capsule taps open picker with Save/Cancel
+- Improved delete dialog with warning icon, white-on-red button
+
+### Issue #8: Home Page Layout ✅ COMPLETED
+- 3 compact stats cards in a Row (not horizontal scroll)
+- Tab bar moved below stats (stats always visible)
+- Projects card navigates to project documents (was incorrectly going to folders)
+- Speed dial switches to Notes tab before executing
+- Removed "Recent Notes" header and "See All" button
+
+### Issue #9: Search Notes Page ✅ COMPLETED
+- Search now matches action items, todos, and reminders text
+- Sectioned results: Notes, Action Items, Todos, Reminders with color-coded headers
+- Section headers show icon, label, and match count
+
+### Issue #10: Project Details Page ✅ COMPLETED
+- QuillEditor in note reference cards uses `customStyles` matching plain text (fontSize 14, onSurface color)
+- Rich text inline editing now uses QuillEditor + toolbar (was plain TextField)
+- New `updateNoteRichContent()` repository method saves delta JSON directly
+- New `editNoteTranscriptRich()` provider method for rich text saves
+
+### Issue #11: Share Option Project & Notes ✅ COMPLETED
+- Share Preview bottom sheet with toggles: Include Title, Include Timestamp, Plain Text Only
+- Live scrollable preview of assembled share text
+- PDF export via `pdf` package (pure Dart, no cloud, ~1.8MB APK increase)
+- Email subject line: "Title — Notes/Project from VoiceNotes AI"
+- Real Quill Delta → Markdown conversion (bold, italic, headers, bullets)
+- Shorter separator lines (title-length underscores instead of fixed 30-char)
+- Temp file cleanup at app startup
+- Project popup menu simplified (Rename/Delete only; exports moved to share sheet)
+
+**New files:** `lib/widgets/share_preview_sheet.dart`
+**New dependency:** `pdf: ^3.11.1`
+**APK size:** 64.6MB → 66.4MB
+
+### Issue #12: Word Count, Find & Replace, Profanity Filter ✅ COMPLETED
+- Word & character count stats row below transcription (live updates during editing)
+- Find & Replace toolbar — search icon in AppBar, match navigation, replace/replace all
+- Block Offensive Words toggle in Settings > AUDIO — filters profanity from STT and Whisper output
+- Whole-word regex matching with asterisk replacement, privacy-first (hardcoded word list)
+
+**New files:** `lib/widgets/find_replace_bar.dart`, `lib/utils/profanity_filter.dart`
+**New model field:** `UserSettings.blockOffensiveWords` (HiveField 18)
+**APK size:** 66.4MB (unchanged)
+
+---
+
 ## Component Status
 
 ### Infrastructure & Setup
@@ -167,13 +220,13 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 |---|---|---|
 | Project Setup | ✅ Done | Flutter project, branding aligned |
 | Theme System | ✅ Done | Light/dark mode, Material 3, Google Fonts |
-| Navigation | ✅ Done | 9 routes via go_router with extras, onboarding redirect |
+| Navigation | ✅ Done | 23 routes via go_router with extras, onboarding redirect |
 | Audio Recording Service | ✅ Done | Record, pause, resume, stop, cancel |
 | Audio Player Service | ✅ Done | Play, pause, seek via just_audio |
 | Transcription Service | ✅ Done | On-device STT via speech_to_text |
 | Notification Service | ✅ Done | Schedule, cancel, deep-link notifications |
 | Hive Database | ✅ Done | AES-256 encrypted, 3 boxes |
-| Riverpod Providers | ✅ Done | 5 providers connected to repositories |
+| Riverpod Providers | ✅ Done | 7 providers connected to repositories (notes, folders, settings, project_documents, tasks + 2 repo providers) |
 | App Logo/Icon | ✅ Done | `assets/icons/logo.png` — launcher + in-app |
 
 ### Screens
@@ -216,7 +269,7 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 
 1. Animated splash screen → onboarding (first launch) or home (returning user)
 2. Multi-page Quick Guide with skip option on first run
-3. Navigation between all 9 active screens with data passing
+3. Navigation between all active screens with data passing
 4. Light and dark theme switching (live from settings)
 5. Audio recording (start, pause, resume, stop, cancel)
 6. On-device speech-to-text transcription during recording
@@ -269,14 +322,38 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 53. Image block overflow menu (view full screen, edit caption, move up/down, remove with cascade delete)
 54. Photo attachments on Note Detail (horizontal thumbnail row, add from gallery/camera, long-press delete)
 55. Storage calculation includes image files; Delete All Data clears images directory
+56. Multi-select mode on home page with bulk folder/project assignment and deletion
+57. Compact 3-card stats row with Notes/Folders/Projects counts
+58. Sectioned search results across notes, action items, todos, and reminders
+59. QuillEditor rich text editing in project document note reference cards
+60. Share preview bottom sheet with toggles (title, timestamp, plain text)
+61. PDF export for notes and project documents (pure Dart, no cloud)
+62. Email subject line auto-populated when sharing via email
+63. Quill Delta → Markdown conversion for formatted sharing
+64. Temp export file cleanup on app startup
+65. Word & character count stats row below each note's transcription (live updates during editing)
+66. Find & Replace toolbar in note detail (search icon in AppBar, match navigation, replace/replace all)
+67. Block Offensive Words setting — filters profanity from live STT and Whisper transcription output
+68. Voice command Todo/Action/Reminder task creation with Whisper transcription normalization ("to do" / "to-do" → "todo")
+69. Voice commands help popup with scrollable content, task examples, and limitations section
+70. Storage page breakdown with Total at bottom (divider + bold)
+71. Note Detail tab system — Action Items, Todos, Reminders, Photos as selectable tabs with badge counts
+72. Photo attachments in 2-column grid layout with larger thumbnails (tap to view, long-press to delete)
+73. Simplified audio player — single-row compact layout with tappable waveform for seeking
+74. Metadata two-row layout — timestamp on first line, duration/language/model on second line
+75. Onboarding logo matches splash screen feel — larger size, matching shadow, scale-in animation
+76. Share preview respects Plain Text Only toggle — rich text markdown formatting visible when toggle is off
+77. Version history preserves and displays rich text formatting (Quill Delta JSON stored per version)
+78. Restoring a rich text version restores formatting; restoring plain text version reverts to plain mode
+79. "New Folder" and "New Project" inline creation in all folder/project picker bottom sheets
 
 ---
 
-## Known Limitations (MVP)
+## Known Limitations (Phase 1)
 
 1. `record` and `speech_to_text` can't share mic on Android — STT notes are transcription-only (no audio file for playback)
 2. Waveform is flat during STT mode (recorder not running)
-3. No unit/widget/integration tests (acceptable for MVP)
+3. No unit/widget/integration tests (to be added)
 4. Terms of Service / Privacy Policy pages not yet implemented (deferred)
 
 ---
@@ -285,19 +362,18 @@ Phase 1 core is fully complete with bonus features beyond original scope. All 7 
 
 | File | Reason | Target Phase |
 |---|---|---|
-| `lib/pages/login_page.dart` | No authentication required in MVP | Phase 2 |
+| `lib/pages/login_page.dart` | No authentication required in Phase 1 | Phase 2 |
 
 ---
 
 ## Next Steps
 
-### Phase 1 — Remaining
-1. **Step 4.6:** Interactive Tasks & Reminder Enhancement (checkboxes, tasks view, OS reminders, reschedule)
-2. **Step 4.7:** Sharing, Rich Text & Image Blocks (share/export notes + projects, flutter_quill rich text, photo blocks + attachments)
+### Phase 1 — Complete
+All Phase 1 features are implemented including post-release enhancements (Issues #7–#11).
 
 ### Phase 2 — AI-Powered
-2. **Step 8:** Whisper API Transcription (cloud-based, higher accuracy)
-3. **Step 9:** AI Categorization & Structuring (auto-extract actions/todos/reminders, smart due dates)
-4. **Step 10:** n8n Integration & Advanced Features
-   - Includes Project Documents Phase 2: AI summary, export, AI-suggested note additions
+1. **Step 8:** Whisper API Transcription (cloud-based, higher accuracy)
+2. **Step 9:** AI Categorization & Structuring (auto-extract actions/todos/reminders, smart due dates)
+3. **Step 10:** n8n Integration & Advanced Features
+   - Includes Project Documents Phase 2: AI summary, AI-suggested note additions
    - Includes Tasks Phase 2: recurring reminders, priority levels, Todoist/Apple Reminders API/Google Tasks API

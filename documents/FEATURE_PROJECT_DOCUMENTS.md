@@ -2,7 +2,7 @@
 
 **Version:** 1.1
 **Date:** 2026-02-27
-**Status:** Core Feature COMPLETE (Step 4.5) · Addendum A features pending implementation
+**Status:** COMPLETE (Step 4.5 + Step 4.7 Addendum A)
 **Phase:** Phase 1 Addition (Step 4.5 — after Wire UI to Data Layer)
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Status](PROJECT_STATUS.md)
 
@@ -34,13 +34,13 @@
 **Created:** 13 files (3 models + 3 generated, 1 repository, 1 provider, 4 pages)
 **Modified:** 8 files (Note model, HiveService, NotesRepository, NotesProvider, nav, Home, main)
 
-### Addendum A Features — ⏳ PENDING
+### Addendum A Features — ✅ COMPLETE (Step 4.7)
 
 | Feature | Status | Description |
 |---|---|---|
-| A1. Sharing & Export | ⏳ Pending | Share notes/projects via OS share sheet, export as Markdown/plain text |
-| A2. Rich Text Formatting | ⏳ Pending | Bold, italic, bullets, headings, links in free-text blocks |
-| A3. Image Blocks (Photos) | ⏳ Pending | Photo blocks in projects + note attachments, gallery/camera/crop |
+| A1. Sharing & Export | ✅ Done | Share notes/projects via OS share sheet, export as Markdown/plain text/PDF |
+| A2. Rich Text Formatting | ✅ Done | Bold, italic, bullets, headings, links in free-text blocks via flutter_quill |
+| A3. Image Blocks (Photos) | ✅ Done | Photo blocks in projects + note attachments, gallery/camera/crop/full-screen viewer |
 
 ---
 

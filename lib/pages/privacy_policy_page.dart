@@ -113,7 +113,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 'on your device:\n\n'
                 'Live Transcription uses your device\'s built-in speech recognition engine. '
                 'No audio is sent to external servers.\n\n'
-                'Whisper AI (Record & Transcribe) uses an on-device AI model that is downloaded '
+                'Whisper (Record & Transcribe) uses an on-device AI model that is downloaded '
                 'once and runs locally. The model download is the only network operation — after '
                 'that, all transcription happens offline on your device. Your audio never leaves '
                 'your phone.',
@@ -172,7 +172,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               // 8. STORAGE ACCESS
               _sectionHeader('8. STORAGE ACCESS', headingStyle),
               Text(
-                'The app stores voice recordings and the Whisper AI model in your device\'s '
+                'The app stores voice recordings and the Whisper model in your device\'s '
                 'app-private storage directory. This storage is accessible only to VoiceNotes AI '
                 'and is automatically deleted when you uninstall the app. All database content '
                 'is encrypted with AES-256 encryption.',
@@ -189,7 +189,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               const SizedBox(height: 4),
               _bulletItem('Delete individual notes, folders, or projects at any time', bulletStyle),
               _bulletItem('Delete all voice recordings from Settings', bulletStyle),
-              _bulletItem('Delete the Whisper AI model from Settings', bulletStyle),
+              _bulletItem('Delete the Whisper model from Settings', bulletStyle),
               _bulletItem('Delete all data from Settings (Danger Zone)', bulletStyle),
               _bulletItem('Delete everything by uninstalling the app', bulletStyle),
               _bulletItem('Export or share individual notes as you wish', bulletStyle),

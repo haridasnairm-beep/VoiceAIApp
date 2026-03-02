@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'notification_service.dart';
@@ -23,7 +24,9 @@ class HiveService {
   static const String _settingsBox = 'settings';
   static const String _projectDocumentsBox = 'project_documents';
   static const String _imageAttachmentsBox = 'image_attachments';
-  static const String _encryptionKeyBox = 'encryption_key';
+  static const String _encryptionKeyBox = 'encryption_key'; // legacy, for migration
+  static const String _secureStorageKey = 'hive_encryption_key';
+  static const _secureStorage = FlutterSecureStorage();
 
   static bool _initialized = false;
 
@@ -74,18 +77,37 @@ class HiveService {
   }
 
   /// Generate or retrieve the encryption key.
-  /// Key is stored in a separate unencrypted box.
+  /// Key is stored in Android Keystore / iOS Keychain via flutter_secure_storage.
+  /// Migrates from legacy plain Hive box on first run after upgrade.
   static Future<Uint8List> _getEncryptionKey() async {
-    final keyBox = await Hive.openBox(_encryptionKeyBox);
-    final existingKey = keyBox.get('key');
-
-    if (existingKey != null) {
-      return base64Decode(existingKey as String);
+    // Try reading from secure storage first
+    final secureKey = await _secureStorage.read(key: _secureStorageKey);
+    if (secureKey != null) {
+      return base64Decode(secureKey);
     }
 
-    // Generate a new key
+    // Migrate from legacy unencrypted Hive box (if it exists)
+    try {
+      final keyBox = await Hive.openBox(_encryptionKeyBox);
+      final legacyKey = keyBox.get('key');
+      if (legacyKey != null) {
+        // Move key to secure storage
+        await _secureStorage.write(
+            key: _secureStorageKey, value: legacyKey as String);
+        // Delete the legacy box
+        await keyBox.deleteFromDisk();
+        debugPrint('HiveService: migrated encryption key to secure storage');
+        return base64Decode(legacyKey);
+      }
+      await keyBox.close();
+    } catch (e) {
+      debugPrint('HiveService: legacy key migration skipped: $e');
+    }
+
+    // Generate a new key (fresh install)
     final key = Hive.generateSecureKey();
-    await keyBox.put('key', base64Encode(key));
+    await _secureStorage.write(
+        key: _secureStorageKey, value: base64Encode(key));
     return Uint8List.fromList(key);
   }
 
@@ -195,51 +217,11 @@ class HiveService {
     }
   }
 
-  /// Calculate total storage used by the app (Hive data + recordings).
+  /// Calculate total storage used by the app (delegates to getStorageBreakdown).
   static Future<String> getStorageUsage() async {
     try {
-      int totalBytes = 0;
-
-      // Hive box files
-      final appDir = await getApplicationDocumentsDirectory();
-      final hiveDir = Directory(appDir.path);
-      if (await hiveDir.exists()) {
-        await for (final entity in hiveDir.list()) {
-          if (entity is File && entity.path.endsWith('.hive')) {
-            totalBytes += await entity.length();
-          }
-        }
-      }
-
-      // Recordings directory
-      final recordingsDir = Directory('${appDir.path}/recordings');
-      if (await recordingsDir.exists()) {
-        await for (final entity in recordingsDir.list()) {
-          if (entity is File) {
-            totalBytes += await entity.length();
-          }
-        }
-      }
-
-      // Images directory
-      final imagesDir = Directory('${appDir.path}/images');
-      if (await imagesDir.exists()) {
-        await for (final entity in imagesDir.list()) {
-          if (entity is File) {
-            totalBytes += await entity.length();
-          }
-        }
-      }
-
-      // Format
-      if (totalBytes < 1024) return '$totalBytes B';
-      if (totalBytes < 1024 * 1024) {
-        return '${(totalBytes / 1024).toStringAsFixed(1)} KB';
-      }
-      if (totalBytes < 1024 * 1024 * 1024) {
-        return '${(totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-      }
-      return '${(totalBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+      final breakdown = await getStorageBreakdown();
+      return formatBytes(breakdown['total']!);
     } catch (e) {
       debugPrint('HiveService.getStorageUsage failed: $e');
       return 'Unknown';

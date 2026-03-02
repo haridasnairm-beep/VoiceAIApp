@@ -88,9 +88,9 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
                     borderRadius: BorderRadius.circular(40),
                     boxShadow: [
                       BoxShadow(
-                        color: primaryColor.withValues(alpha: 0.25),
-                        blurRadius: 40,
-                        offset: const Offset(0, 12),
+                        color: primaryColor.withValues(alpha: 0.3),
+                        blurRadius: 50,
+                        spreadRadius: 8,
                       ),
                     ],
                   ),
@@ -128,6 +128,35 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
                 ),
               ),
               const Spacer(flex: 2),
+              // Terms & Conditions link
+              Text.rich(
+                TextSpan(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: primaryColor.withValues(alpha: 0.7),
+                        fontSize: 11,
+                      ),
+                  children: [
+                    const TextSpan(text: 'By using this app you agree to the\n'),
+                    WidgetSpan(
+                      child: GestureDetector(
+                        onTap: () => context.push(AppRoutes.termsConditions),
+                        child: Text(
+                          'Terms & Conditions',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: primaryColor.withValues(alpha: 0.9),
+                                decoration: TextDecoration.underline,
+                                decorationColor: primaryColor.withValues(alpha: 0.5),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
               // Bottom branding
               Text(
                 'by HDMPixels',
@@ -139,7 +168,7 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
                       letterSpacing: 1.0,
                     ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 72),
             ],
           ),
         ),

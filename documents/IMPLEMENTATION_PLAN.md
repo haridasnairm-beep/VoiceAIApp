@@ -1,9 +1,9 @@
 # VoiceNotes AI - Implementation Plan
 
-**Version:** 2.4
-**Last Updated:** 2026-03-01
+**Version:** 3.0
+**Last Updated:** 2026-03-02
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
+**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md) | [Phase 1 Value Gaps](FEATURE_PHASE1_VALUE_GAPS.md)
 
 ---
 
@@ -14,8 +14,8 @@ This plan is split into two phases:
 - **Phase 1 (On-Device):** A fully functional voice note-taking app with recording, on-device transcription, local storage, folders, search, playback, and notifications — all without any AI/cloud dependency.
 - **Phase 2 (AI-Powered):** Adds AI categorization, smart structuring, Whisper API transcription, auto-folder assignment, and n8n integration.
 
-**Current state:** Phase 1 feature-complete (all 7 steps + Steps 4.5/4.6/4.7 + bonus features: voice commands, unified Library, Whisper UX, default folder, rich text editing, Whisper noise filters). Current version: **v1.12.0**. Ready for Phase 2 (AI-powered features).
-**Phase 1 target:** Privacy-first voice note app with on-device transcription, local Hive storage, audio playback, reminder notifications, project documents, voice command auto-linking, interactive tasks & aggregated tasks view, hybrid reminders with OS calendar bridge, sharing/export, rich text editing, and photo attachments.
+**Current state:** Phase 1 core complete (all 7 steps + Steps 4.5/4.6/4.7 + bonus features + post-release enhancements Issues #7–#12). Current version: **v1.0.0** (Release). **Next:** Phase 1 Value Proposition Gaps (Steps 8–10.7, 8 features) — features to match competitor expectations before Play Store launch.
+**Phase 1 target:** Privacy-first voice note app with on-device transcription, local Hive storage, audio playback, reminder notifications, project documents, voice command auto-linking, interactive tasks & aggregated tasks view, hybrid reminders with OS calendar bridge, sharing/export with PDF, rich text editing, share preview with toggles, photo attachments, word count, find & replace, profanity filter, voice commands for task creation, **pinned notes, AMOLED dark theme, auto-title generation, note templates, trash/soft delete, home screen widget, app lock (PIN/biometric), and local backup & restore**.
 
 ---
 
@@ -563,11 +563,339 @@ This plan is split into two phases:
 
 ---
 
+# PHASE 1 — Value Proposition Gaps (Pre-Launch Enhancements)
+
+**Spec:** [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md)
+
+These 8 features address competitive gaps that users expect at launch. They require no AI and remain fully on-device/privacy-first.
+
+---
+
+## Step 8: Pinned Notes + AMOLED Dark Theme + Auto-Title Generation ⬜ PENDING
+
+**Goal:** Three small, independent features that can be implemented in parallel.
+
+### Sub-step A: Pinned Notes
+
+**Goal:** Allow users to pin important notes to the top of the Home page feed.
+
+#### Tasks:
+1. Add `isPinned` (bool) and `pinnedAt` (DateTime?) fields to Note Hive model → `build_runner`
+2. Update `notesProvider` to return pinned list (sorted by `pinnedAt` desc) and unpinned list (sorted by `createdAt` desc)
+3. Add "Pinned" section header (collapsible, with count badge) above regular notes feed on Home page
+4. Add pin icon on pinned note cards (top-right corner)
+5. Add "Pin to Top" / "Unpin" action in:
+   - Long-press note card overflow menu
+   - Note Detail AppBar overflow menu
+   - Multi-select bottom action bar
+6. Enforce max 10 pinned notes with warning SnackBar
+7. Pinned notes still appear in folder views and search (without special positioning)
+
+#### New files:
+- `lib/widgets/pinned_section_widget.dart` — Pinned section header + list
+
+#### Modified files:
+- `lib/models/note.dart` — Add `isPinned`, `pinnedAt` HiveFields
+- `lib/providers/notes_provider.dart` — Pinned/unpinned split
+- `lib/pages/home_page.dart` — Pinned section above feed
+- `lib/pages/note_detail_page.dart` — Pin/unpin in overflow menu
+
+### Sub-step B: AMOLED Dark Theme
+
+**Goal:** Add a pure black theme option for OLED screens.
+
+#### Tasks:
+1. Create `amoledDarkTheme` ThemeData in `lib/theme.dart` — copy `darkTheme`, override scaffold/surface/card/appbar backgrounds to `#000000`, cards to `#0A0A0A`, dividers to `#1A1A1A`
+2. Add theme option to `UserSettings` model (string field: `'light'`, `'dark'`, `'amoled'`, `'system'`)
+3. Update `MaterialApp` to select between three theme data objects
+4. Update Settings → Appearance theme picker to show 4 options (Light, Dark, AMOLED Dark, System)
+
+#### Modified files:
+- `lib/theme.dart` — Add `amoledDarkTheme`
+- `lib/models/user_settings.dart` — Add theme mode field
+- `lib/providers/settings_provider.dart` — Expose new theme
+- `lib/main.dart` — Select theme in MaterialApp
+- `lib/pages/preferences_page.dart` — Theme picker update
+
+### Sub-step C: Auto-Title Generation
+
+**Goal:** Generate meaningful, scannable titles from transcription text using local heuristics (no AI).
+
+#### Tasks:
+1. Create `TitleGeneratorService` — pure Dart utility class
+2. Implement algorithm: strip filler phrases → extract first meaningful sentence → apply fallback patterns (task-based titles) → truncate at 60 chars at word boundary
+3. Call after transcription is finalized (both live STT and Whisper modes)
+4. Only auto-generate if user has not manually edited the title
+5. Add `isUserEditedTitle` flag to Note model to track manual edits
+
+#### New files:
+- `lib/services/title_generator_service.dart`
+
+#### Modified files:
+- `lib/models/note.dart` — Add `isUserEditedTitle` HiveField
+- `lib/pages/recording_page.dart` — Call title generator after transcription
+- `lib/pages/note_detail_page.dart` — Set `isUserEditedTitle = true` on manual title edit
+
+### Estimated effort: Small (all three combined)
+
+---
+
+## Step 9: Note Templates ⬜ PENDING
+
+**Goal:** Offer built-in note templates that pre-populate new text notes with structured placeholders.
+
+### Tasks:
+1. Create `NoteTemplate` data class and `lib/constants/note_templates.dart` with 6 built-in templates:
+   - Meeting Notes, Daily Journal, Idea Capture, Grocery List, Project Planning, Quick Checklist
+2. Create `TemplatePickerSheet` bottom sheet widget — shows Blank Note + 6 templates with icons
+3. Integrate with SpeedDialFab "New Text Note" action — show template picker first
+4. Pre-fill Quill Delta content in new note from selected template
+5. Auto-generate title from template name (e.g., "Meeting Notes — Mar 2, 2026")
+
+### New files:
+- `lib/constants/note_templates.dart` — Template definitions
+- `lib/widgets/template_picker_sheet.dart` — Bottom sheet picker UI
+
+### Modified files:
+- `lib/pages/home_page.dart` — SpeedDialFab "New Text Note" shows picker
+- `lib/pages/note_detail_page.dart` — Accept pre-filled template content
+
+### Estimated effort: Small
+
+---
+
+## Step 10: Trash / Soft Delete ⬜ PENDING
+
+**Goal:** Replace permanent deletion with a Trash system offering 30-day recovery.
+
+### Sub-step A: Data Model Changes
+
+#### Tasks:
+1. Add to Note model: `isDeleted` (bool), `deletedAt` (DateTime?), `previousFolderId` (String?), `previousProjectIds` (List<String>?)
+2. Add to Folder model: `isDeleted` (bool), `deletedAt` (DateTime?)
+3. Add to ProjectDocument model: `isDeleted` (bool), `deletedAt` (DateTime?)
+4. Run `build_runner` for Hive adapter regeneration
+5. Data migration: existing items get `isDeleted = false` by default
+
+### Sub-step B: Repository & Provider Filtering
+
+#### Tasks:
+1. Update all note/folder/project queries to filter out `isDeleted == true` items
+2. Add `softDeleteNote()`, `softDeleteFolder()`, `softDeleteProject()` methods to repositories
+3. Add `restoreFromTrash()` methods — re-link to original folder/projects
+4. Add `permanentlyDelete()` methods — actual Hive removal + file cleanup
+5. Add `getTrashItems()` methods — return items where `isDeleted == true`
+6. Add auto-purge logic on app launch — permanently delete items where `deletedAt` > 30 days ago
+7. Update tasks provider to exclude tasks from trashed notes
+8. Update search to exclude trashed items
+
+### Sub-step C: Trash Screen UI
+
+#### Tasks:
+1. Create `TrashPage` with:
+   - Header with item count
+   - "Items are permanently deleted after 30 days" info bar
+   - Sections for Notes, Folders, Projects (with counts)
+   - Each item shows: title, "Deleted X days ago", days remaining badge
+   - Swipe/overflow menu: Restore, Delete Permanently
+   - "Empty Trash" button with confirmation dialog
+2. Add route `/trash` to go_router
+3. Add "Trash" entry to App Menu (3-dot overflow) with item count badge
+
+### Sub-step D: Integration & Polish
+
+#### Tasks:
+1. Update all delete dialogs: "Move to Trash? You can restore within 30 days."
+2. Add Undo SnackBar after soft delete (5 seconds): "Note moved to Trash [Undo]"
+3. Project document blocks show "Note in Trash" placeholder for trashed notes (with Restore quick action)
+4. Update storage display: show trash storage separately
+5. "Delete All Data" in Danger Zone bypasses Trash (with explicit warning)
+6. Stats cards exclude trashed items from counts
+
+### New files:
+- `lib/pages/trash_page.dart` — Trash screen
+
+### Modified files:
+- `lib/models/note.dart`, `lib/models/folder.dart`, `lib/models/project_document.dart` — Soft delete fields
+- `lib/services/notes_repository.dart`, `lib/services/folders_repository.dart`, `lib/services/project_documents_repository.dart` — Soft delete/restore/purge
+- `lib/providers/notes_provider.dart`, `lib/providers/folders_provider.dart`, `lib/providers/project_documents_provider.dart` — Query filtering
+- `lib/providers/tasks_provider.dart` — Exclude trashed
+- `lib/pages/home_page.dart` — Delete → soft delete, stats filtering
+- `lib/pages/search_page.dart` — Exclude trashed
+- `lib/pages/note_detail_page.dart` — Delete → soft delete
+- `lib/pages/folders_page.dart` — Delete → soft delete
+- `lib/pages/project_document_detail_page.dart` — Delete → soft delete, trashed note placeholder
+- `lib/nav.dart` — Add `/trash` route
+
+### Estimated effort: Medium
+
+---
+
+## Step 10.5: App Lock — PIN / Biometric ⬜ PENDING
+
+**Goal:** Protect VoiceNotes AI with PIN and/or biometric authentication. Must be built before or in parallel with Home Screen Widget so Widget can read lock state for Widget Privacy.
+
+**Spec:** [FEATURE_PHASE1_VALUE_GAPS.md — Feature 8](FEATURE_PHASE1_VALUE_GAPS.md)
+
+### Sub-step A: Data Model & PIN Storage
+
+#### Tasks:
+1. Add to UserSettings model: `appLockEnabled` (bool), `appLockPinHash` (String?), `biometricEnabled` (bool), `autoLockTimeoutSeconds` (int, default 0 = immediately), `widgetPrivacyLevel` (String, default 'record_only')
+2. Run `build_runner` for Hive adapter regeneration
+3. Store PIN salt in `flutter_secure_storage` (not in Hive) — salted SHA-256 hash only, never raw PIN
+4. Add `local_auth` and `crypto` dependencies
+
+### Sub-step B: App Lock Service
+
+#### Tasks:
+1. Create `AppLockService` — manages lock state, timeout tracking, authentication orchestration
+2. Use `WidgetsBindingObserver` to detect `didChangeAppLifecycleState` — track `lastBackgroundedAt` timestamp
+3. Implement auto-lock logic: compare `lastBackgroundedAt` + timeout vs current time on resume
+4. Lock screen is a full-screen overlay via `Navigator` (not a route — prevents back-button bypass)
+5. Handle incoming notifications: lock screen → authenticate → navigate to deep-link target
+
+### Sub-step C: Lock Screen UI
+
+#### Tasks:
+1. Create `LockScreenPage` — app logo (matching splash screen), "VoiceNotes AI" title, biometric auto-prompt (if enabled), "Use PIN" button
+2. Create custom PIN keypad widget — obscured dots, 4-6 digit support, shake animation on wrong PIN
+3. Implement biometric auth via `local_auth` — check `canCheckBiometrics`, handle success/failure, auto-fallback to PIN after 3 failed attempts
+4. Implement progressive lockout: 30s → 1min → 5min cooldown after repeated wrong PINs (resets on app restart)
+5. Background matches current theme (light/dark/AMOLED)
+
+### Sub-step D: PIN Setup & Settings
+
+#### Tasks:
+1. Create `PinSetupPage` — create PIN flow (enter + confirm), change PIN flow, biometric enable prompt
+2. Add Security section to Settings menu: App Lock toggle, Change PIN, Biometric Unlock toggle, Auto-Lock Timeout picker (Immediately / 1 min / 5 min / 15 min)
+3. Widget Privacy picker (visible only when App Lock ON and widget active): Full / Record-Only / Minimal
+4. Disabling App Lock requires current PIN/biometric confirmation
+5. Show warning during setup: "If you forget your PIN, you'll need to reinstall the app. Make sure you have a backup first."
+
+### Sub-step E: Task Switcher Protection & Notifications
+
+#### Tasks:
+1. Android: set `FLAG_SECURE` on window when App Lock enabled — hides content in task switcher
+2. iOS: overlay blur when app enters background (via lifecycle observer)
+3. Update notification service: use `VISIBILITY_SECRET` when App Lock enabled — shows "VoiceNotes AI reminder" without note content
+4. Optional: FLAG_SECURE also blocks screenshots (user-configurable)
+
+### New files:
+- `lib/services/app_lock_service.dart` — Lock state, timeout, auth orchestration
+- `lib/pages/lock_screen_page.dart` — PIN keypad + biometric prompt overlay
+- `lib/pages/pin_setup_page.dart` — PIN creation and change flow
+- `lib/widgets/widget_privacy_picker.dart` — Privacy level selector (for Widget × App Lock)
+
+### Modified files:
+- `lib/models/user_settings.dart` — App Lock fields (5 new HiveFields)
+- `lib/main.dart` — Add `WidgetsBindingObserver` for auto-lock lifecycle
+- `lib/services/notification_service.dart` — VISIBILITY_SECRET when locked
+- Settings pages — New Security section
+- `pubspec.yaml` — Add `local_auth`
+- `android/app/src/main/AndroidManifest.xml` — FLAG_SECURE support
+
+### New dependencies: `local_auth`, `crypto` (dart:crypto)
+
+### Estimated effort: Medium
+
+---
+
+## Step 10.6: Home Screen Widget ⬜ PENDING
+
+**Goal:** Provide one-tap voice recording from the home screen and glanceable note/task stats. Widget behavior adapts when App Lock (Step 10.5) is enabled via Widget Privacy setting.
+
+**Spec:** [FEATURE_PHASE1_VALUE_GAPS.md — Feature 4](FEATURE_PHASE1_VALUE_GAPS.md)
+
+### Tasks:
+1. Add `home_widget` dependency
+2. Implement Small widget (2×1): App icon + "Tap to Record" → deep-links to Recording screen (unaffected by App Lock — no content displayed)
+3. Implement Dashboard widget (4×2): Record button + note count + open task count + latest note preview
+4. Android: widget layout XML, `AppWidgetProvider`, deep-link intent `voicenotesai://record`
+5. iOS: WidgetKit extension, SwiftUI widget, app group for shared data
+6. Background data refresh via WorkManager (every 30 min) or on app foreground
+7. Widget update triggers on note creation/deletion
+8. **App Lock integration:** Widget reads App Lock + Widget Privacy settings to determine display mode:
+   - App Lock OFF → full display
+   - App Lock ON + "Full" → show everything (user accepted tradeoff)
+   - App Lock ON + "Record-Only" (default) → counts only, no text preview
+   - App Lock ON + "Minimal" → icon + "Tap to Record" only
+9. Record tap: skip App Lock in Full/Record-Only modes (recording is write-only); require auth in Minimal mode
+10. Content tap (counts/preview): always show App Lock screen first if enabled
+11. First-time Widget Privacy prompt when user enables App Lock while widget is active (or adds widget while App Lock is on)
+
+### New files:
+- `android/app/src/main/res/layout/widget_small.xml`
+- `android/app/src/main/res/layout/widget_dashboard.xml`
+- Android `AppWidgetProvider` classes
+- iOS widget extension files
+
+### Modified files:
+- `pubspec.yaml` — Add `home_widget`
+- `lib/main.dart` — Widget data refresh hooks
+
+### New dependency: `home_widget`
+
+### Estimated effort: Medium
+
+---
+
+## Step 10.7: Local Backup & Restore ⬜ PENDING
+
+**Goal:** Allow users to export their entire database as an encrypted archive and restore from it.
+
+### Sub-step A: Backup Service
+
+#### Tasks:
+1. Add `toMap()` / `fromMap()` serialization methods to all Hive models (Note, Folder, ProjectDocument, UserSettings, and nested models)
+2. Create `BackupService` — serializes all Hive boxes to JSON, collects audio/image files, creates ZIP archive, encrypts with AES-256 using user passphrase (PBKDF2 key derivation)
+3. File format: `.vnbak` (renamed ZIP) containing `manifest.json`, `data/*.json`, `audio/*`, `images/*`
+4. `manifest.json` includes: appVersion, backupFormatVersion, creation timestamp, note/folder/project counts, total file count
+5. Process in isolate to avoid UI jank; emit progress events
+
+### Sub-step B: Restore Service
+
+#### Tasks:
+1. Decrypt `.vnbak` file with user passphrase
+2. Validate ZIP integrity and `manifest.json` before proceeding
+3. Check version compatibility (warn if from newer app version)
+4. Preview screen: show backup date, counts, total size
+5. Clear all existing Hive boxes → populate from backup JSON → copy audio/image files to app directories
+6. Apply data migration logic for backups from older versions
+7. Restart app after restore
+
+### Sub-step C: Backup & Restore UI
+
+#### Tasks:
+1. Create `BackupRestorePage` with:
+   - "Last backup: [date] ([size])" or "No backups created"
+   - "Create Backup" button → passphrase dialog (with confirm, strength indicator, warning) → progress → share sheet
+   - "Restore from Backup" button → warning dialog (offer "Create Backup First") → file picker → passphrase → preview → restore → progress → restart
+2. Add route `/backup_restore` to go_router
+3. Add "Backup & Restore" entry to Settings → Data & Storage (between Storage and Danger Zone)
+4. Add `lastBackupDate` to UserSettings model
+
+### New files:
+- `lib/services/backup_service.dart` — Backup & restore logic
+- `lib/pages/backup_restore_page.dart` — UI
+
+### Modified files:
+- All Hive models — Add `toMap()` / `fromMap()` methods
+- `lib/models/user_settings.dart` — Add `lastBackupDate` HiveField
+- `lib/nav.dart` — Add `/backup_restore` route
+- Settings page — Add Backup & Restore section
+- `pubspec.yaml` — Add `archive`, `encrypt`
+
+### New dependencies: `archive`, `encrypt`
+
+### Estimated effort: Medium-Large
+
+---
+
 # PHASE 2 — AI-Powered Features (Requires n8n / Cloud APIs)
 
 ---
 
-## Step 8: AI Transcription (Whisper API)
+## Step 11: AI Transcription (Whisper API)
 
 **Goal:** Add high-accuracy cloud transcription as an upgrade over on-device STT.
 
@@ -585,7 +913,7 @@ This plan is split into two phases:
 
 ---
 
-## Step 9: AI Categorization & Structuring
+## Step 12: AI Categorization & Structuring
 
 **Goal:** Parse transcriptions into actions, todos, reminders, and general notes using AI.
 
@@ -626,7 +954,7 @@ This plan is split into two phases:
 
 ---
 
-## Step 10: n8n Integration & Advanced Features
+## Step 13: n8n Integration & Advanced Features
 
 **Goal:** Connect to n8n workflows for extensibility.
 
@@ -677,18 +1005,47 @@ PHASE 1 — On-Device (No AI)
     + Bonus: Voice Commands (auto-link to folder/project)
     + Bonus: Unified Library (folders + projects)
     + Bonus: Whisper UX (auto-scroll + flash highlight)
+    + Post-Release: Issues #7–#12 (multi-select, layout,
+      sectioned search, project rich text, share preview + PDF,
+      word count, find & replace, profanity filter)
+    + Post-Release: UI Polish & Voice Command Fixes
+      (Todo normalization, stats tile consistency, storage
+      layout, voice commands help, whisper cancel button,
+      keep-screen-awake default)
+    + Post-Release: Note Detail Refactor
+      (Tab system for Actions/Todos/Reminders/Photos,
+      simplified audio player, metadata two-row layout,
+      photo grid, onboarding logo animation,
+      share preview rich text fix)
+    + Post-Release: Rich Text Version History &
+      Picker Enhancements (richContentJson in
+      TranscriptVersion, QuillEditor preview in
+      version history, restore rich/plain, inline
+      New Folder/New Project in all pickers)
                                                     │
-                                             PHASE 1 RELEASE (after Step 4.7)
+                                             PHASE 1 CORE COMPLETE (v1.0.0)
+
+PHASE 1 — Value Proposition Gaps (Pre-Launch)
+├── Step 8: Pinned Notes + AMOLED + Auto-Title ── [Small]
+├── Step 9: Note Templates ───────────────────── [Small]
+├── Step 10: Trash / Soft Delete ─────────────── [Medium]
+├── Step 10.5: App Lock (PIN/Biometric) ──────── [Medium]
+├── Step 10.6: Home Screen Widget ────────────── [Medium]  (reads App Lock state)
+└── Step 10.7: Local Backup & Restore ────────── [Medium-Large]  (includes App Lock settings)
+    (Spec: FEATURE_PHASE1_VALUE_GAPS.md — 8 features)
+                                                    │
+                                             PHASE 1 RELEASE (Play Store)
 
 PHASE 2 — AI-Powered
-├── Step 8: Whisper API Transcription ────────── [Medium]
-├── Step 9: AI Categorization & Structuring ──── [Large]
-└── Step 10: n8n Integration & Advanced ──────── [Large]
-    + Project Documents Phase 2: AI summary, PDF export, AI-suggested note additions
+├── Step 11: Whisper API Transcription ─────────── [Medium]
+├── Step 12: AI Categorization & Structuring ───── [Large]
+└── Step 13: n8n Integration & Advanced ────────── [Large]
+    + Project Documents Phase 2: AI summary, AI-suggested note additions
     + Tasks Phase 2: AI auto-extraction, smart due dates, recurring reminders,
       priority levels, Todoist/Apple Reminders API/Google Tasks API
     (Note: voice commands moved to Phase 1 — v1.3.0)
     (Note: sharing/export + rich text + images moved to Phase 1 — Step 4.7)
+    (Note: PDF export moved to Phase 1 — Issue #11, v1.15.0)
                                                     │
                                              PHASE 2 RELEASE
 ```
@@ -704,6 +1061,7 @@ PHASE 2 — AI-Powered
 | 3 | Whisper API vs Google Cloud STT | 2 | Whisper (batch) vs Google (streaming) | Affects transcription quality |
 | 4 | AI provider | 2 | OpenAI vs Anthropic | Affects structuring quality and cost |
 | 5 | API key management | 2 | flutter_secure_storage vs dart_define env | Affects security approach |
+| 6 | ~~Step numbering~~ | 1 | ~~Renumber Phase 2 to 11-13~~ | ✅ Decided — Steps 8-10.6 for value gaps |
 
 ---
 
@@ -719,3 +1077,6 @@ PHASE 2 — AI-Powered
 | AI categorization quality varies | 2 | Invest in prompt engineering, allow manual override |
 | Large recordings fail API upload | 2 | Chunked uploads, max recording duration |
 | Mixed-language detection unreliable | 2 | Default to user-preferred language for ambiguous segments |
+| Backup passphrase loss = unrecoverable backup | 1 | Clear warning during backup creation; no recovery mechanism by design (privacy-first) |
+| Soft delete increases storage usage (30-day retention) | 1 | Show trash storage in storage display; allow manual empty |
+| Home screen widget platform differences (Android vs iOS) | 1 | Implement Android first; iOS WidgetKit as follow-up if needed |

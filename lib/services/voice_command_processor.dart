@@ -11,6 +11,8 @@ class VoiceCommandProcessResult {
   final String noteContent;
   final bool folderCreated;
   final bool projectCreated;
+  final String? taskType;        // 'todo', 'action', or 'reminder'
+  final String? taskDescription; // truncated description for the task item
 
   const VoiceCommandProcessResult({
     this.folderId,
@@ -18,6 +20,8 @@ class VoiceCommandProcessResult {
     required this.noteContent,
     this.folderCreated = false,
     this.projectCreated = false,
+    this.taskType,
+    this.taskDescription,
   });
 }
 
@@ -79,6 +83,8 @@ class VoiceCommandProcessor {
       noteContent: parsed.noteContent,
       folderCreated: folderCreated,
       projectCreated: projectCreated,
+      taskType: parsed.taskType,
+      taskDescription: parsed.taskDescription,
     );
   }
 

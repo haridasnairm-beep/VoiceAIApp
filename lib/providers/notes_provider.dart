@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:uuid/uuid.dart';
 import '../models/note.dart';
 import '../models/reminder_item.dart';
@@ -8,6 +10,7 @@ import '../services/notes_repository.dart';
 import '../services/notification_service.dart';
 import '../services/voice_command_processor.dart';
 import '../services/whisper_service.dart';
+import '../utils/profanity_filter.dart';
 import 'folders_provider.dart';
 import 'project_documents_provider.dart';
 import 'settings_provider.dart';
@@ -120,11 +123,17 @@ class NotesNotifier extends Notifier<List<Note>> {
       // Determine if we need translation to English
       final settings = ref.read(settingsProvider);
       final isTranslate = (language != 'en' && settings.noteOutputMode == 'english');
-      final transcription = await WhisperService.instance.transcribe(
+      var transcription = await WhisperService.instance.transcribe(
         wavPath,
         language: language,
         isTranslate: isTranslate,
       );
+
+      // Apply profanity filter if enabled
+      if (settings.blockOffensiveWords) {
+        transcription = ProfanityFilter.instance.filter(transcription);
+      }
+
       final note = getNoteById(noteId);
       if (note == null) return;
 
@@ -159,6 +168,29 @@ class NotesNotifier extends Notifier<List<Note>> {
               .addNoteBlock(result.projectId!, noteId);
           debugPrint('VoiceCmd: linked to project ${result.projectId}');
         }
+
+        // Auto-create task item if voice command detected a task keyword
+        if (result.taskType != null && result.taskDescription != null) {
+          debugPrint('VoiceCmd: creating ${result.taskType} task: "${result.taskDescription}"');
+          switch (result.taskType) {
+            case 'todo':
+              await addTodoItem(noteId: noteId, text: result.taskDescription!);
+              break;
+            case 'action':
+              await addActionItem(noteId: noteId, text: result.taskDescription!);
+              break;
+            case 'reminder':
+              final tomorrow = DateTime.now().add(const Duration(days: 1));
+              final notifEnabled = ref.read(settingsProvider).notificationsEnabled;
+              await addReminder(
+                noteId: noteId,
+                text: result.taskDescription!,
+                reminderTime: tomorrow,
+                notificationsEnabled: notifEnabled,
+              );
+              break;
+          }
+        }
       } else {
         note.rawTranscription =
             transcription.isNotEmpty ? transcription : 'No speech detected';
@@ -166,6 +198,7 @@ class NotesNotifier extends Notifier<List<Note>> {
 
       note.isProcessed = true;
       note.detectedLanguage = 'auto';
+      note.transcriptionModel = WhisperService.instance.currentModelName;
       await updateNote(note);
     } catch (_) {
       final note = getNoteById(noteId);
@@ -174,6 +207,117 @@ class NotesNotifier extends Notifier<List<Note>> {
       note.isProcessed = true;
       await updateNote(note);
     }
+  }
+
+  /// Re-transcribe an existing note using the currently active Whisper model.
+  /// Saves old transcription as a version, replaces rawTranscription,
+  /// and updates transcriptionModel. Returns true on success.
+  Future<bool> retranscribeNote(String noteId) async {
+    final note = getNoteById(noteId);
+    if (note == null) return false;
+    if (note.audioFilePath.isEmpty) return false;
+    final audioFile = File(note.audioFilePath);
+    if (!await audioFile.exists()) return false;
+
+    try {
+      // Save current transcription as a version before overwriting
+      if (note.rawTranscription.isNotEmpty) {
+        final oldModel = note.transcriptionModel ?? 'unknown';
+        final oldText = note.contentFormat == 'quill_delta'
+            ? _extractPlainText(note.rawTranscription)
+            : note.rawTranscription;
+        await addTranscriptVersion(
+          noteId, oldText, 'Before re-transcription (model: $oldModel)',
+        );
+      }
+
+      // Transcribe with current model
+      final settings = ref.read(settingsProvider);
+      final language = note.detectedLanguage == 'auto'
+          ? (settings.defaultLanguage ?? 'en')
+          : note.detectedLanguage;
+      final isTranslate =
+          (language != 'en' && settings.noteOutputMode == 'english');
+
+      final transcription = await WhisperService.instance.transcribe(
+        note.audioFilePath,
+        language: language,
+        isTranslate: isTranslate,
+      );
+
+      note.rawTranscription =
+          transcription.isNotEmpty ? transcription : 'No speech detected';
+      note.transcriptionModel = WhisperService.instance.currentModelName;
+      note.isProcessed = true;
+      note.updatedAt = DateTime.now();
+
+      // Reset rich text format since re-transcription produces plain text
+      if (note.contentFormat == 'quill_delta') {
+        note.contentFormat = null;
+      }
+
+      await updateNote(note);
+
+      // Add new transcription as a version
+      await addTranscriptVersion(
+        noteId,
+        note.rawTranscription,
+        'Re-transcribed (model: ${WhisperService.instance.currentModelName})',
+      );
+
+      return true;
+    } catch (e) {
+      debugPrint('retranscribeNote failed: $e');
+      return false;
+    }
+  }
+
+  /// Helper to extract plain text from quill delta JSON.
+  String _extractPlainText(String deltaJson) {
+    try {
+      // Simple extraction: pull all "insert" string values
+      final buffer = StringBuffer();
+      final regex = RegExp(r'"insert"\s*:\s*"([^"]*)"');
+      for (final match in regex.allMatches(deltaJson)) {
+        buffer.write(match.group(1)?.replaceAll(r'\n', '\n') ?? '');
+      }
+      return buffer.toString().trim();
+    } catch (_) {
+      return deltaJson;
+    }
+  }
+
+  /// Get notes eligible for re-transcription (have audio file on disk).
+  Future<List<Note>> getRetranscribableNotes() async {
+    final eligible = <Note>[];
+    for (final note in state) {
+      if (note.audioFilePath.isEmpty) continue;
+      final file = File(note.audioFilePath);
+      if (await file.exists()) {
+        eligible.add(note);
+      }
+    }
+    return eligible;
+  }
+
+  /// Re-transcribe multiple notes sequentially with progress callback.
+  /// Returns count of successfully re-transcribed notes.
+  Future<int> bulkRetranscribe({
+    required List<String> noteIds,
+    void Function(int completed, int total)? onProgress,
+  }) async {
+    await WakelockPlus.enable();
+    int success = 0;
+    try {
+      for (int i = 0; i < noteIds.length; i++) {
+        final ok = await retranscribeNote(noteIds[i]);
+        if (ok) success++;
+        onProgress?.call(i + 1, noteIds.length);
+      }
+    } finally {
+      await WakelockPlus.disable();
+    }
+    return success;
   }
 
   Future<void> updateNote(Note note) async {
@@ -203,7 +347,10 @@ class NotesNotifier extends Notifier<List<Note>> {
     return state.where((n) {
       return n.title.toLowerCase().contains(lower) ||
           n.rawTranscription.toLowerCase().contains(lower) ||
-          n.topics.any((t) => t.toLowerCase().contains(lower));
+          n.topics.any((t) => t.toLowerCase().contains(lower)) ||
+          n.actions.any((a) => a.text.toLowerCase().contains(lower)) ||
+          n.todos.any((t) => t.text.toLowerCase().contains(lower)) ||
+          n.reminders.any((r) => r.text.toLowerCase().contains(lower));
     }).toList();
   }
 
@@ -275,10 +422,12 @@ class NotesNotifier extends Notifier<List<Note>> {
 
   /// Add a transcript version and update rawTranscription.
   Future<void> addTranscriptVersion(
-      String noteId, String newText, String editSource) async {
+      String noteId, String newText, String editSource,
+      {String? richContentJson}) async {
     await ref
         .read(notesRepositoryProvider)
-        .addTranscriptVersion(noteId, newText, editSource);
+        .addTranscriptVersion(noteId, newText, editSource,
+            richContentJson: richContentJson);
     refresh();
   }
 

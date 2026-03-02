@@ -4,7 +4,232 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.12.0] - 2026-03-01 - Rich Text Persistence Fix + Whisper Noise Filters + Project View Rich Text
+## [Unreleased] - 2026-03-02 - Documentation: Release Status & Value Gaps Integration
+
+### Documentation
+- **Project status updated to Release** — removed all "MVP" and "pre-release" language across CLAUDE.md, PROJECT_STATUS.md, IMPLEMENTATION_PLAN.md, and PROJECT_SPECIFICATION.md. App is now a full-fledged release, not an MVP.
+- **Phase 1 Value Proposition Gaps integrated** — 8 new features (Steps 8–10.7) added to IMPLEMENTATION_PLAN.md (v3.0) and PROJECT_SPECIFICATION.md (v2.8): Pinned Notes, AMOLED Dark Theme, Auto-Title Generation, Note Templates, Trash/Soft Delete, App Lock (PIN/Biometric), Home Screen Widget, Local Backup & Restore
+- **Phase 2 steps renumbered** — Steps 8/9/10 → Steps 11/12/13 to make room for value gap features
+- **New feature spec added:** `FEATURE_PHASE1_VALUE_GAPS.md` — detailed specifications for all 8 pre-launch features with user flows, data model changes, dependency maps, and effort estimates
+- **Image cropper wired** — `image_cropper` (already in pubspec) now active in project document image blocks and note photo attachments
+- **Splash screen Terms link** — hyperlink limited to "Terms & Conditions" text only, split to two lines
+
+---
+
+## [Unreleased] - 2026-03-02 - Rich Text Version History & Picker Enhancements
+
+### Added
+- **Rich text in version history** — `TranscriptVersion` model now stores `richContentJson` (Quill Delta JSON) alongside plain text; version history page renders formatting (bold, italic, etc.) via read-only QuillEditor
+- **"New Folder" option in folder pickers** — all folder picker bottom sheets (single-select and bulk) now show a "New Folder" tile at the top; creates folder inline and auto-selects it
+- **"New Project" option in project pickers** — all project picker bottom sheets (single-select and bulk) now show a "New Project" tile at the top; creates project inline and auto-selects it
+
+### Changed
+- `TranscriptVersion` model — added `richContentJson` HiveField(6) for storing Quill Delta JSON
+- `NotesRepository.addTranscriptVersion()` — accepts optional `richContentJson` parameter
+- `NotesRepository.updateNoteRichContent()` — stores Delta JSON in version's `richContentJson` and plain text in `text`
+- `NotesRepository.restoreTranscriptVersion()` — restores rich content (Delta JSON + contentFormat) when available; reverts to plain text when restoring a plain version
+- `NotesRepository.ensureTranscriptVersion()` — captures rich content for existing notes during migration
+- `note_detail_page.dart` — `_saveTranscription()` passes Delta JSON to `addTranscriptVersion()` via `richContentJson` parameter
+- `version_history_page.dart` — renders rich text preview via `_buildRichPreview()` using read-only QuillEditor; falls back to plain text for older versions
+- `home_page.dart` — added `_showNewNameDialog()` helper; all 4 picker sheets use `var` for folder/project lists to allow refresh after creation
+
+---
+
+## [Unreleased] - 2026-03-01 - Note Detail Refactor & Share Preview Fix
+
+### Changed
+- **Note Detail — Tab system for sections** — Action Items, Todos, Reminders, and Photos now display as tabs instead of stacked vertical sections, reducing page length and improving navigation
+- **Note Detail — Photo attachments grid** — Photos tab shows a 2-column grid layout (~170px thumbnails) instead of the previous 100px horizontal scroll row; tap for full-screen, long-press to delete
+- **Note Detail — Audio player simplified** — Replaced separate waveform + slider + times layout with a single compact row: play button + current time + tappable waveform (seek on tap) + total time
+- **Note Detail — Tab container card** — Tab content wrapped in bordered Container card with divider between tab selector and content, giving a cohesive grouped appearance
+- **Note Detail — Custom tab selector** — Replaced SegmentedButton with custom Row of icon+label columns for cleaner dual-line tab presentation with badge counts
+- **Note Detail — Metadata two-row layout** — Metadata changed from single overflowing Row to two explicit Rows: timestamp on first row, duration/language/model on second row
+- **Onboarding logo enhanced** — Logo size 120→140px, border radius 36→40, shadow matched to splash screen (0.3 alpha, 50px blur, 8px spread), added scale-in animation (0.85→1.0, 800ms, easeOutBack)
+
+### Fixed
+- **Share preview rich text not showing** — `_previewText` getter in SharePreviewSheet was hardcoded to `plainTextOnly: true`, ignoring the user's toggle; now correctly uses `_options` to respect the Plain Text Only switch
+
+---
+
+## [Unreleased] - 2026-03-01 - UI Polish & Voice Command Fixes
+
+### Fixed
+- **Voice command "Todo" not creating tasks** — Whisper transcribes "Todo" as "To do" (two words) or "To-do" (hyphenated); added `_normalizeTaskKeywords()` to merge these variants before parsing
+- **Home page Notes stat tile mismatched styling** — Notes tile now uses same surface background, border, and icon-color pattern as Folders and Projects tiles
+- **Storage page Total at top was confusing** — moved Total to the bottom with a divider and bold styling; individual items listed first, summary total last
+
+### Changed
+- **Voice commands popup expanded** — added Task/Action/Reminder command documentation with examples (e.g. "Todo Call the dentist tomorrow") and a Limitations section explaining one-command-per-recording, 30-char description limit, and reminder default timing
+- **Voice commands popup scroll visibility** — wrapped content in `Scrollbar(thumbVisibility: true)` so users can see the dialog is scrollable; compacted "Got it" button spacing
+- **Whisper download Cancel button restyled** — changed from plain `TextButton` to `OutlinedButton` with error-colored border and label "Cancel Download" for better discoverability
+- **Keep Screen Awake default changed to disabled** — `keepScreenAwake` now defaults to `false` in both HiveField annotation and constructor (was `true`)
+
+---
+
+## [Unreleased] - 2026-03-01 - Codebase Audit Fixes
+
+### Security
+- **Encryption key moved to flutter_secure_storage** — AES-256 key now stored in Android Keystore / iOS Keychain instead of plain Hive box. Legacy keys auto-migrated on first launch.
+
+### Fixed
+- **Raw language codes replaced with friendly names** — note cards, folder detail, and search results now show "English", "Hindi" etc. instead of "en", "hi"
+- **`auto_awesome_rounded` icon replaced** with `tune_rounded` in audio settings (AI icon removal)
+- **"Whisper AI" renamed to "Whisper"** across 5 files (audio_settings, danger_zone, recording, privacy_policy, terms_conditions)
+- **`isProcessed` default changed to `true`** in note.dart (was `false`, violating Phase 1 spec)
+- **Navigator.push replaced with GoRouter** in splash_page.dart for Terms & Conditions link
+- **ProjectDocumentsNotifier.search() fixed** to filter provider state instead of reading from repository directly
+- **Dead `hasUpdate` parameter removed** from _FolderCard in folders_page.dart
+
+### Removed
+- **Deleted `settings_page.dart`** — 1,505 lines of dead code (no route existed, replaced by sub-pages)
+- **Deleted `connectivity_provider.dart`** and **`recording_provider.dart`** — unused providers never consumed
+- **Deleted unused assets** — `dreamflow_icon.jpg` and `google_logo.svg`
+
+### Changed
+- **Java version bumped to 17** in Gradle build files (required by flutter_secure_storage v10)
+- **`android/key.properties` added to .gitignore** — prevents accidental credential commits
+- **Linter rules enabled** in analysis_options.yaml — `avoid_print`, `prefer_const_constructors`, `prefer_const_declarations`, `prefer_final_locals`, `unnecessary_this`
+- **Deduplicated storage calculation** — `getStorageUsage()` now delegates to `getStorageBreakdown()`
+
+### Documentation
+- **All doc versions aligned to 1.0.0** (pre-release) — CHANGELOG, PROJECT_STATUS, IMPLEMENTATION_PLAN
+- **CLAUDE.md fully updated** — project structure reflects actual 75+ files, routes table shows all 23 routes, tech stack includes all dependencies, AI exclusion rule #6 updated to reflect on-device Whisper design decision, removed references to deleted files
+- **PROJECT_SPECIFICATION.md fixed** — replaced stale `connectivity_plus` and `delta_to_markdown` entries, corrected provider count
+- **FEATURE_PROJECT_DOCUMENTS.md updated** — Addendum A features marked as COMPLETE
+- **PROJECT_STATUS.md updated** — version 1.0.0, correct route count (23), correct provider count (7)
+
+---
+
+## [Unreleased] - 2026-03-01 - Voice Commands for Tasks + Share Preview Fixes (Issue #12)
+
+### Added
+- **Voice commands for task creation** — say a keyword at the start of a Whisper recording to auto-create a task item:
+  - `"ToDo <description>"` — creates a TodoItem on the note
+  - `"Action <description>"` — creates an ActionItem on the note
+  - `"Reminder <description>"` — creates a ReminderItem with next-day default time
+- Task keywords work alongside existing folder/project voice commands (e.g., "Folder Work ToDo finish report")
+- Task description auto-truncated to first 30 characters
+- One task type per voice command (simple and predictable)
+- **Include Note Titles toggle** — project document share preview now has a toggle to show/hide individual note titles
+
+### Fixed
+- **Share preview now uses full screen** — expanded from small bottom sheet (maxHeight 200px) to 85% screen height for better readability
+- **Rich text no longer shows as raw codes** — preview always renders plain text instead of showing markdown syntax like `**bold**`
+
+### Changed
+- `lib/utils/voice_command_parser.dart` — added `todo`, `action`, `reminder` keyword detection; added `taskType` and `taskDescription` fields to `VoiceCommandResult`
+- `lib/services/voice_command_processor.dart` — added `taskType` and `taskDescription` pass-through in `VoiceCommandProcessResult`
+- `lib/providers/notes_provider.dart` — auto-creates task items in `transcribeInBackground()` based on detected voice command task type
+- `lib/services/sharing_service.dart` — added `includeNoteTitles` to `ShareOptions`, respected in text and PDF export
+- `lib/widgets/share_preview_sheet.dart` — full-height preview, plain text display, "Include Note Titles" toggle for projects
+- `lib/pages/note_detail_page.dart` — increased share sheet size (initialChildSize 0.85)
+- `lib/pages/project_document_detail_page.dart` — increased share sheet size (initialChildSize 0.85)
+
+---
+
+## [Unreleased] - 2026-03-01 - Word Count, Find & Replace, Profanity Filter
+
+### Added
+- **Word & Character Count** — compact stats row below each note's transcription section showing `Words: N · Characters: N`. Updates live during editing via QuillController listener.
+- **Find & Replace** — search icon in note detail AppBar opens a compact toolbar with:
+  - Find text field with match counter (`2/5`) and up/down navigation arrows
+  - Expandable Replace row with "Replace" (single) and "All" (replace all) buttons
+  - Case-insensitive search, auto-enters edit mode when opened
+  - Works with both plain text and Quill Delta rich text notes
+- **Block Offensive Words** — new toggle in Settings > AUDIO group. When enabled, filters profanity from:
+  - Live STT transcription output (speech_to_text)
+  - Whisper transcription output
+  - Uses whole-word regex matching to avoid false positives
+  - Replaces matched words with asterisks of matching length
+  - Privacy-first: hardcoded word list, no network fetch, no external package
+
+### New Files
+- `lib/widgets/find_replace_bar.dart` — reusable Find & Replace toolbar widget
+- `lib/utils/profanity_filter.dart` — offline profanity filter with common English words
+
+### Changed
+- `lib/models/user_settings.dart` — added `blockOffensiveWords` field (HiveField 18)
+- `lib/services/transcription_service.dart` — added `textFilter` callback for filtering transcription output
+- `lib/pages/note_detail_page.dart` — added word count stats, find & replace toolbar, search icon in AppBar
+- `lib/pages/recording_page.dart` — wires profanity filter to transcription service when enabled
+- `lib/providers/notes_provider.dart` — applies profanity filter to Whisper transcription output
+- `lib/providers/settings_provider.dart` — added `blockOffensiveWords` to SettingsState
+- `lib/services/settings_repository.dart` — added `setBlockOffensiveWords()` method
+- `lib/pages/settings_page.dart` — added "Block Offensive Words" toggle in AUDIO group
+
+---
+
+## [Unreleased] - 2026-03-01 - Share Preview, PDF Export, Rich Text Sharing (Issue #11)
+
+### Added
+- **Share Preview bottom sheet** — new `SharePreviewSheet` widget shown before sharing for both notes and project documents. Includes:
+  - **Include Title** toggle (default: on)
+  - **Include Timestamp** toggle (default: off)
+  - **Plain Text Only** toggle (default: off) — strips rich text formatting when enabled
+  - Live scrollable preview of the assembled share text
+  - "Share as Text", "Export as PDF", and "Export as Markdown" (projects only) action buttons
+- **PDF export** — generate formatted PDF documents locally using the `pdf` package (pure Dart, no cloud). Supports:
+  - Note title as bold header with divider
+  - Rich text content with bold/italic/font size/color preserved
+  - Action items, todos, reminders as checkbox lists with strikethrough for completed
+  - Project documents with section headers, note reference cards (bordered), image captions
+  - Multi-page automatic pagination
+  - Footer: "Shared from VoiceNotes AI"
+- **Email subject line** — `Share.share()` now passes a subject: `"Title — Notes from VoiceNotes AI"` (notes) or `"Title — Project from VoiceNotes AI"` (projects)
+- **Real Quill Delta → Markdown conversion** — `_deltaToMarkdown()` now properly converts bold→`**text**`, italic→`*text*`, headers→`#`/`##`, bullet lists→`- item`
+- **Temp file cleanup** — `SharingService.cleanupTempExports()` runs at app startup to remove leftover .pdf/.md/.txt files from temp directory
+
+### Changed
+- **Shorter separator lines** — replaced fixed 30-character separators (`─`/`═`) with title-length underscores (`_`) (minimum 10 characters)
+- **Project detail popup menu** — removed "Export as Markdown" and "Export as Plain Text" items (now available in share preview sheet). Kept "Rename" and "Delete".
+- **APK size** — increased from 64.6MB to 66.4MB (+1.8MB from `pdf` package). No runtime storage impact — PDF files are written to system temp and cleaned up on next launch.
+
+### New Dependencies
+- `pdf: ^3.11.1` — pure Dart PDF generation, no native binaries, no cloud
+
+### New Files
+- `lib/widgets/share_preview_sheet.dart` — share preview bottom sheet with toggles and export buttons
+
+---
+
+## [Unreleased] - 2026-03-01 - Project Detail Rich Text Fixes (Issue #10)
+
+### Fixed
+- **Rich text display styling mismatch** — QuillEditor in note reference cards now uses `customStyles` with `fontSize: 14` and theme `onSurface` color, matching the plain text display exactly. Previously rich text blocks appeared with a different font size and color than plain text blocks.
+- **Rich text inline editing not saving** — note reference cards with `quill_delta` format now edit with a full QuillEditor + toolbar (bold, italic, headers, font sizes, colors) instead of a plain TextField. Edits are saved as delta JSON via new `updateNoteRichContent()` repository method, preserving all formatting. Previously, editing a rich text note from the project page would silently discard changes because `addTranscriptVersion()` skipped overwriting `rawTranscription` for quill_delta notes.
+
+### Added
+- `NotesRepository.updateNoteRichContent()` — saves rich text (delta JSON) directly to `rawTranscription` and updates `contentFormat`, with version history entry
+- `ProjectDocumentsNotifier.editNoteTranscriptRich()` — provider method for rich text saves from project documents
+- `_NoteReferenceCard.onSaveRichEdit` callback — routes rich text saves through the new provider method
+
+---
+
+## [Unreleased] - 2026-03-01 - Home Multi-Select, Layout Redesign, Sectioned Search
+
+### Added — GitHub Issue #7: Home Dashboard Tiles
+- **Multi-select mode** — long-press a note to enter selection mode; tap to toggle, select all/deselect all in AppBar
+- **Single-select actions** — bottom action bar with Open, Edit Title, Folder, Project, Delete
+- **Bulk actions** — Add to Folder, Add to Project, Delete for multiple selected notes
+- **Folder/Project capsule taps** — tapping folder or project chip on a note card opens a picker with Save/Cancel
+- **Improved delete dialog** — warning icon, detailed message, white-on-red "Delete Permanently" button
+
+### Changed — GitHub Issue #8: Home Page Layout
+- **Stats cards** — 3 cards now fit in screen width (Row of Expanded instead of horizontal scroll)
+- **Compact category cards** — icon + count in same row, label below, smaller padding
+- **Tab bar moved below stats** — segmented button now sits under stats cards so stats are always visible
+- **Projects card** — now navigates to project documents (was incorrectly going to folders)
+- **Speed dial** — actions switch to Notes tab before executing
+- **Removed** "Recent Notes" header and "See All" button
+
+### Added — GitHub Issue #9: Sectioned Search
+- **Search across all content types** — queries now match action items, todos, and reminders text (not just note title/transcription)
+- **Sectioned results** — results grouped into Notes, Action Items, Todos, Reminders sections with color-coded headers, icons, and counts
+- **Section headers** — each section shows icon, label, and match count in a styled row
+
+---
+
+## [Unreleased] - 2026-03-01 - Rich Text Persistence Fix + Whisper Noise Filters + Project View Rich Text
 
 ### Fixed
 - **CRITICAL: Rich text formatting now persists after save** — `addTranscriptVersion()` in `notes_repository.dart` was overwriting `rawTranscription` (delta JSON) with plain text after every save. Fixed by skipping the overwrite for `quill_delta` format notes.
@@ -28,7 +253,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.11.0] - 2026-02-28 - Animated Download Experience + Recording Screen Toggle
+## [Unreleased] - 2026-02-28 - Animated Download Experience + Recording Screen Toggle
 
 ### Added
 - **Animated download experience** — Whisper model download now shows a full-screen branded experience with animated waveform bars, app logo, progress bar with percentage, and rotating feature tips (Privacy First, No Cloud Required, On-Device AI, No Ads/Tracking, Rich Text Notes). Replaces the plain AlertDialog progress bar.
@@ -46,7 +271,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.10.0] - 2026-02-28 - Keep Screen Awake + Rich Text Editing + Support Us Page
+## [Unreleased] - 2026-02-28 - Keep Screen Awake + Rich Text Editing + Support Us Page
 
 ### Added
 - **Keep Screen Awake** toggle in Audio & Recording settings — prevents screen from locking during long recordings (meetings, lectures). Default: ON. Uses `wakelock_plus` to keep screen on while recording, disables on save/discard.
@@ -64,7 +289,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.9.4] - 2026-02-28 - Whisper Model Status Capsule Badge + Download Re-trigger Fix
+## [Unreleased] - 2026-02-28 - Whisper Model Status Capsule Badge + Download Re-trigger Fix
 
 ### Changed
 - **Whisper Model item** now shows a **capsule status badge** next to the label:
@@ -77,7 +302,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.9.2] - 2026-02-28 - Default Folder Moved + Download Resume & Wakelock
+## [Unreleased] - 2026-02-28 - Default Folder Moved + Download Resume & Wakelock
 
 ### Changed
 - **Default Folder** setting moved from Audio & Recording page to **Preferences** page (better UX grouping)
@@ -91,7 +316,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.9.1] - 2026-02-28 - Speaking Language for All Modes + Mixed-Language Guidance
+## [Unreleased] - 2026-02-28 - Speaking Language for All Modes + Mixed-Language Guidance
 
 ### Changed
 - **Speaking Language** picker now visible for **both** Whisper and Live transcription modes (was Whisper-only)
@@ -106,7 +331,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.9.0] - 2026-02-28 - Speaking Language + Note Output Mode (Two-Part Language UX)
+## [Unreleased] - 2026-02-28 - Speaking Language + Note Output Mode (Two-Part Language UX)
 
 ### Added
 - **Speaking Language picker** in Audio & Recording — user selects the language they speak during recording (English default). No more "Auto" mode.
@@ -130,7 +355,7 @@ Whisper's `isTranslate` param translates any language to English text output. Th
 
 ---
 
-## [1.8.5] - 2026-02-28 - Unified Whisper Model Item
+## [Unreleased] - 2026-02-28 - Unified Whisper Model Item
 
 ### Changed
 - **Unified Whisper Model item** in Audio Settings — merged the separate "Whisper Model" (download status) and "Transcription Model" (Standard/Enhanced picker) into ONE item showing model name + size + download status in the sublabel (e.g. "Standard (142 MB) · Ready")
@@ -138,7 +363,7 @@ Whisper's `isTranslate` param translates any language to English text output. Th
 
 ---
 
-## [1.8.4] - 2026-02-28 - Selectable Whisper Model (Standard / Enhanced)
+## [Unreleased] - 2026-02-28 - Selectable Whisper Model (Standard / Enhanced)
 
 ### Added
 - **Transcription Model picker** in Audio Settings — users can choose between:
@@ -157,7 +382,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.8.3] - 2026-02-28 - Fix: Wire Language Setting to Transcription Engines
+## [Unreleased] - 2026-02-28 - Fix: Wire Language Setting to Transcription Engines
 
 ### Fixed
 - **CRITICAL: Language setting was completely disconnected** — the "Detection Language" preference was stored but never forwarded to either transcription engine. All recordings used engine defaults regardless of user selection.
@@ -174,7 +399,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.8.2] - 2026-02-28 - Audio Settings UX + Preferences Toggles
+## [Unreleased] - 2026-02-28 - Audio Settings UX + Preferences Toggles
 
 ### Changed
 - **Transcription mode picker** — "Record & Transcribe" now listed first with "(Recommended)" label; on-device privacy messaging added ("nothing leaves your phone"); Live Transcription moved to second option with clearer description
@@ -189,7 +414,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.8.1] - 2026-02-27 - About Page Fixes + Spec Update
+## [Unreleased] - 2026-02-27 - About Page Fixes + Spec Update
 
 ### Fixed
 - **About page: Support Development section** — now uses theme-aware colors (`errorContainer`, `error`) instead of hardcoded `Colors.red.shade50` / `Colors.pink.shade50` that clashed with dark mode
@@ -202,7 +427,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.8.0] - 2026-02-27 - Settings Redesign: 3-dot Menu + Sub-pages
+## [Unreleased] - 2026-02-27 - Settings Redesign: 3-dot Menu + Sub-pages
 
 ### Changed
 - **Home AppBar**: Replaced gear icon with 3-dot overflow menu (`PopupMenuButton`)
@@ -237,7 +462,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.7.2] - 2026-02-27 - Send Feedback Page
+## [Unreleased] - 2026-02-27 - Send Feedback Page
 
 ### Added
 - **Send Feedback page** — category dropdown (Bug Report, Feature Request, General Feedback), text field with 1000 char limit, sends via share sheet to hdmpixels@gmail.com
@@ -252,7 +477,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.7.1] - 2026-02-27 - About Page
+## [Unreleased] - 2026-02-27 - About Page
 
 ### Added
 - **About VoiceNotes AI page** — full about screen with app logo, version, description, development credits (HDMPixels + Claude Code), Phase 2 roadmap, "Buy Me a Coffee" support section, legal links (Privacy Policy & Terms), and technical details
@@ -267,7 +492,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.7.0] - 2026-02-27 - Privacy Policy & Terms and Conditions Pages
+## [Unreleased] - 2026-02-27 - Privacy Policy & Terms and Conditions Pages
 
 ### Added
 - **Privacy & Data Policy page** — comprehensive privacy policy accessible from Settings > About
@@ -287,7 +512,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.9] - 2026-02-27 - Strip [BLANK_AUDIO] from Whisper Transcriptions
+## [Unreleased] - 2026-02-27 - Strip [BLANK_AUDIO] from Whisper Transcriptions
 
 ### Fixed
 - **[BLANK_AUDIO] tag removal** — Whisper transcriptions no longer contain `[BLANK_AUDIO]` or `[BLANK AUDIO]` tags that appeared when the user paused during recording
@@ -298,7 +523,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.8] - 2026-02-27 - Whisper Download Popup & General Folder Fix
+## [Unreleased] - 2026-02-27 - Whisper Download Popup & General Folder Fix
 
 ### Changed
 - **Whisper model not ready popup** — when user tries to record in whisper mode without the model downloaded, shows a 3-option dialog: "Go to Settings" (download), "Use Live Mode" (switch to live transcription for this session), or "Cancel"
@@ -314,7 +539,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.7] - 2026-02-27 - Text Note Prefix & Auto-General Folder
+## [Unreleased] - 2026-02-27 - Text Note Prefix & Auto-General Folder
 
 ### Added
 - **Text Note Prefix setting** — separate prefix for text notes (default "TXT"), configurable in Settings
@@ -337,7 +562,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.6] - 2026-02-27 - Text Notes Support
+## [Unreleased] - 2026-02-27 - Text Notes Support
 
 ### Added
 - **Text Note creation** — new "Text Note" option in speed dial FAB on home page
@@ -354,7 +579,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.5] - 2026-02-27 - Issue #5: Voice Notes Detail Page Redesign
+## [Unreleased] - 2026-02-27 - Issue #5: Voice Notes Detail Page Redesign
 
 ### Changed
 - **AppBar title** — editable inline with pen icon (tap title to edit, check to save)
@@ -376,7 +601,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.4] - 2026-02-27 - Issue #4: Speed Dial FAB Overlay Fix
+## [Unreleased] - 2026-02-27 - Issue #4: Speed Dial FAB Overlay Fix
 
 ### Fixed
 - **Main FAB button** now renders above the blur overlay when speed dial is open
@@ -388,7 +613,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.3] - 2026-02-27 - Issue #3: General Folder Protection
+## [Unreleased] - 2026-02-27 - Issue #3: General Folder Protection
 
 ### Changed
 - **General folder** — rename and delete options hidden for the "General" folder
@@ -401,7 +626,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.2] - 2026-02-27 - Issue #2: Search Notes Page
+## [Unreleased] - 2026-02-27 - Issue #2: Search Notes Page
 
 ### Changed
 - **Removed recording FAB** from search page — search is now purely for finding notes
@@ -419,7 +644,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.1] - 2026-02-27 - Issue #1: Voice Note Tile Redesign
+## [Unreleased] - 2026-02-27 - Issue #1: Voice Note Tile Redesign
 
 ### Added
 - **Compact NoteCard widget** (`lib/widgets/note_card.dart`) — extracted and redesigned note tile from home page into reusable widget
@@ -447,7 +672,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.5.0] - 2026-02-27 - Step 4.6: Interactive Tasks & Reminder Enhancement
+## [Unreleased] - 2026-02-27 - Step 4.6: Interactive Tasks & Reminder Enhancement
 
 ### Added
 - **Interactive checkboxes on Note Detail** — action items and todos are now tappable; checkbox toggles `isCompleted` with strikethrough + muted styling
@@ -496,7 +721,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.6.0] - 2026-02-27 - Step 4.7: Sharing, Rich Text & Image Blocks
+## [Unreleased] - 2026-02-27 - Step 4.7: Sharing, Rich Text & Image Blocks
 
 ### Added
 - **Share single note** — share button in Note Detail overflow menu assembles formatted note text and opens OS share sheet via `share_plus`
@@ -558,7 +783,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.4.0] - 2026-02-27 - Library Merge, Whisper UX, UI Polish
+## [Unreleased] - 2026-02-27 - Library Merge, Whisper UX, UI Polish
 
 ### Added
 - **Unified Library page** — folders and projects now shown together on a single page with collapsible sections (arrow toggle + count badge)
@@ -581,7 +806,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.3.0] - 2026-02-27 - Voice Command Auto-Linking
+## [Unreleased] - 2026-02-27 - Voice Command Auto-Linking
 
 ### Added
 - **Voice command parsing** — in Whisper mode, say "Folder/Project name Start content" to auto-organize recordings
@@ -600,7 +825,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.2.3] - 2026-02-26 - Edge-to-Edge Display & UI Fixes
+## [Unreleased] - 2026-02-26 - Edge-to-Edge Display & UI Fixes
 
 ### Fixed
 - **Android navigation bar** — now truly transparent (edge-to-edge) by adding `android:navigationBarColor` and `android:statusBarColor` to both light and dark Android styles.xml
@@ -611,7 +836,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.2.2] - 2026-02-26 - Default Folder & Create from Recording Page
+## [Unreleased] - 2026-02-26 - Default Folder & Create from Recording Page
 
 ### Added
 - **Default "General" folder** — auto-created on first launch, pre-selected in recording page
@@ -628,7 +853,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.2.1] - 2026-02-26 - Recording Page Enhancements
+## [Unreleased] - 2026-02-26 - Recording Page Enhancements
 
 ### Added
 - **Folder/Project selection on recording page** — in Whisper mode, dropdown selectors let users assign folder and/or project before saving
@@ -648,7 +873,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.2.0] - 2026-02-26 - Speed Dial FAB, Background Transcription & UI Polish
+## [Unreleased] - 2026-02-26 - Speed Dial FAB, Background Transcription & UI Polish
 
 ### Added
 - **Speed Dial FAB** — expandable floating action button on Home, Folders, and Project Documents pages
@@ -672,7 +897,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.1.0] - 2026-02-26 - Project Documents Feature (Step 4.5)
+## [Unreleased] - 2026-02-26 - Project Documents Feature (Step 4.5)
 
 ### Added
 - **Project Documents feature** — rich composite documents assembled from voice notes
@@ -714,7 +939,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.0.3] - 2026-02-26 - Whisper Fix, Timestamps, Conditional UI
+## [Unreleased] - 2026-02-26 - Whisper Fix, Timestamps, Conditional UI
 
 ### Added
 - **Speaker name setting** — "Your Name" field in Settings (default: "Speaker 1"), persisted via Hive
@@ -731,7 +956,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.0.2] - 2026-02-26 - UI Polish & Compact Headers
+## [Unreleased] - 2026-02-26 - UI Polish & Compact Headers
 
 ### Changed
 - Replaced manual header Rows with proper AppBar widgets on Home, Folders, and Folder Detail pages
@@ -748,7 +973,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [1.0.1] - 2026-02-26 - Settings Overhaul, Splash Screen & Quick Guide
+## [Unreleased] - 2026-02-26 - Settings Overhaul, Splash Screen & Quick Guide
 
 ### Added
 - **Splash screen** (`lib/pages/splash_page.dart`) — Animated logo + tagline, 5-second timer, navigates to onboarding (first launch) or home (returning user)
@@ -775,7 +1000,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [0.1.1] - 2026-02-25 - Concept Alignment & Documentation
+## [Unreleased] - 2026-02-25 - Concept Alignment & Documentation
 
 ### Changed
 - Aligned project specification with Product Concept Document
@@ -799,7 +1024,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ---
 
-## [0.1.0] - 2026-02-24 - Initial Scaffolding
+## [Unreleased] - 2026-02-24 - Initial Scaffolding
 
 ### Added
 

@@ -117,4 +117,10 @@ class SettingsRepository {
     settings.keepScreenAwake = enabled;
     await saveSettings(settings);
   }
+
+  Future<void> setBlockOffensiveWords(bool enabled) async {
+    final settings = getSettings();
+    settings.blockOffensiveWords = enabled;
+    await saveSettings(settings);
+  }
 }

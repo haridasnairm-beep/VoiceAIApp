@@ -231,7 +231,6 @@ class _FoldersPageState extends ConsumerState<FoldersPage> {
                                   count: folder.noteIds.length,
                                   lastActive:
                                       _formatDate(folder.updatedAt),
-                                  hasUpdate: true,
                                   icon: Icons.folder_rounded,
                                   iconBg: const Color(0xFFE3F2FD),
                                   iconColor: const Color(0xFF1E88E5),
@@ -575,7 +574,6 @@ class _FolderCard extends StatelessWidget {
   final String title;
   final int count;
   final String lastActive;
-  final bool hasUpdate;
   final IconData icon;
   final Color iconBg;
   final Color iconColor;
@@ -585,7 +583,6 @@ class _FolderCard extends StatelessWidget {
     required this.title,
     required this.count,
     required this.lastActive,
-    required this.hasUpdate,
     required this.icon,
     required this.iconBg,
     required this.iconColor,
@@ -651,7 +648,7 @@ class _FolderCard extends StatelessWidget {
                                   Theme.of(context).colorScheme.secondary,
                             ),
                       ),
-                      if (hasUpdate && lastActive.isNotEmpty) ...[
+                      if (lastActive.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Container(
                           width: 4,

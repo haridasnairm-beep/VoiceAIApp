@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../nav.dart';
+import '../providers/notes_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/whisper_service.dart';
 import '../widgets/settings_widgets.dart';
@@ -75,6 +76,120 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
     setState(() => _showHighlight = false);
   }
 
+  Future<void> _showBulkRetranscribe(BuildContext context, WidgetRef ref) async {
+    final eligibleNotes =
+        await ref.read(notesProvider.notifier).getRetranscribableNotes();
+
+    if (!context.mounted) return;
+
+    if (eligibleNotes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No notes with audio files found for re-transcription.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Check model is ready
+    if (!await WhisperService.instance.isModelDownloaded()) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Whisper model not downloaded. Download it first.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final currentModel = WhisperService.instance.currentModelName;
+    final modelLabel = currentModel == 'small' ? 'Enhanced' : 'Standard';
+
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Re-transcribe Notes'),
+        content: Text(
+          'Found ${eligibleNotes.length} note(s) with audio files.\n\n'
+          'Re-transcribe all using the $modelLabel model?\n\n'
+          'Previous transcriptions will be saved in version history. '
+          'This may take a while.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Re-transcribe ${eligibleNotes.length} Notes'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    await WhisperService.instance.ensureModelReady();
+
+    final noteIds = eligibleNotes.map((n) => n.id).toList();
+    final progressNotifier = ValueNotifier<int>(0);
+
+    if (!context.mounted) return;
+
+    // Show progress dialog and run bulk operation
+    final resultFuture = ref.read(notesProvider.notifier).bulkRetranscribe(
+      noteIds: noteIds,
+      onProgress: (done, total) => progressNotifier.value = done,
+    );
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => ValueListenableBuilder<int>(
+        valueListenable: progressNotifier,
+        builder: (ctx, completed, _) {
+          // Auto-close when done
+          if (completed >= noteIds.length) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            });
+          }
+          return AlertDialog(
+            title: const Text('Re-transcribing...'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(
+                  value: noteIds.isEmpty ? 0 : completed / noteIds.length,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                const SizedBox(height: 16),
+                Text('$completed / ${noteIds.length} notes processed'),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    final successCount = await resultFuture;
+    progressNotifier.dispose();
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Re-transcription complete. $successCount / ${noteIds.length} notes processed ($modelLabel model).'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _showModelPicker(
       BuildContext context, WidgetRef ref, String currentModel) async {
     // Check download status for both models
@@ -109,7 +224,7 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
               onPressed: () => Navigator.pop(ctx, 'small'),
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.auto_awesome_rounded),
+                leading: const Icon(Icons.tune_rounded),
                 title: const Text('Enhanced (466 MB)'),
                 subtitle: Text(smallDownloaded
                     ? 'Better accuracy, supports Hindi & other languages'
@@ -201,76 +316,171 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
   }
 
   void _showVoiceCommandsInfo(BuildContext context) {
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Voice Commands'),
-        content: const SingleChildScrollView(
+        content: Scrollbar(
+          thumbVisibility: true,
+          child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('How to use voice commands:',
+              const Text('How to use voice commands:',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 12),
-              Text('1. Start recording normally'),
-              Text('2. Say your command at the beginning:'),
-              SizedBox(height: 8),
-              Padding(
+              const SizedBox(height: 12),
+              const Text('1. Start recording normally'),
+              const Text('2. Say your command at the beginning:'),
+              const SizedBox(height: 12),
+
+              // --- Folder & Project commands ---
+              Text('Folder & Project',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.primary,
+                  )),
+              const SizedBox(height: 6),
+              const Padding(
                 padding: EdgeInsets.only(left: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('• "Folder [name] Start" — saves to that folder'),
                     SizedBox(height: 4),
-                    Text('• "Project [name] Start" — saves to that project document'),
+                    Text('• "Project [name] Start" — saves to that project'),
                   ],
                 ),
               ),
-              SizedBox(height: 16),
-              Text('Examples:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              Padding(
+              const SizedBox(height: 6),
+              _commandExample(
+                '"Folder Meeting Notes Start discuss agenda"',
+                'Saves note to Meeting Notes folder',
+              ),
+              _commandExample(
+                '"Project App Launch Start finalize the timeline"',
+                'Saves note to App Launch project',
+              ),
+
+              const SizedBox(height: 16),
+
+              // --- Task commands ---
+              Text('Tasks, Actions & Reminders',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.primary,
+                  )),
+              const SizedBox(height: 6),
+              const Padding(
                 padding: EdgeInsets.only(left: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('• "Folder Meeting Notes Start"'),
-                    Text('  → saves to Meeting Notes folder'),
+                    Text('• "Todo [description]" — creates a to-do item'),
                     SizedBox(height: 4),
-                    Text('• "Project App Launch Start"'),
-                    Text('  → saves to App Launch project'),
+                    Text('• "Action [description]" — creates an action item'),
+                    SizedBox(height: 4),
+                    Text('• "Reminder [description]" — creates a reminder'),
                   ],
                 ),
               ),
-              SizedBox(height: 16),
-              Text('Tips:',
+              const SizedBox(height: 6),
+              _commandExample(
+                '"Todo Call the dentist tomorrow"',
+                'Creates a to-do: "Call the dentist tomorrow"',
+              ),
+              _commandExample(
+                '"Action Send report to the team"',
+                'Creates an action: "Send report to the team"',
+              ),
+              _commandExample(
+                '"Reminder Review pull requests"',
+                'Creates a reminder set for tomorrow',
+              ),
+
+              const SizedBox(height: 16),
+
+              // --- Limitations ---
+              Text('Limitations',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.error,
+                  )),
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.only(left: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• Only one command per recording '
+                        '(folder/project OR task — not both)'),
+                    SizedBox(height: 4),
+                    Text('• Task description is taken from the first '
+                        '30 characters of your note'),
+                    SizedBox(height: 4),
+                    Text('• Reminders are always set for the next day '
+                        '— edit the time manually afterwards'),
+                    SizedBox(height: 4),
+                    Text('• Commands must be spoken at the very start '
+                        'of the recording'),
+                    SizedBox(height: 4),
+                    Text('• Folder/project names must match an existing '
+                        'name or a new one will be created'),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // --- Tips ---
+              const Text('Tips:',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              Padding(
+              const SizedBox(height: 8),
+              const Padding(
                 padding: EdgeInsets.only(left: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('• Say the command clearly before your actual note'),
                     SizedBox(height: 4),
-                    Text('• The keyword "Start" signals the end of the command'),
+                    Text('• The keyword "Start" signals the end of '
+                        'folder/project commands'),
                     SizedBox(height: 4),
-                    Text('• Folder/project names are matched to existing ones'),
-                    SizedBox(height: 4),
-                    Text('• If no match is found, the note saves to your default folder'),
+                    Text('• If no match is found, the note saves to your '
+                        'default folder'),
                   ],
                 ),
               ),
             ],
           ),
         ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.only(bottom: 8),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Got it'),
           ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _commandExample(String command, String result) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(command,
+              style: const TextStyle(
+                fontStyle: FontStyle.italic,
+                fontSize: 13,
+              )),
+          Text('  \u2192 $result',
+              style: const TextStyle(fontSize: 12, height: 1.4)),
         ],
       ),
     );
@@ -537,7 +747,7 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
                     label: "Transcription",
                     sublabel: settings.transcriptionMode == 'live'
                         ? "Real-time text, no audio saved"
-                        : "On-device Whisper AI — high accuracy",
+                        : "On-device Whisper — high accuracy",
                     type: SettingsType.value,
                     valueText: settings.transcriptionMode == 'live'
                         ? 'Live'
@@ -558,7 +768,7 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
                                   leading: Icon(Icons.mic_rounded),
                                   title: Text('Record & Transcribe (Recommended)'),
                                   subtitle: Text(
-                                      'On-device Whisper AI — nothing leaves your phone. '
+                                      'On-device Whisper — nothing leaves your phone. '
                                       'Higher accuracy, transcription takes a moment after recording. '
                                       'Audio saved for playback. '
                                       'Supports English translation for other languages.'),
@@ -602,7 +812,7 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
                         builder: (ctx) => AlertDialog(
                           title: const Text('Download Whisper Model'),
                           content: const Text(
-                            'Whisper AI requires a one-time model download (~140 MB).\n\n'
+                            'Whisper requires a one-time model download (~140 MB).\n\n'
                             'Make sure you are connected to WiFi before proceeding.',
                           ),
                           actions: [
@@ -659,6 +869,18 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
                         onTap: () => _showModelPicker(
                             context, ref, settings.whisperModel),
                       ),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    SettingsItem(
+                      icon: Icons.refresh_rounded,
+                      iconBg: const Color(0xFFFFF8E1),
+                      iconColor: const Color(0xFFF57F17),
+                      label: 'Re-transcribe Notes',
+                      sublabel: 'Re-process notes with current model',
+                      type: SettingsType.value,
+                      valueText: '',
+                      hasSublabel: true,
+                      onTap: () => _showBulkRetranscribe(context, ref),
                     ),
                   ],
                   // Speaking Language — shown for ALL transcription modes

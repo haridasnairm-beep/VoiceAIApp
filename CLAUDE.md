@@ -11,7 +11,7 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 
 **VoiceNotes AI** is a privacy-first, voice-driven note-taking and task management mobile app built with Flutter. Users record voice notes, the app transcribes audio on-device, and organizes content into folders with manual categorization.
 
-**Current Phase:** MVP (Phase 1) — Core 100% complete (all 7 steps done + bonus features). Step 4.5 (Project Documents) approved for development.
+**Current Phase:** Phase 1 (Release) — Core 100% complete (all 7 steps + Steps 4.5/4.6/4.7 + bonus features + post-release enhancements Issues #7–#12). Version 1.0.0. **Next:** Value Proposition Gaps (Steps 8–10.7).
 
 ---
 
@@ -19,15 +19,15 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 
 | Phase | Scope | AI Required |
 |---|---|---|
-| **Phase 1 (Current)** | On-device recording, transcription (speech_to_text), local storage, manual organization, playback, notifications | **No AI** |
+| **Phase 1 (Current)** | On-device recording, transcription (speech_to_text + whisper_flutter_new), local storage, manual organization, playback, notifications, project documents, tasks, sharing/export, rich text, image blocks | **No AI** |
 | Phase 2 (Future) | Whisper API transcription, AI categorization, auto-folders, n8n integration | Yes |
 
 ---
 
 ## Core Principles (MUST follow)
 
-1. **Privacy-first** — All data stored locally in encrypted Hive. No cloud storage in MVP.
-2. **No login required** — MVP works without any account creation or sign-in.
+1. **Privacy-first** — All data stored locally in encrypted Hive. No cloud storage in Phase 1.
+2. **No login required** — Phase 1 works without any account creation or sign-in.
 3. **Voice as primary interface** — Every core feature is voice-accessible.
 4. **No ads, ever** — Revenue through freemium model only.
 5. **Phase 1 = No AI** — All features must work without any cloud AI service. See AI exclusion rules below.
@@ -43,7 +43,7 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 3. **DO NOT** build AI categorization, auto-structuring, or smart suggestions
 4. **DO NOT** add auto-folder assignment or topic extraction
 5. **DO NOT** implement follow-up question generation
-6. **USE** `speech_to_text` package (on-device, free) for transcription — NOT Whisper API
+6. **USE** `speech_to_text` (live mode) and `whisper_flutter_new` (record & transcribe mode) for on-device transcription — NOT cloud Whisper API
 7. **Reminders** are manual (user picks date/time) — NOT AI-extracted
 
 ### AI UI Elements to Hide/Remove in Phase 1
@@ -61,9 +61,9 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 | `folders_page.dart` | "Smart organized by AI" subtitle | **Change** to "Your folders" |
 | `folders_page.dart` | "Smart Topics" section header | **Change** to "Topics" |
 | `folders_page.dart` | "AI Organization Tip" card section (lines ~173-237) | **Remove entirely** |
-| `settings_page.dart` | "AUDIO & AI" group header | **Change** to "AUDIO" |
-| `settings_page.dart` | "AI Follow-up" toggle setting | **Remove entirely** |
-| `settings_page.dart` | "Smart Reminders" toggle | **Change** to "Reminders" (manual) |
+| `audio_settings_page.dart` | "AUDIO & AI" group header | **Done** — changed to "AUDIO" |
+| `preferences_page.dart` | "AI Follow-up" toggle setting | **Done** — removed |
+| `preferences_page.dart` | "Smart Reminders" toggle | **Done** — changed to "Reminders" (manual) |
 | `search_page.dart` | `auto_awesome_rounded` icon at end of results | **Replace** with `check_circle_outline` or similar |
 
 ### Note Model Fields — Keep but Leave Unused
@@ -73,23 +73,31 @@ These fields in `lib/models/note.dart` should **remain in the model** (for Phase
 - `followUpQuestions` — always `null`
 - `hasFollowUpTrigger` — always `false`
 - `isProcessed` — always `true` (on-device transcription = immediately processed)
-- `actions`, `todos`, `reminders` — empty lists (user can manually add in Phase 2)
+- `actions`, `todos`, `reminders` — manually created by user (auto-extraction is Phase 2)
 - `topics` — empty list (manual folder assignment only)
 
 ---
 
-## Tech Stack (Phase 1 MVP)
+## Tech Stack (Phase 1)
 
 | Component | Technology |
 |---|---|
 | Framework | Flutter (Dart SDK ^3.6.0) |
 | Local database | Hive (AES-256 encrypted) |
+| Encryption key storage | flutter_secure_storage (Android Keystore / iOS Keychain) |
 | State management | Riverpod 3.x (Notifier/NotifierProvider) |
 | Navigation | go_router |
 | Audio recording | record package |
 | Audio playback | just_audio |
-| Speech-to-text | speech_to_text (on-device, free) |
+| Speech-to-text (live) | speech_to_text (on-device, free) |
+| Speech-to-text (whisper) | whisper_flutter_new (on-device ggml-base model) |
 | Notifications | flutter_local_notifications |
+| OS calendar bridge | add_2_calendar |
+| Sharing | share_plus |
+| Rich text editor | flutter_quill |
+| Image picker/viewer | image_picker, image_cropper, photo_view, flutter_image_compress |
+| PDF generation | pdf (pure Dart, on-device) |
+| Screen wakelock | wakelock_plus |
 | Typography | Google Fonts (Plus Jakarta Sans, Inter) |
 | App icon | `assets/icons/logo.png` (used for launcher icon + in-app branding) |
 
@@ -100,7 +108,7 @@ These fields in `lib/models/note.dart` should **remain in the model** (for Phase
 ```
 lib/
 ├── main.dart                         # App entry point (Hive init + ProviderScope)
-├── nav.dart                          # GoRouter routes and AppRoutes constants
+├── nav.dart                          # GoRouter routes (23 routes) and AppRoutes constants
 ├── theme.dart                        # Material 3 theme (light + dark)
 ├── models/
 │   ├── note.dart                     # Hive model (typeId: 0)
@@ -109,56 +117,83 @@ lib/
 │   ├── reminder_item.dart            # Hive model (typeId: 3)
 │   ├── folder.dart                   # Hive model (typeId: 4)
 │   ├── user_settings.dart            # Hive model (typeId: 5)
-│   ├── project_document.dart         # Hive model (typeId: 6) — PLANNED (Step 4.5)
-│   ├── project_block.dart            # Hive model (typeId: 7) — PLANNED (Step 4.5)
-│   └── transcript_version.dart       # Hive model (typeId: 8) — PLANNED (Step 4.5)
+│   ├── project_document.dart         # Hive model (typeId: 6)
+│   ├── project_block.dart            # Hive model (typeId: 7)
+│   ├── transcript_version.dart       # Hive model (typeId: 8)
+│   ├── image_attachment.dart         # Hive model (typeId: 9)
+│   ├── task_item.dart                # View model for aggregated tasks (NOT Hive)
+│   └── *.g.dart                      # Generated Hive type adapters
 ├── services/
-│   ├── audio_recorder_service.dart   # Audio recording (working)
+│   ├── audio_recorder_service.dart   # Audio recording
 │   ├── audio_player_service.dart     # Audio playback via just_audio
-│   ├── hive_service.dart             # Encrypted Hive initialization + storage usage
-│   ├── notes_repository.dart         # CRUD for notes
+│   ├── hive_service.dart             # Encrypted Hive init + storage usage
+│   ├── notes_repository.dart         # CRUD for notes + tasks + versioning
 │   ├── folders_repository.dart       # CRUD for folders
 │   ├── settings_repository.dart      # Settings persistence
 │   ├── transcription_service.dart    # On-device STT via speech_to_text
+│   ├── whisper_service.dart          # On-device Whisper transcription
 │   ├── notification_service.dart     # Local notifications + scheduling
-│   └── project_documents_repository.dart  # CRUD for project documents — PLANNED (Step 4.5)
+│   ├── project_documents_repository.dart  # CRUD for project documents
+│   ├── image_attachment_repository.dart   # Image CRUD + file management
+│   ├── sharing_service.dart          # Assemble share text, export PDF/MD/TXT
+│   ├── voice_command_processor.dart  # Voice command lookup/auto-create
+│   └── os_reminder_service.dart      # OS calendar bridge via add_2_calendar
 ├── providers/
 │   ├── notes_provider.dart           # NotesNotifier + notesProvider
 │   ├── folders_provider.dart         # FoldersNotifier + foldersProvider
 │   ├── settings_provider.dart        # SettingsNotifier + settingsProvider
-│   ├── recording_provider.dart       # RecordingNotifier
-│   ├── connectivity_provider.dart    # ConnectivityNotifier
-│   └── project_documents_provider.dart  # ProjectDocumentsNotifier — PLANNED (Step 4.5)
+│   ├── project_documents_provider.dart  # ProjectDocumentsNotifier
+│   └── tasks_provider.dart           # Derived provider: aggregated tasks view
 ├── pages/
 │   ├── splash_page.dart              # Animated splash → onboarding or home
-│   ├── onboarding_page.dart          # 4-page Quick Guide (swipeable)
+│   ├── onboarding_page.dart          # 5-page Quick Guide (swipeable)
 │   ├── login_page.dart               # NOT IN USE (Phase 2)
-│   ├── home_page.dart                # Dashboard with notes feed (AppBar header)
-│   ├── recording_page.dart           # Voice recording UI + live STT
-│   ├── note_detail_page.dart         # Full note view + playback + reminders
-│   ├── folders_page.dart             # Folder list (AppBar with back button)
-│   ├── folder_detail_page.dart       # Notes within a folder (AppBar with folder name)
-│   ├── settings_page.dart            # Preferences, pickers, storage, danger zone
-│   ├── search_page.dart              # Search and filter
-│   ├── project_documents_page.dart   # Project Documents list — PLANNED (Step 4.5)
-│   ├── project_document_detail_page.dart  # Project Document detail/canvas — PLANNED (Step 4.5)
-│   ├── note_picker_page.dart         # Multi-select note picker — PLANNED (Step 4.5)
-│   └── version_history_page.dart     # Transcript version history — PLANNED (Step 4.5)
-├── widgets/                          # Reusable widgets — PLANNED (Step 4.5)
-│   ├── note_reference_block.dart     # Note reference block widget
-│   ├── free_text_block.dart          # Free text block widget
-│   ├── section_header_block.dart     # Section header block widget
-│   └── project_document_card.dart    # Project document card for list
-└── utils/                            # Helpers and constants
+│   ├── home_page.dart                # Dashboard: Notes/Tasks tabs, stats, SpeedDialFab
+│   ├── recording_page.dart           # Voice recording UI + live STT / Whisper
+│   ├── note_detail_page.dart         # Full note view + playback + tasks + reminders
+│   ├── folders_page.dart             # Unified Library: Folders + Projects
+│   ├── folder_detail_page.dart       # Notes within a folder
+│   ├── search_page.dart              # Sectioned search (notes, actions, todos, reminders)
+│   ├── project_documents_page.dart   # Project Documents list
+│   ├── project_document_detail_page.dart  # Project Document detail/canvas
+│   ├── note_picker_page.dart         # Multi-select note picker
+│   ├── version_history_page.dart     # Transcript version history
+│   ├── image_viewer_page.dart        # Full-screen image viewer
+│   ├── preferences_page.dart         # User preferences (name, theme, toggles)
+│   ├── audio_settings_page.dart      # Audio quality, transcription mode, Whisper
+│   ├── storage_page.dart             # Storage breakdown display
+│   ├── support_page.dart             # Quick Guide + Send Feedback
+│   ├── danger_zone_page.dart         # Delete Whisper model / recordings / all data
+│   ├── about_page.dart               # App info, credits, legal
+│   ├── feedback_page.dart            # User feedback form
+│   ├── support_us_page.dart          # Buy Me a Coffee
+│   ├── privacy_policy_page.dart      # Privacy policy
+│   └── terms_conditions_page.dart    # Terms & conditions
+├── widgets/
+│   ├── note_card.dart                # Note card for lists
+│   ├── speed_dial_fab.dart           # Multi-action floating button
+│   ├── share_preview_sheet.dart      # Share preview with toggles + PDF export
+│   ├── find_replace_bar.dart         # Find & Replace toolbar
+│   ├── settings_widgets.dart         # Reusable settings UI components
+│   ├── download_progress_sheet.dart  # Whisper model download progress
+│   ├── project_document_card.dart    # Project document card for list
+│   ├── image_block_widget.dart       # Image block for project documents
+│   ├── note_attachments_section.dart # Photo section on Note Detail
+│   ├── task_list_item.dart           # Task row in aggregated tasks view
+│   ├── tasks_tab.dart                # Tasks tab content for Home page
+│   └── reminder_destination_sheet.dart  # "Keep in-app / Also add to OS" choice
+└── utils/
+    ├── voice_command_parser.dart      # Voice command keyword parsing
+    └── profanity_filter.dart          # Offline profanity filter (whole-word regex)
 ```
 
 ---
 
-## Pages NOT IN USE (MVP Phase 1)
+## Pages NOT IN USE (Phase 1)
 
 | File | Reason | When Active |
 |---|---|---|
-| `lib/pages/login_page.dart` | No authentication in MVP | Phase 2 |
+| `lib/pages/login_page.dart` | No authentication in Phase 1 | Phase 2 |
 
 ---
 
@@ -168,36 +203,48 @@ lib/
 2. **State Management Migration (Riverpod)** ✅ Done
 3. **Data Models & Hive Database** ✅ Done
 4. **Wire UI to Data Layer** ✅ Done (AI UI elements removed, all pages wired to Riverpod/Hive)
-4.5. **Project Documents** ⏳ Approved (rich composite documents from voice notes — see [FEATURE_PROJECT_DOCUMENTS.md](documents/FEATURE_PROJECT_DOCUMENTS.md))
-5. **On-Device Speech-to-Text** ✅ Done (speech_to_text package, on-device, free)
+4.5. **Project Documents** ✅ Done (rich composite documents — see [FEATURE_PROJECT_DOCUMENTS.md](documents/FEATURE_PROJECT_DOCUMENTS.md))
+4.6. **Interactive Tasks & Reminders** ✅ Done (checkboxes, aggregated tasks view, OS calendar bridge)
+4.7. **Sharing, Rich Text & Image Blocks** ✅ Done (share_plus, flutter_quill, image_picker, PDF export)
+5. **On-Device Speech-to-Text** ✅ Done (speech_to_text + whisper_flutter_new, on-device)
 6. **Waveform, Playback & Notifications** ✅ Done (amplitude waveform, just_audio playback, manual reminders)
 7. **Testing, Polish & Release** ✅ Done (splash screen, quick guide, settings overhaul, compact AppBar headers)
+- **Post-release enhancements:** Issues #7–#12 ✅ Done (multi-select, layout, search, rich text, share preview, word count, find & replace, profanity filter, voice commands for tasks)
 
 **Phase 2 Steps (future, not in scope):**
-8. Whisper API Transcription
-9. AI Categorization & Structuring
-10. n8n Integration & Advanced Features (includes Project Documents Phase 2: AI summary, export, voice commands)
+8. Whisper API Transcription (cloud-based, higher accuracy)
+9. AI Categorization & Structuring (auto-extract actions/todos/reminders)
+10. n8n Integration & Advanced Features (includes Project Documents Phase 2: AI summary)
 
 ---
 
-## Routes (go_router)
+## Routes (go_router) — 23 routes
 
-| Path | Screen | MVP Status |
+| Path | Screen | Status |
 |---|---|---|
 | `/` | Splash | Active (initial route, animated branding) |
-| `/onboarding` | Quick Guide | Active (4-page swipeable guide) |
-| `/login` | Login | NOT IN USE |
-| `/home` | Home/Dashboard | Active |
-| `/recording` | Recording | Active |
-| `/note_detail` | Note Detail | Active (accepts `recordingPath` extra) |
-| `/folders` | Folders List | Active |
+| `/onboarding` | Quick Guide | Active (5-page swipeable guide) |
+| `/login` | Login | NOT IN USE (Phase 2) |
+| `/home` | Home/Dashboard | Active (Notes/Tasks tabs, stats, SpeedDialFab) |
+| `/recording` | Recording | Active (live STT + Whisper modes) |
+| `/note_detail` | Note Detail | Active (accepts `recordingPath`, `noteId` extras) |
+| `/folders` | Library | Active (unified Folders + Projects) |
 | `/folder_detail` | Folder Detail | Active |
-| `/settings` | Settings | Active |
-| `/search` | Search | Active |
-| `/project-documents` | Project Documents List | PLANNED (Step 4.5) |
-| `/project-documents/:id` | Project Document Detail | PLANNED (Step 4.5) |
-| `/project-documents/:id/add-notes` | Note Picker | PLANNED (Step 4.5) |
-| `/project-documents/:id/version-history/:noteId` | Version History | PLANNED (Step 4.5) |
+| `/search` | Search | Active (sectioned results) |
+| `/preferences` | Preferences | Active (name, theme, toggles) |
+| `/audio_settings` | Audio & Recording | Active (accepts `highlightWhisper` extra) |
+| `/storage` | Storage | Active |
+| `/support` | Help & Support | Active |
+| `/danger_zone` | Danger Zone | Active |
+| `/about` | About | Active |
+| `/feedback` | Feedback | Active |
+| `/support_us` | Support Us | Active |
+| `/privacy_policy` | Privacy Policy | Active |
+| `/terms_conditions` | Terms & Conditions | Active |
+| `/project_documents` | Project Documents List | Active |
+| `/project_document_detail` | Project Document Detail | Active |
+| `/note_picker` | Note Picker | Active |
+| `/version_history` | Version History | Active |
 
 ---
 
@@ -243,11 +290,11 @@ flutter analyze
 4. **Phase 1 = NO AI.** Remove/hide all AI UI elements. See the AI exclusion table above.
 5. **DO NOT implement cloud API calls** (OpenAI, Anthropic, Whisper) — these are Phase 2.
 6. **DO NOT add cloud sync, authentication, or user accounts** — these are Phase 2.
-7. **DO NOT modify login_page.dart** — it is not in use for MVP.
+7. **DO NOT modify login_page.dart** — it is not in use for Phase 1.
 8. **Hive is the database** — not sqflite, not Drift, not Isar. Use Hive with encryption.
 9. **Privacy is non-negotiable** — local-first, no telemetry, no tracking.
-10. **Use speech_to_text package** for transcription — on-device, free, no API key needed.
-11. **Read the Project Documents feature spec** (`documents/FEATURE_PROJECT_DOCUMENTS.md`) before implementing Step 4.5.
+10. **Use speech_to_text** (live mode) or **whisper_flutter_new** (record & transcribe mode) for transcription — both on-device, no cloud API.
+11. **Read the feature specs** in `documents/` before modifying related features.
 12. **Always update documentation** after every change:
     - `documents/CHANGELOG.md` — log all changes
     - `documents/PROJECT_STATUS.md` — update after major updates

@@ -218,7 +218,7 @@ class TermsConditionsPage extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 '6.2 The App works entirely offline. The only network operation is the optional one-time '
-                'download of the Whisper AI transcription model (~140 MB). After download, all '
+                'download of the Whisper transcription model (~140 MB). After download, all '
                 'transcription happens on-device.',
                 style: bodyStyle,
               ),
@@ -234,13 +234,13 @@ class TermsConditionsPage extends StatelessWidget {
               _sectionHeader('7. ON-DEVICE TRANSCRIPTION', headingStyle),
               Text(
                 '7.1 VoiceNotes AI offers two transcription modes: Live Transcription (using your '
-                'device\'s built-in speech recognition) and Whisper AI (using a locally downloaded '
+                'device\'s built-in speech recognition) and Whisper (using a locally downloaded '
                 'AI model). Both operate entirely on your device.',
                 style: bodyStyle,
               ),
               const SizedBox(height: 8),
               Text(
-                '7.2 The Whisper AI model is downloaded once over the internet and thereafter runs '
+                '7.2 The Whisper model is downloaded once over the internet and thereafter runs '
                 'completely offline. Your audio recordings are never transmitted to any server.',
                 style: bodyStyle,
               ),

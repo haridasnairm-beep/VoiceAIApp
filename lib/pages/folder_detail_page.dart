@@ -9,6 +9,7 @@ import '../providers/folders_provider.dart';
 import '../providers/notes_provider.dart';
 import '../models/folder.dart';
 import '../models/note.dart';
+import '../widgets/settings_widgets.dart' show friendlyLanguageName;
 
 enum _SortOption { newest, oldest, titleAZ, titleZA }
 
@@ -328,7 +329,7 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                         children: [
                           ...folderNotes.map((note) => _FolderNoteCard(
                                 title: note.title,
-                                lang: note.detectedLanguage,
+                                lang: friendlyLanguageName(note.detectedLanguage),
                                 preview: _plainTextPreview(note),
                                 hasTasks: note.todos.isNotEmpty,
                                 taskCount: '${note.todos.length}',

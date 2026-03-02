@@ -47,6 +47,7 @@ app.*.map.json
 # Sensitive files
 android/app/google-services.json
 android/local.properties
+android/key.properties
 
 .prompt_attachments
 *.hologram.dart

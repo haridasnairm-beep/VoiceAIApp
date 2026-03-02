@@ -39,6 +39,9 @@ class TranscriptionService {
   /// Callback for status changes.
   void Function(String status)? onStatusChanged;
 
+  /// Optional text filter applied to transcription output (e.g., profanity filter).
+  String Function(String text)? textFilter;
+
   bool get isAvailable => _isInitialized;
   bool get isListening => _isListening;
 
@@ -91,7 +94,8 @@ class TranscriptionService {
     }
     // Commit any remaining session text
     _commitCurrentSession();
-    final result = _finalizedText.trim();
+    final raw = _finalizedText.trim();
+    final result = textFilter?.call(raw) ?? raw;
     onStatusChanged?.call('done');
     return result;
   }
@@ -156,9 +160,12 @@ class TranscriptionService {
 
     if (result.finalResult) {
       _commitCurrentSession();
-      onTranscriptionUpdate?.call(_finalizedText, '');
+      final filtered = textFilter?.call(_finalizedText) ?? _finalizedText;
+      onTranscriptionUpdate?.call(filtered, '');
     } else {
-      onTranscriptionUpdate?.call(_finalizedText, _currentSessionText);
+      final filteredInterim = textFilter?.call(_currentSessionText) ?? _currentSessionText;
+      final filteredFinal = textFilter?.call(_finalizedText) ?? _finalizedText;
+      onTranscriptionUpdate?.call(filteredFinal, filteredInterim);
     }
   }
 

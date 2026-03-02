@@ -15,6 +15,7 @@ import 'package:voicenotes_ai/theme.dart';
 import 'package:voicenotes_ai/providers/notes_provider.dart';
 import 'package:voicenotes_ai/providers/folders_provider.dart';
 import 'package:voicenotes_ai/providers/project_documents_provider.dart';
+import 'package:voicenotes_ai/utils/profanity_filter.dart';
 
 class RecordingPage extends ConsumerStatefulWidget {
   final String? folderId;
@@ -150,7 +151,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
           builder: (ctx) => AlertDialog(
             title: const Text('Whisper Model Not Ready'),
             content: const Text(
-              'The Whisper AI model is still downloading or has not been downloaded yet.\n\n'
+              'The Whisper model is still downloading or has not been downloaded yet.\n\n'
               'You can wait for the download to finish in Settings, or switch to Live Transcription mode to start recording now.',
             ),
             actions: [
@@ -223,7 +224,14 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       if (_speechAvailable) {
         _transcription.onTranscriptionUpdate = _onTranscriptionUpdate;
         _transcription.onStatusChanged = _onStatusChanged;
-        final langCode = ref.read(settingsProvider).defaultLanguage;
+        final settings = ref.read(settingsProvider);
+        if (settings.blockOffensiveWords) {
+          _transcription.textFilter = (text) =>
+              ProfanityFilter.instance.filter(text);
+        } else {
+          _transcription.textFilter = null;
+        }
+        final langCode = settings.defaultLanguage;
         await _transcription.startListening(localeId: _mapToLocaleId(langCode));
 
         // Create a placeholder audio file path for the note

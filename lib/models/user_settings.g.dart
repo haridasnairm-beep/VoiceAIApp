@@ -34,14 +34,15 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       todosEnabled: fields[14] as bool,
       whisperModel: fields[15] as String,
       noteOutputMode: fields[16] as String,
-      keepScreenAwake: fields[17] == null ? true : fields[17] as bool,
+      keepScreenAwake: fields[17] == null ? false : fields[17] as bool,
+      blockOffensiveWords: fields[18] == null ? false : fields[18] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(18)
+      ..writeByte(19)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -77,7 +78,9 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(16)
       ..write(obj.noteOutputMode)
       ..writeByte(17)
-      ..write(obj.keepScreenAwake);
+      ..write(obj.keepScreenAwake)
+      ..writeByte(18)
+      ..write(obj.blockOffensiveWords);
   }
 
   @override

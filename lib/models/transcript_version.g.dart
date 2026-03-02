@@ -23,13 +23,14 @@ class TranscriptVersionAdapter extends TypeAdapter<TranscriptVersion> {
       editSource: fields[3] as String,
       createdAt: fields[4] as DateTime?,
       isOriginal: fields[5] as bool,
+      richContentJson: fields[6] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, TranscriptVersion obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +42,9 @@ class TranscriptVersionAdapter extends TypeAdapter<TranscriptVersion> {
       ..writeByte(4)
       ..write(obj.createdAt)
       ..writeByte(5)
-      ..write(obj.isOriginal);
+      ..write(obj.isOriginal)
+      ..writeByte(6)
+      ..write(obj.richContentJson);
   }
 
   @override

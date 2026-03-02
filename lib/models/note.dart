@@ -71,6 +71,9 @@ class Note extends HiveObject {
   @HiveField(20)
   String? contentFormat; // null/'plain' = plain text, 'quill_delta' = rich text JSON
 
+  @HiveField(21)
+  String? transcriptionModel; // Whisper model used: 'base', 'small', etc. null = unknown/pre-feature
+
   Note({
     required this.id,
     required this.title,
@@ -87,12 +90,13 @@ class Note extends HiveObject {
     List<ReminderItem>? reminders,
     List<String>? generalNotes,
     this.followUpQuestions,
-    this.isProcessed = false,
+    this.isProcessed = true,
     this.hasFollowUpTrigger = false,
     List<TranscriptVersion>? transcriptVersions,
     List<String>? projectDocumentIds,
     List<String>? imageAttachmentIds,
     this.contentFormat,
+    this.transcriptionModel,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         topics = topics ?? [],

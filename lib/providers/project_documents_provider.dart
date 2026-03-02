@@ -130,6 +130,25 @@ class ProjectDocumentsNotifier extends Notifier<List<ProjectDocument>> {
     refresh();
   }
 
+  /// Edit a note's rich-text transcript from within a project document.
+  Future<void> editNoteTranscriptRich({
+    required String documentId,
+    required String noteId,
+    required String newContent,
+    required String contentFormat,
+    required String documentTitle,
+  }) async {
+    final notesRepo = ref.read(notesRepositoryProvider);
+    await notesRepo.updateNoteRichContent(
+      noteId,
+      newContent,
+      contentFormat,
+      'Project: $documentTitle',
+    );
+    ref.read(notesProvider.notifier).refresh();
+    refresh();
+  }
+
   ProjectDocument? getById(String id) {
     try {
       return state.firstWhere((d) => d.id == id);
@@ -139,9 +158,12 @@ class ProjectDocumentsNotifier extends Notifier<List<ProjectDocument>> {
   }
 
   List<ProjectDocument> search(String query) {
-    return ref
-        .read(projectDocumentsRepositoryProvider)
-        .searchProjectDocuments(query);
+    if (query.isEmpty) return state;
+    final lower = query.toLowerCase();
+    return state.where((doc) {
+      return doc.title.toLowerCase().contains(lower) ||
+          (doc.description?.toLowerCase().contains(lower) ?? false);
+    }).toList();
   }
 }
 

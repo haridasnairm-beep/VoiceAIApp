@@ -89,7 +89,8 @@ class NotesRepository {
 
   /// Add a new transcript version to a note and update rawTranscription.
   Future<void> addTranscriptVersion(
-      String noteId, String newText, String editSource) async {
+      String noteId, String newText, String editSource,
+      {String? richContentJson}) async {
     final note = getNoteById(noteId);
     if (note == null) return;
 
@@ -105,6 +106,7 @@ class NotesRepository {
       text: newText,
       versionNumber: nextVersion,
       editSource: editSource,
+      richContentJson: richContentJson,
     );
 
     note.transcriptVersions = [...note.transcriptVersions, version];
@@ -114,6 +116,35 @@ class NotesRepository {
     if (note.contentFormat != 'quill_delta') {
       note.rawTranscription = newText;
     }
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Update a note's rich-text content (delta JSON) and add a version entry.
+  Future<void> updateNoteRichContent(
+      String noteId, String newContent, String contentFormat,
+      String editSource, {String? plainText}) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+
+    final nextVersion = note.transcriptVersions.isEmpty
+        ? 1
+        : note.transcriptVersions
+                .map((v) => v.versionNumber)
+                .reduce((a, b) => a > b ? a : b) +
+            1;
+
+    final version = TranscriptVersion(
+      id: _uuid.v4(),
+      text: plainText ?? newContent,
+      versionNumber: nextVersion,
+      editSource: editSource,
+      richContentJson: contentFormat == 'quill_delta' ? newContent : null,
+    );
+
+    note.transcriptVersions = [...note.transcriptVersions, version];
+    note.rawTranscription = newContent;
+    note.contentFormat = contentFormat;
     note.updatedAt = DateTime.now();
     await HiveService.notesBox.put(note.id, note);
   }
@@ -138,8 +169,27 @@ class NotesRepository {
         .firstOrNull;
     if (version == null) return;
 
-    await addTranscriptVersion(
-        noteId, version.text, 'Restored from v${version.versionNumber}');
+    final editSource = 'Restored from v${version.versionNumber}';
+
+    if (version.richContentJson != null) {
+      // Restore rich content — update rawTranscription + contentFormat
+      await updateNoteRichContent(
+        noteId,
+        version.richContentJson!,
+        'quill_delta',
+        editSource,
+        plainText: version.text,
+      );
+    } else {
+      // Restore plain text
+      await addTranscriptVersion(noteId, version.text, editSource);
+      // If note was previously rich text, revert to plain
+      if (note.contentFormat == 'quill_delta') {
+        note.rawTranscription = version.text;
+        note.contentFormat = null;
+        await HiveService.notesBox.put(note.id, note);
+      }
+    }
   }
 
   /// Ensure a note has at least one transcript version (migration helper).
@@ -152,6 +202,8 @@ class NotesRepository {
         editSource: 'Original transcription',
         createdAt: note.createdAt,
         isOriginal: true,
+        richContentJson:
+            note.contentFormat == 'quill_delta' ? note.rawTranscription : null,
       );
       note.transcriptVersions = [version];
       await HiveService.notesBox.put(note.id, note);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import '../models/note.dart';
 import '../theme.dart';
+import '../widgets/settings_widgets.dart' show friendlyLanguageName;
 
 /// Compact voice note card with metadata, folder/project labels, and gestures.
 class NoteCard extends StatelessWidget {
@@ -14,6 +15,10 @@ class NoteCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onLongPress;
+  final bool isSelected;
+  final bool selectionMode;
+  final void Function(String name)? onFolderTap;
+  final void Function(String name)? onProjectTap;
 
   const NoteCard({
     super.key,
@@ -24,6 +29,10 @@ class NoteCard extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onLongPress,
+    this.isSelected = false,
+    this.selectionMode = false,
+    this.onFolderTap,
+    this.onProjectTap,
   });
 
   String _formatDuration(int seconds) {
@@ -61,7 +70,9 @@ class NoteCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          color: isSelected
+              ? theme.colorScheme.primary.withValues(alpha: 0.08)
+              : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.md),
           boxShadow: [
             BoxShadow(
@@ -70,7 +81,12 @@ class NoteCard extends StatelessWidget {
               offset: const Offset(0, 1),
             ),
           ],
-          border: Border.all(color: theme.dividerColor),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.dividerColor,
+            width: isSelected ? 1.5 : 1.0,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,6 +94,18 @@ class NoteCard extends StatelessWidget {
             // Row 1: Metadata (timestamp · duration · language)
             Row(
               children: [
+                if (selectionMode) ...[
+                  Icon(
+                    isSelected
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 20,
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.hintColor,
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Icon(Icons.access_time_rounded,
                     size: 12, color: theme.hintColor),
                 const SizedBox(width: 3),
@@ -108,7 +136,7 @@ class NoteCard extends StatelessWidget {
                     size: 12, color: theme.hintColor),
                 const SizedBox(width: 2),
                 Text(
-                  note.detectedLanguage,
+                  friendlyLanguageName(note.detectedLanguage),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.hintColor,
                   ),
@@ -151,17 +179,23 @@ class NoteCard extends StatelessWidget {
                       ? const Color(0xFFE65100)
                       : const Color(0xFF2E7D32),
                 ),
-                ...folderNames.map((name) => _LabelChip(
-                      icon: Icons.folder_rounded,
-                      label: name,
-                      bgColor: const Color(0xFFE3F2FD),
-                      textColor: const Color(0xFF1565C0),
+                ...folderNames.map((name) => GestureDetector(
+                      onTap: onFolderTap != null ? () => onFolderTap!(name) : null,
+                      child: _LabelChip(
+                        icon: Icons.folder_rounded,
+                        label: name,
+                        bgColor: const Color(0xFFE3F2FD),
+                        textColor: const Color(0xFF1565C0),
+                      ),
                     )),
-                ...projectNames.map((name) => _LabelChip(
-                      icon: Icons.article_rounded,
-                      label: name,
-                      bgColor: const Color(0xFFF3E5F5),
-                      textColor: const Color(0xFF7B1FA2),
+                ...projectNames.map((name) => GestureDetector(
+                      onTap: onProjectTap != null ? () => onProjectTap!(name) : null,
+                      child: _LabelChip(
+                        icon: Icons.article_rounded,
+                        label: name,
+                        bgColor: const Color(0xFFF3E5F5),
+                        textColor: const Color(0xFF7B1FA2),
+                      ),
                     )),
               ],
             ),

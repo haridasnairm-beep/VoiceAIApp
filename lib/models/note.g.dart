@@ -38,13 +38,14 @@ class NoteAdapter extends TypeAdapter<Note> {
       projectDocumentIds: (fields[18] as List?)?.cast<String>(),
       imageAttachmentIds: (fields[19] as List?)?.cast<String>(),
       contentFormat: fields[20] as String?,
+      transcriptionModel: fields[21] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Note obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -86,7 +87,9 @@ class NoteAdapter extends TypeAdapter<Note> {
       ..writeByte(19)
       ..write(obj.imageAttachmentIds)
       ..writeByte(20)
-      ..write(obj.contentFormat);
+      ..write(obj.contentFormat)
+      ..writeByte(21)
+      ..write(obj.transcriptionModel);
   }
 
   @override

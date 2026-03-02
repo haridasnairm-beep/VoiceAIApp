@@ -28,6 +28,7 @@ class SettingsState {
   final String whisperModel; // 'base', 'small', 'medium'
   final String noteOutputMode; // 'english' or 'native'
   final bool keepScreenAwake; // Keep screen on during recording
+  final bool blockOffensiveWords; // Filter offensive words from transcription
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -48,6 +49,7 @@ class SettingsState {
     this.whisperModel = 'base',
     this.noteOutputMode = 'english',
     this.keepScreenAwake = true,
+    this.blockOffensiveWords = false,
   });
 
   SettingsState copyWith({
@@ -69,6 +71,7 @@ class SettingsState {
     String? whisperModel,
     String? noteOutputMode,
     bool? keepScreenAwake,
+    bool? blockOffensiveWords,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -92,6 +95,7 @@ class SettingsState {
       whisperModel: whisperModel ?? this.whisperModel,
       noteOutputMode: noteOutputMode ?? this.noteOutputMode,
       keepScreenAwake: keepScreenAwake ?? this.keepScreenAwake,
+      blockOffensiveWords: blockOffensiveWords ?? this.blockOffensiveWords,
     );
   }
 
@@ -159,6 +163,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       whisperModel: settings.whisperModel,
       noteOutputMode: settings.noteOutputMode,
       keepScreenAwake: settings.keepScreenAwake,
+      blockOffensiveWords: settings.blockOffensiveWords,
     );
   }
 
@@ -261,6 +266,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setKeepScreenAwake(bool enabled) async {
     await ref.read(settingsRepositoryProvider).setKeepScreenAwake(enabled);
     state = state.copyWith(keepScreenAwake: enabled);
+  }
+
+  Future<void> setBlockOffensiveWords(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setBlockOffensiveWords(enabled);
+    state = state.copyWith(blockOffensiveWords: enabled);
   }
 }
 

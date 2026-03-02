@@ -55,8 +55,11 @@ class UserSettings extends HiveObject {
   @HiveField(16)
   String noteOutputMode; // 'english' or 'native' — note output language mode
 
-  @HiveField(17, defaultValue: true)
+  @HiveField(17, defaultValue: false)
   bool keepScreenAwake; // Keep screen on during recording (for long recordings)
+
+  @HiveField(18, defaultValue: false)
+  bool blockOffensiveWords; // Filter offensive words from transcription output
 
   UserSettings({
     this.defaultLanguage = 'en',
@@ -76,6 +79,7 @@ class UserSettings extends HiveObject {
     this.todosEnabled = true,
     this.whisperModel = 'base',
     this.noteOutputMode = 'english',
-    this.keepScreenAwake = true,
+    this.keepScreenAwake = false,
+    this.blockOffensiveWords = false,
   });
 }

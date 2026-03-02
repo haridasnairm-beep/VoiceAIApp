@@ -192,14 +192,15 @@ class _DownloadProgressSheetState extends State<DownloadProgressSheet>
 
                 // Cancel button
                 if (_downloading)
-                  TextButton(
+                  OutlinedButton(
                     onPressed: _cancel,
-                    child: Text(
-                      'Cancel',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                      side: BorderSide(color: theme.colorScheme.error),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 12),
                     ),
+                    child: const Text('Cancel Download'),
                   ),
                 const SizedBox(height: 24),
               ],

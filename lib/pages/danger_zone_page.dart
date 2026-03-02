@@ -34,7 +34,7 @@ class _DangerZonePageState extends ConsumerState<DangerZonePage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Whisper Model'),
         content: const Text(
-          'This will delete the downloaded Whisper AI model (~140 MB). '
+          'This will delete the downloaded Whisper model (~140 MB). '
           'You will need to re-download it to use Record & Transcribe mode.',
         ),
         actions: [

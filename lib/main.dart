@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/hive_service.dart';
 import 'services/notification_service.dart';
+import 'services/sharing_service.dart';
 import 'theme.dart';
 import 'nav.dart';
 import 'providers/settings_provider.dart';
@@ -23,6 +24,7 @@ void main() async {
   await HiveService.migrateDefaultTranscriptionMode();
   await HiveService.ensureDefaultFolder();
   await NotificationService.instance.initialize();
+  SharingService.cleanupTempExports(); // fire-and-forget
   runApp(const ProviderScope(child: VoiceNotesApp()));
 }
 

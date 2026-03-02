@@ -22,6 +22,10 @@ class TranscriptVersion extends HiveObject {
   @HiveField(5)
   final bool isOriginal;
 
+  /// Quill Delta JSON for rich text versions. Null means plain text only.
+  @HiveField(6)
+  final String? richContentJson;
+
   TranscriptVersion({
     required this.id,
     required this.text,
@@ -29,5 +33,6 @@ class TranscriptVersion extends HiveObject {
     required this.editSource,
     DateTime? createdAt,
     this.isOriginal = false,
+    this.richContentJson,
   }) : createdAt = createdAt ?? DateTime.now();
 }

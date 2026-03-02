@@ -299,13 +299,6 @@ class _StorageBreakdownSectionState extends State<StorageBreakdownSection> {
           ),
           const SizedBox(height: 16),
           _StorageRow(
-            icon: Icons.storage_rounded,
-            color: theme.colorScheme.primary,
-            label: 'Total',
-            size: HiveService.formatBytes(total),
-          ),
-          const SizedBox(height: 10),
-          _StorageRow(
             icon: Icons.downloading_rounded,
             color: const Color(0xFFE65100),
             label: 'Whisper Model',
@@ -336,6 +329,14 @@ class _StorageBreakdownSectionState extends State<StorageBreakdownSection> {
               size: HiveService.formatBytes(_breakdown?['images'] ?? 0),
             ),
           ],
+          Divider(height: 24, color: theme.dividerColor),
+          _StorageRow(
+            icon: Icons.storage_rounded,
+            color: theme.colorScheme.primary,
+            label: 'Total',
+            size: HiveService.formatBytes(total),
+            isBold: true,
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -364,16 +365,19 @@ class _StorageRow extends StatelessWidget {
   final Color color;
   final String label;
   final String size;
+  final bool isBold;
 
   const _StorageRow({
     required this.icon,
     required this.color,
     required this.label,
     required this.size,
+    this.isBold = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final weight = isBold ? FontWeight.w700 : FontWeight.w500;
     return Row(
       children: [
         Icon(icon, color: color, size: 16),
@@ -383,15 +387,17 @@ class _StorageRow extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: weight,
                 ),
           ),
         ),
         Text(
           size,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.secondary,
-                fontWeight: FontWeight.w500,
+                color: isBold
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).colorScheme.secondary,
+                fontWeight: weight,
               ),
         ),
       ],
@@ -404,6 +410,12 @@ class _StorageRow extends StatelessWidget {
 class LanguageChoice {
   final String? code;
   const LanguageChoice(this.code);
+}
+
+/// Converts a language code (e.g. 'en', 'hi') to a friendly display name.
+/// Falls back to the uppercased code if the code is not in [languageOptions].
+String friendlyLanguageName(String code) {
+  return languageOptions[code] ?? code.toUpperCase();
 }
 
 /// Language options map for detection language picker.

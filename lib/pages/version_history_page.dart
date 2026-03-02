@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/notes_provider.dart';
@@ -7,6 +9,43 @@ class VersionHistoryPage extends ConsumerWidget {
   final String? noteId;
 
   const VersionHistoryPage({super.key, this.noteId});
+
+  Widget _buildRichPreview(BuildContext context, String deltaJson) {
+    try {
+      final deltaList = jsonDecode(deltaJson) as List;
+      final doc = quill.Document.fromJson(deltaList);
+      final controller = quill.QuillController(
+        document: doc,
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      return AbsorbPointer(
+        child: quill.QuillEditor.basic(
+          controller: controller,
+          config: quill.QuillEditorConfig(
+            showCursor: false,
+            maxHeight: 120,
+            customStyles: quill.DefaultStyles(
+              paragraph: quill.DefaultTextBlockStyle(
+                Theme.of(context).textTheme.bodyMedium!,
+                const quill.HorizontalSpacing(0, 0),
+                const quill.VerticalSpacing(2, 2),
+                const quill.VerticalSpacing(0, 0),
+                null,
+              ),
+            ),
+          ),
+        ),
+      );
+    } catch (_) {
+      // Fallback to plain text if delta parsing fails
+      return Text(
+        deltaJson,
+        style: Theme.of(context).textTheme.bodyMedium,
+        maxLines: 5,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+  }
 
   String _formatDateTime(DateTime dt) {
     const months = [
@@ -93,8 +132,9 @@ class VersionHistoryPage extends ConsumerWidget {
               itemBuilder: (context, index) {
                 // Show newest first
                 final version = versions[versions.length - 1 - index];
-                final isCurrent =
-                    version.text == note.rawTranscription;
+                final isCurrent = version.richContentJson != null
+                    ? version.richContentJson == note.rawTranscription
+                    : version.text == note.rawTranscription;
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -182,12 +222,15 @@ class VersionHistoryPage extends ConsumerWidget {
                                   ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          version.text,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                          maxLines: 5,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        if (version.richContentJson != null)
+                          _buildRichPreview(context, version.richContentJson!)
+                        else
+                          Text(
+                            version.text,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            maxLines: 5,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                       ],
                     ),
                   ),
