@@ -83,6 +83,15 @@ class Note extends HiveObject {
   @HiveField(24, defaultValue: false)
   bool isUserEditedTitle;
 
+  @HiveField(25, defaultValue: false)
+  bool isDeleted;
+
+  @HiveField(26)
+  DateTime? deletedAt;
+
+  @HiveField(27)
+  String? previousFolderId;
+
   Note({
     required this.id,
     required this.title,
@@ -109,6 +118,9 @@ class Note extends HiveObject {
     this.isPinned = false,
     this.pinnedAt,
     this.isUserEditedTitle = false,
+    this.isDeleted = false,
+    this.deletedAt,
+    this.previousFolderId,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         topics = topics ?? [],

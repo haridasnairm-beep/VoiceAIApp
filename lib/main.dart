@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/hive_service.dart';
 import 'services/notification_service.dart';
+import 'services/folders_repository.dart';
+import 'services/notes_repository.dart';
+import 'services/project_documents_repository.dart';
 import 'services/sharing_service.dart';
 import 'theme.dart';
 import 'nav.dart';
@@ -25,6 +28,10 @@ void main() async {
   await HiveService.ensureDefaultFolder();
   await NotificationService.instance.initialize();
   SharingService.cleanupTempExports(); // fire-and-forget
+  // Auto-purge trash items older than 30 days
+  NotesRepository().purgeExpiredTrash();
+  FoldersRepository().purgeExpiredTrash();
+  ProjectDocumentsRepository().purgeExpiredTrash();
   runApp(const ProviderScope(child: VoiceNotesApp()));
 }
 

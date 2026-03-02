@@ -12,6 +12,7 @@ import 'pages/audio_settings_page.dart';
 import 'pages/storage_page.dart';
 import 'pages/support_page.dart';
 import 'pages/danger_zone_page.dart';
+import 'pages/trash_page.dart';
 import 'pages/search_page.dart';
 import 'pages/project_documents_page.dart';
 import 'pages/project_document_detail_page.dart';
@@ -180,6 +181,13 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: AppRoutes.trash,
+        name: 'trash',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: TrashPage(),
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.dangerZone,
         name: 'danger_zone',
         pageBuilder: (context, state) => const NoTransitionPage(
@@ -303,6 +311,7 @@ class AppRoutes {
   static const String audioSettings = '/audio_settings';
   static const String storage = '/storage';
   static const String support = '/support';
+  static const String trash = '/trash';
   static const String dangerZone = '/danger_zone';
   static const String search = '/search';
   static const String projectDocuments = '/project_documents';

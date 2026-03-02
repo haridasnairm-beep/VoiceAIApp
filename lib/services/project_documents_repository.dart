@@ -8,11 +8,20 @@ import 'hive_service.dart';
 class ProjectDocumentsRepository {
   static const _uuid = Uuid();
 
-  /// Get all project documents, sorted by updatedAt desc.
+  /// Get all active (non-deleted) project documents, sorted by updatedAt desc.
   List<ProjectDocument> getAllProjectDocuments() {
-    final docs = HiveService.projectDocumentsBox.values.toList();
+    final docs = HiveService.projectDocumentsBox.values
+        .where((d) => !d.isDeleted)
+        .toList();
     docs.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return docs;
+  }
+
+  /// Get all trashed project documents.
+  List<ProjectDocument> getTrashedProjects() {
+    return HiveService.projectDocumentsBox.values
+        .where((d) => d.isDeleted)
+        .toList();
   }
 
   /// Get a single project document by ID.
@@ -45,11 +54,28 @@ class ProjectDocumentsRepository {
     await HiveService.projectDocumentsBox.put(document.id, document);
   }
 
-  /// Delete a project document and remove its ID from all linked notes.
+  /// Soft-delete a project document (move to trash).
   Future<void> deleteProjectDocument(String id) async {
     final doc = getProjectDocument(id);
+    if (doc == null) return;
+    doc.isDeleted = true;
+    doc.deletedAt = DateTime.now();
+    await HiveService.projectDocumentsBox.put(id, doc);
+  }
+
+  /// Restore a project document from trash.
+  Future<void> restoreProjectDocument(String id) async {
+    final doc = getProjectDocument(id);
+    if (doc == null) return;
+    doc.isDeleted = false;
+    doc.deletedAt = null;
+    await HiveService.projectDocumentsBox.put(id, doc);
+  }
+
+  /// Permanently delete a project document and unlink notes.
+  Future<void> permanentlyDeleteProjectDocument(String id) async {
+    final doc = getProjectDocument(id);
     if (doc != null) {
-      // Remove documentId from all linked notes
       for (final block in doc.blocks) {
         if (block.type == BlockType.noteReference && block.noteId != null) {
           _removeDocIdFromNote(block.noteId!, id);
@@ -57,6 +83,18 @@ class ProjectDocumentsRepository {
       }
     }
     await HiveService.projectDocumentsBox.delete(id);
+  }
+
+  /// Purge projects in trash for more than 30 days.
+  Future<int> purgeExpiredTrash() async {
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final expired = HiveService.projectDocumentsBox.values
+        .where((d) => d.isDeleted && d.deletedAt != null && d.deletedAt!.isBefore(cutoff))
+        .toList();
+    for (final doc in expired) {
+      await permanentlyDeleteProjectDocument(doc.id);
+    }
+    return expired.length;
   }
 
   /// Add a note_reference block to a document.

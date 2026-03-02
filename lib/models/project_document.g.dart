@@ -23,13 +23,15 @@ class ProjectDocumentAdapter extends TypeAdapter<ProjectDocument> {
       blocks: (fields[3] as List?)?.cast<ProjectBlock>(),
       createdAt: fields[4] as DateTime?,
       updatedAt: fields[5] as DateTime?,
+      isDeleted: fields[6] == null ? false : fields[6] as bool,
+      deletedAt: fields[7] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ProjectDocument obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +43,11 @@ class ProjectDocumentAdapter extends TypeAdapter<ProjectDocument> {
       ..writeByte(4)
       ..write(obj.createdAt)
       ..writeByte(5)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(6)
+      ..write(obj.isDeleted)
+      ..writeByte(7)
+      ..write(obj.deletedAt);
   }
 
   @override

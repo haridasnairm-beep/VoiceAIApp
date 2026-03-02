@@ -25,6 +25,12 @@ class Folder extends HiveObject {
   @HiveField(6)
   DateTime updatedAt;
 
+  @HiveField(7, defaultValue: false)
+  bool isDeleted;
+
+  @HiveField(8)
+  DateTime? deletedAt;
+
   Folder({
     required this.id,
     required this.name,
@@ -33,6 +39,8 @@ class Folder extends HiveObject {
     List<String>? noteIds,
     DateTime? createdAt,
     DateTime? updatedAt,
+    this.isDeleted = false,
+    this.deletedAt,
   })  : topics = topics ?? [],
         noteIds = noteIds ?? [],
         createdAt = createdAt ?? DateTime.now(),

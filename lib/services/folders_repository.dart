@@ -6,11 +6,20 @@ import 'hive_service.dart';
 class FoldersRepository {
   static const _uuid = Uuid();
 
-  /// Get all folders, sorted by update date (newest first).
+  /// Get all active (non-deleted) folders, sorted by update date (newest first).
   List<Folder> getAllFolders() {
-    final folders = HiveService.foldersBox.values.toList();
+    final folders = HiveService.foldersBox.values
+        .where((f) => !f.isDeleted)
+        .toList();
     folders.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return folders;
+  }
+
+  /// Get all trashed folders.
+  List<Folder> getTrashedFolders() {
+    return HiveService.foldersBox.values
+        .where((f) => f.isDeleted)
+        .toList();
   }
 
   /// Get a single folder by ID.
@@ -44,9 +53,39 @@ class FoldersRepository {
     await HiveService.foldersBox.put(folder.id, folder);
   }
 
-  /// Delete a folder by ID.
+  /// Soft-delete a folder (move to trash).
   Future<void> deleteFolder(String id) async {
+    final folder = getFolderById(id);
+    if (folder == null) return;
+    folder.isDeleted = true;
+    folder.deletedAt = DateTime.now();
+    await HiveService.foldersBox.put(id, folder);
+  }
+
+  /// Restore a folder from trash.
+  Future<void> restoreFolder(String id) async {
+    final folder = getFolderById(id);
+    if (folder == null) return;
+    folder.isDeleted = false;
+    folder.deletedAt = null;
+    await HiveService.foldersBox.put(id, folder);
+  }
+
+  /// Permanently delete a folder.
+  Future<void> permanentlyDeleteFolder(String id) async {
     await HiveService.foldersBox.delete(id);
+  }
+
+  /// Purge folders in trash for more than 30 days.
+  Future<int> purgeExpiredTrash() async {
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final expired = HiveService.foldersBox.values
+        .where((f) => f.isDeleted && f.deletedAt != null && f.deletedAt!.isBefore(cutoff))
+        .toList();
+    for (final folder in expired) {
+      await HiveService.foldersBox.delete(folder.id);
+    }
+    return expired.length;
   }
 
   /// Add a note ID to a folder.

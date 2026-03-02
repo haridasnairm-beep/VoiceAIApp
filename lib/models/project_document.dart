@@ -23,6 +23,12 @@ class ProjectDocument extends HiveObject {
   @HiveField(5)
   DateTime updatedAt;
 
+  @HiveField(6, defaultValue: false)
+  bool isDeleted;
+
+  @HiveField(7)
+  DateTime? deletedAt;
+
   ProjectDocument({
     required this.id,
     required this.title,
@@ -30,6 +36,8 @@ class ProjectDocument extends HiveObject {
     List<ProjectBlock>? blocks,
     DateTime? createdAt,
     DateTime? updatedAt,
+    this.isDeleted = false,
+    this.deletedAt,
   })  : blocks = blocks ?? [],
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();

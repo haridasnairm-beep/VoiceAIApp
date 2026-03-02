@@ -37,8 +37,23 @@ class ProjectDocumentsNotifier extends Notifier<List<ProjectDocument>> {
   Future<void> delete(String id) async {
     await ref.read(projectDocumentsRepositoryProvider).deleteProjectDocument(id);
     state = state.where((d) => d.id != id).toList();
-    // Refresh notes to reflect removed projectDocumentIds
-    ref.read(notesProvider.notifier).refresh();
+  }
+
+  Future<void> restoreProject(String id) async {
+    await ref.read(projectDocumentsRepositoryProvider).restoreProjectDocument(id);
+    refresh();
+  }
+
+  Future<void> permanentlyDeleteProject(String id) async {
+    await ref.read(projectDocumentsRepositoryProvider).permanentlyDeleteProjectDocument(id);
+  }
+
+  List<ProjectDocument> getTrashedProjects() {
+    return ref.read(projectDocumentsRepositoryProvider).getTrashedProjects();
+  }
+
+  Future<int> purgeExpiredTrash() async {
+    return ref.read(projectDocumentsRepositoryProvider).purgeExpiredTrash();
   }
 
   Future<void> updateDocument(ProjectDocument document) async {

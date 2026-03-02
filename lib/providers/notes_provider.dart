@@ -376,6 +376,27 @@ class NotesNotifier extends Notifier<List<Note>> {
     state = state.where((n) => n.id != id).toList();
   }
 
+  /// Restore a note from trash.
+  Future<void> restoreNote(String id) async {
+    await ref.read(notesRepositoryProvider).restoreNote(id);
+    refresh();
+  }
+
+  /// Permanently delete a note (cannot be undone).
+  Future<void> permanentlyDeleteNote(String id) async {
+    await ref.read(notesRepositoryProvider).permanentlyDeleteNote(id);
+  }
+
+  /// Get all trashed notes.
+  List<Note> getTrashedNotes() {
+    return ref.read(notesRepositoryProvider).getTrashedNotes();
+  }
+
+  /// Purge expired trash items (> 30 days).
+  Future<int> purgeExpiredTrash() async {
+    return ref.read(notesRepositoryProvider).purgeExpiredTrash();
+  }
+
   Note? getNoteById(String id) {
     try {
       return state.firstWhere((n) => n.id == id);

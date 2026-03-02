@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:uuid/uuid.dart';
 import '../models/action_item.dart';
 import '../models/note.dart';
@@ -9,10 +10,22 @@ import 'hive_service.dart';
 class NotesRepository {
   static const _uuid = Uuid();
 
-  /// Get all notes, sorted by creation date (newest first).
+  /// Get all active (non-deleted) notes, sorted by creation date (newest first).
   List<Note> getAllNotes() {
-    final notes = HiveService.notesBox.values.toList();
+    final notes = HiveService.notesBox.values
+        .where((n) => !n.isDeleted)
+        .toList();
     notes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return notes;
+  }
+
+  /// Get all trashed notes, sorted by deletion date (newest first).
+  List<Note> getTrashedNotes() {
+    final notes = HiveService.notesBox.values
+        .where((n) => n.isDeleted)
+        .toList();
+    notes.sort((a, b) =>
+        (b.deletedAt ?? DateTime.now()).compareTo(a.deletedAt ?? DateTime.now()));
     return notes;
   }
 
@@ -56,9 +69,51 @@ class NotesRepository {
     await HiveService.notesBox.put(note.id, note);
   }
 
-  /// Delete a note by ID.
+  /// Soft-delete a note (move to trash).
   Future<void> deleteNote(String id) async {
+    final note = getNoteById(id);
+    if (note == null) return;
+    note.isDeleted = true;
+    note.deletedAt = DateTime.now();
+    note.previousFolderId = note.folderId;
+    note.isPinned = false;
+    note.pinnedAt = null;
+    await HiveService.notesBox.put(id, note);
+  }
+
+  /// Restore a note from trash.
+  Future<void> restoreNote(String id) async {
+    final note = getNoteById(id);
+    if (note == null) return;
+    note.isDeleted = false;
+    note.deletedAt = null;
+    note.folderId = note.previousFolderId;
+    note.previousFolderId = null;
+    await HiveService.notesBox.put(id, note);
+  }
+
+  /// Permanently delete a note and its files.
+  Future<void> permanentlyDeleteNote(String id) async {
+    final note = getNoteById(id);
+    if (note != null && note.audioFilePath.isNotEmpty) {
+      try {
+        final file = File(note.audioFilePath);
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    }
     await HiveService.notesBox.delete(id);
+  }
+
+  /// Purge notes that have been in trash for more than 30 days.
+  Future<int> purgeExpiredTrash() async {
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final expired = HiveService.notesBox.values
+        .where((n) => n.isDeleted && n.deletedAt != null && n.deletedAt!.isBefore(cutoff))
+        .toList();
+    for (final note in expired) {
+      await permanentlyDeleteNote(note.id);
+    }
+    return expired.length;
   }
 
   /// Search notes by query string.

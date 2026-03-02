@@ -171,6 +171,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                     ),
                     PopupMenuItem(
+                      value: AppRoutes.trash,
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 12),
+                          const Text('Trash'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
                       value: AppRoutes.dangerZone,
                       child: Row(
                         children: [
@@ -715,20 +725,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             const Text('Delete Note'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Are you sure you want to delete "${note.title}"?'),
-            const SizedBox(height: 12),
-            Text(
-              'This action cannot be undone. The note and its audio recording will be permanently removed.',
-              style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
+        content: Text('Move "${note.title}" to Trash? You can restore it within 30 days.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -736,11 +733,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete Permanently'),
+            child: const Text('Move to Trash'),
           ),
         ],
       ),
@@ -753,6 +746,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     final confirmed = await _confirmDelete(context, note);
     if (confirmed) {
       ref.read(notesProvider.notifier).deleteNote(note.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('"${note.title}" moved to Trash'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () {
+              ref.read(notesProvider.notifier).restoreNote(note.id);
+            },
+          ),
+          duration: const Duration(seconds: 5),
+        ));
+      }
     }
   }
 
@@ -770,21 +775,8 @@ class _HomePageState extends ConsumerState<HomePage> {
             Text('Delete $count Note${count > 1 ? 's' : ''}'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-                'Are you sure you want to delete $count selected note${count > 1 ? 's' : ''}?'),
-            const SizedBox(height: 12),
-            Text(
-              'This action cannot be undone. All selected notes and their audio recordings will be permanently removed.',
-              style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
+        content: Text(
+            'Move $count note${count > 1 ? 's' : ''} to Trash? You can restore within 30 days.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -792,11 +784,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Delete $count Note${count > 1 ? 's' : ''}'),
+            child: const Text('Move to Trash'),
           ),
         ],
       ),

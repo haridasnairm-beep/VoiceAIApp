@@ -42,13 +42,16 @@ class NoteAdapter extends TypeAdapter<Note> {
       isPinned: fields[22] == null ? false : fields[22] as bool,
       pinnedAt: fields[23] as DateTime?,
       isUserEditedTitle: fields[24] == null ? false : fields[24] as bool,
+      isDeleted: fields[25] == null ? false : fields[25] as bool,
+      deletedAt: fields[26] as DateTime?,
+      previousFolderId: fields[27] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Note obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(28)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -98,7 +101,13 @@ class NoteAdapter extends TypeAdapter<Note> {
       ..writeByte(23)
       ..write(obj.pinnedAt)
       ..writeByte(24)
-      ..write(obj.isUserEditedTitle);
+      ..write(obj.isUserEditedTitle)
+      ..writeByte(25)
+      ..write(obj.isDeleted)
+      ..writeByte(26)
+      ..write(obj.deletedAt)
+      ..writeByte(27)
+      ..write(obj.previousFolderId);
   }
 
   @override

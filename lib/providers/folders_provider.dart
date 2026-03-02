@@ -46,6 +46,23 @@ class FoldersNotifier extends Notifier<List<Folder>> {
     state = state.where((f) => f.id != id).toList();
   }
 
+  Future<void> restoreFolder(String id) async {
+    await ref.read(foldersRepositoryProvider).restoreFolder(id);
+    refresh();
+  }
+
+  Future<void> permanentlyDeleteFolder(String id) async {
+    await ref.read(foldersRepositoryProvider).permanentlyDeleteFolder(id);
+  }
+
+  List<Folder> getTrashedFolders() {
+    return ref.read(foldersRepositoryProvider).getTrashedFolders();
+  }
+
+  Future<int> purgeExpiredTrash() async {
+    return ref.read(foldersRepositoryProvider).purgeExpiredTrash();
+  }
+
   Future<void> addNoteToFolder(String folderId, String noteId) async {
     await ref.read(foldersRepositoryProvider).addNoteToFolder(folderId, noteId);
     refresh();
