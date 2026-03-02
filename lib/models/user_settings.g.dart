@@ -36,13 +36,17 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       noteOutputMode: fields[16] as String,
       keepScreenAwake: fields[17] == null ? false : fields[17] as bool,
       blockOffensiveWords: fields[18] == null ? false : fields[18] as bool,
+      appLockEnabled: fields[19] == null ? false : fields[19] as bool,
+      appLockPinHash: fields[20] as String?,
+      biometricEnabled: fields[21] == null ? false : fields[21] as bool,
+      autoLockTimeoutSeconds: fields[22] == null ? 0 : fields[22] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(19)
+      ..writeByte(23)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -80,7 +84,15 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(17)
       ..write(obj.keepScreenAwake)
       ..writeByte(18)
-      ..write(obj.blockOffensiveWords);
+      ..write(obj.blockOffensiveWords)
+      ..writeByte(19)
+      ..write(obj.appLockEnabled)
+      ..writeByte(20)
+      ..write(obj.appLockPinHash)
+      ..writeByte(21)
+      ..write(obj.biometricEnabled)
+      ..writeByte(22)
+      ..write(obj.autoLockTimeoutSeconds);
   }
 
   @override

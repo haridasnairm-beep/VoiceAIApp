@@ -30,6 +30,10 @@ class SettingsState {
   final bool keepScreenAwake; // Keep screen on during recording
   final bool blockOffensiveWords; // Filter offensive words from transcription
   final bool isAmoled; // True when user selected AMOLED dark theme
+  final bool appLockEnabled;
+  final String? appLockPinHash;
+  final bool biometricEnabled;
+  final int autoLockTimeoutSeconds;
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -52,6 +56,10 @@ class SettingsState {
     this.keepScreenAwake = true,
     this.blockOffensiveWords = false,
     this.isAmoled = false,
+    this.appLockEnabled = false,
+    this.appLockPinHash,
+    this.biometricEnabled = false,
+    this.autoLockTimeoutSeconds = 0,
   });
 
   SettingsState copyWith({
@@ -75,6 +83,10 @@ class SettingsState {
     bool? keepScreenAwake,
     bool? blockOffensiveWords,
     bool? isAmoled,
+    bool? appLockEnabled,
+    String? Function()? appLockPinHash,
+    bool? biometricEnabled,
+    int? autoLockTimeoutSeconds,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -100,6 +112,10 @@ class SettingsState {
       keepScreenAwake: keepScreenAwake ?? this.keepScreenAwake,
       blockOffensiveWords: blockOffensiveWords ?? this.blockOffensiveWords,
       isAmoled: isAmoled ?? this.isAmoled,
+      appLockEnabled: appLockEnabled ?? this.appLockEnabled,
+      appLockPinHash: appLockPinHash != null ? appLockPinHash() : this.appLockPinHash,
+      biometricEnabled: biometricEnabled ?? this.biometricEnabled,
+      autoLockTimeoutSeconds: autoLockTimeoutSeconds ?? this.autoLockTimeoutSeconds,
     );
   }
 
@@ -170,6 +186,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
       keepScreenAwake: settings.keepScreenAwake,
       blockOffensiveWords: settings.blockOffensiveWords,
       isAmoled: settings.themeMode == 'amoled',
+      appLockEnabled: settings.appLockEnabled,
+      appLockPinHash: settings.appLockPinHash,
+      biometricEnabled: settings.biometricEnabled,
+      autoLockTimeoutSeconds: settings.autoLockTimeoutSeconds,
     );
   }
 
@@ -276,6 +296,26 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setBlockOffensiveWords(bool enabled) async {
     await ref.read(settingsRepositoryProvider).setBlockOffensiveWords(enabled);
     state = state.copyWith(blockOffensiveWords: enabled);
+  }
+
+  Future<void> setAppLockEnabled(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setAppLockEnabled(enabled);
+    state = state.copyWith(appLockEnabled: enabled);
+  }
+
+  Future<void> setAppLockPinHash(String? hash) async {
+    await ref.read(settingsRepositoryProvider).setAppLockPinHash(hash);
+    state = state.copyWith(appLockPinHash: () => hash);
+  }
+
+  Future<void> setBiometricEnabled(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setBiometricEnabled(enabled);
+    state = state.copyWith(biometricEnabled: enabled);
+  }
+
+  Future<void> setAutoLockTimeout(int seconds) async {
+    await ref.read(settingsRepositoryProvider).setAutoLockTimeout(seconds);
+    state = state.copyWith(autoLockTimeoutSeconds: seconds);
   }
 }
 

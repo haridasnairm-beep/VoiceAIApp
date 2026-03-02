@@ -123,4 +123,28 @@ class SettingsRepository {
     settings.blockOffensiveWords = enabled;
     await saveSettings(settings);
   }
+
+  Future<void> setAppLockEnabled(bool enabled) async {
+    final settings = getSettings();
+    settings.appLockEnabled = enabled;
+    await saveSettings(settings);
+  }
+
+  Future<void> setAppLockPinHash(String? hash) async {
+    final settings = getSettings();
+    settings.appLockPinHash = hash;
+    await saveSettings(settings);
+  }
+
+  Future<void> setBiometricEnabled(bool enabled) async {
+    final settings = getSettings();
+    settings.biometricEnabled = enabled;
+    await saveSettings(settings);
+  }
+
+  Future<void> setAutoLockTimeout(int seconds) async {
+    final settings = getSettings();
+    settings.autoLockTimeoutSeconds = seconds;
+    await saveSettings(settings);
+  }
 }

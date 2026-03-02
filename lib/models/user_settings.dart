@@ -61,6 +61,18 @@ class UserSettings extends HiveObject {
   @HiveField(18, defaultValue: false)
   bool blockOffensiveWords; // Filter offensive words from transcription output
 
+  @HiveField(19, defaultValue: false)
+  bool appLockEnabled;
+
+  @HiveField(20)
+  String? appLockPinHash; // SHA-256 hash of PIN (never store raw PIN)
+
+  @HiveField(21, defaultValue: false)
+  bool biometricEnabled;
+
+  @HiveField(22, defaultValue: 0)
+  int autoLockTimeoutSeconds; // 0=immediately, 60, 300, 900
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -81,5 +93,9 @@ class UserSettings extends HiveObject {
     this.noteOutputMode = 'english',
     this.keepScreenAwake = false,
     this.blockOffensiveWords = false,
+    this.appLockEnabled = false,
+    this.appLockPinHash,
+    this.biometricEnabled = false,
+    this.autoLockTimeoutSeconds = 0,
   });
 }

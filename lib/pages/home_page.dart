@@ -131,6 +131,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                     ),
                     PopupMenuItem(
+                      value: AppRoutes.security,
+                      child: Row(
+                        children: [
+                          Icon(Icons.lock_rounded, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 12),
+                          const Text('Security'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
                       value: AppRoutes.audioSettings,
                       child: Row(
                         children: [

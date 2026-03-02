@@ -33,6 +33,8 @@ dependencies:
   flutter_image_compress: ^2.3.0
   wakelock_plus: ^1.2.8
   flutter_secure_storage: ^10.0.0
+  local_auth: ^2.3.0
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:
