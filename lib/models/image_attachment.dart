@@ -42,4 +42,28 @@ class ImageAttachment extends HiveObject {
     required this.sourceType,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'filePath': filePath,
+        'fileName': fileName,
+        'caption': caption,
+        'width': width,
+        'height': height,
+        'fileSizeBytes': fileSizeBytes,
+        'sourceType': sourceType,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory ImageAttachment.fromMap(Map<String, dynamic> m) => ImageAttachment(
+        id: m['id'] as String,
+        filePath: m['filePath'] as String,
+        fileName: m['fileName'] as String,
+        caption: m['caption'] as String?,
+        width: m['width'] as int,
+        height: m['height'] as int,
+        fileSizeBytes: m['fileSizeBytes'] as int,
+        sourceType: m['sourceType'] as String? ?? 'gallery',
+        createdAt: DateTime.parse(m['createdAt'] as String),
+      );
 }

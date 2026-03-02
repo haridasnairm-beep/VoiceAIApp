@@ -35,4 +35,24 @@ class TranscriptVersion extends HiveObject {
     this.isOriginal = false,
     this.richContentJson,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'text': text,
+        'versionNumber': versionNumber,
+        'editSource': editSource,
+        'createdAt': createdAt.toIso8601String(),
+        'isOriginal': isOriginal,
+        'richContentJson': richContentJson,
+      };
+
+  factory TranscriptVersion.fromMap(Map<String, dynamic> m) => TranscriptVersion(
+        id: m['id'] as String,
+        text: m['text'] as String,
+        versionNumber: m['versionNumber'] as int,
+        editSource: m['editSource'] as String,
+        createdAt: DateTime.parse(m['createdAt'] as String),
+        isOriginal: m['isOriginal'] as bool? ?? false,
+        richContentJson: m['richContentJson'] as String?,
+      );
 }

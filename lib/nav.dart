@@ -24,6 +24,7 @@ import 'pages/terms_conditions_page.dart';
 import 'pages/about_page.dart';
 import 'pages/feedback_page.dart';
 import 'pages/support_us_page.dart';
+import 'pages/backup_restore_page.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -302,6 +303,13 @@ class AppRouter {
           child: SupportUsPage(),
         ),
       ),
+      GoRoute(
+        path: AppRoutes.backupRestore,
+        name: 'backup_restore',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: BackupRestorePage(),
+        ),
+      ),
     ],
   );
 }
@@ -332,4 +340,5 @@ class AppRoutes {
   static const String about = '/about';
   static const String feedback = '/feedback';
   static const String supportUs = '/support_us';
+  static const String backupRestore = '/backup_restore';
 }

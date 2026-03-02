@@ -30,4 +30,22 @@ class ReminderItem extends HiveObject {
     this.notificationId,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'text': text,
+        'reminderTime': reminderTime?.toIso8601String(),
+        'isCompleted': isCompleted,
+        'notificationId': notificationId,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory ReminderItem.fromMap(Map<String, dynamic> m) => ReminderItem(
+        id: m['id'] as String,
+        text: m['text'] as String,
+        reminderTime: m['reminderTime'] != null ? DateTime.parse(m['reminderTime'] as String) : null,
+        isCompleted: m['isCompleted'] as bool? ?? false,
+        notificationId: m['notificationId'] as int?,
+        createdAt: DateTime.parse(m['createdAt'] as String),
+      );
 }

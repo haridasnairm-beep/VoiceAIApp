@@ -40,13 +40,16 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       appLockPinHash: fields[20] as String?,
       biometricEnabled: fields[21] == null ? false : fields[21] as bool,
       autoLockTimeoutSeconds: fields[22] == null ? 0 : fields[22] as int,
+      widgetPrivacyLevel:
+          fields[23] == null ? 'record_only' : fields[23] as String,
+      lastBackupDate: fields[24] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(23)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -92,7 +95,11 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(21)
       ..write(obj.biometricEnabled)
       ..writeByte(22)
-      ..write(obj.autoLockTimeoutSeconds);
+      ..write(obj.autoLockTimeoutSeconds)
+      ..writeByte(23)
+      ..write(obj.widgetPrivacyLevel)
+      ..writeByte(24)
+      ..write(obj.lastBackupDate);
   }
 
   @override

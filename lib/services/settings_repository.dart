@@ -147,4 +147,16 @@ class SettingsRepository {
     settings.autoLockTimeoutSeconds = seconds;
     await saveSettings(settings);
   }
+
+  Future<void> setWidgetPrivacyLevel(String level) async {
+    final settings = getSettings();
+    settings.widgetPrivacyLevel = level;
+    await saveSettings(settings);
+  }
+
+  Future<void> setLastBackupDate(DateTime? date) async {
+    final settings = getSettings();
+    settings.lastBackupDate = date;
+    await saveSettings(settings);
+  }
 }

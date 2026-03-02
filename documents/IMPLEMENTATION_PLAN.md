@@ -800,7 +800,7 @@ These 8 features address competitive gaps that users expect at launch. They requ
 
 ---
 
-## Step 10.6: Home Screen Widget ⬜ PENDING
+## Step 10.6: Home Screen Widget ✅ COMPLETED
 
 **Goal:** Provide one-tap voice recording from the home screen and glanceable note/task stats. Widget behavior adapts when App Lock (Step 10.5) is enabled via Widget Privacy setting.
 
@@ -839,7 +839,7 @@ These 8 features address competitive gaps that users expect at launch. They requ
 
 ---
 
-## Step 10.7: Local Backup & Restore ⬜ PENDING
+## Step 10.7: Local Backup & Restore ✅ DONE
 
 **Goal:** Allow users to export their entire database as an encrypted archive and restore from it.
 
@@ -1030,7 +1030,7 @@ PHASE 1 — Value Proposition Gaps (Pre-Launch)
 ├── Step 9: Note Templates ───────────────────── [Small]
 ├── Step 10: Trash / Soft Delete ─────────────── [Medium]
 ├── Step 10.5: App Lock (PIN/Biometric) ──────── [Medium]
-├── Step 10.6: Home Screen Widget ────────────── [Medium]  (reads App Lock state)
+├── Step 10.6: Home Screen Widget ────────────── [Medium]  ✅ DONE
 └── Step 10.7: Local Backup & Restore ────────── [Medium-Large]  (includes App Lock settings)
     (Spec: FEATURE_PHASE1_VALUE_GAPS.md — 8 features)
                                                     │

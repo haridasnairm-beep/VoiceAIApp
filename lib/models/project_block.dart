@@ -58,4 +58,28 @@ class ProjectBlock extends HiveObject {
     this.contentFormat,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'type': type.index,
+        'sortOrder': sortOrder,
+        'noteId': noteId,
+        'content': content,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+        'imageAttachmentId': imageAttachmentId,
+        'contentFormat': contentFormat,
+      };
+
+  factory ProjectBlock.fromMap(Map<String, dynamic> m) => ProjectBlock(
+        id: m['id'] as String,
+        type: BlockType.values[m['type'] as int],
+        sortOrder: m['sortOrder'] as int,
+        noteId: m['noteId'] as String?,
+        content: m['content'] as String?,
+        createdAt: DateTime.parse(m['createdAt'] as String),
+        updatedAt: DateTime.parse(m['updatedAt'] as String),
+        imageAttachmentId: m['imageAttachmentId'] as String?,
+        contentFormat: m['contentFormat'] as String?,
+      );
 }

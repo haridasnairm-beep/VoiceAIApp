@@ -73,6 +73,12 @@ class UserSettings extends HiveObject {
   @HiveField(22, defaultValue: 0)
   int autoLockTimeoutSeconds; // 0=immediately, 60, 300, 900
 
+  @HiveField(23, defaultValue: 'record_only')
+  String widgetPrivacyLevel; // 'full', 'record_only', 'minimal' — controls Dashboard widget content when App Lock is on
+
+  @HiveField(24)
+  DateTime? lastBackupDate; // When the user last created a successful backup
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -97,5 +103,65 @@ class UserSettings extends HiveObject {
     this.appLockPinHash,
     this.biometricEnabled = false,
     this.autoLockTimeoutSeconds = 0,
+    this.widgetPrivacyLevel = 'record_only',
+    this.lastBackupDate,
   });
+
+  Map<String, dynamic> toMap() => {
+        'defaultLanguage': defaultLanguage,
+        'audioQuality': audioQuality,
+        'notificationsEnabled': notificationsEnabled,
+        'quietHoursStartMinutes': quietHoursStartMinutes,
+        'quietHoursEndMinutes': quietHoursEndMinutes,
+        'themeMode': themeMode,
+        'onboardingCompleted': onboardingCompleted,
+        'transcriptionMode': transcriptionMode,
+        'speakerName': speakerName,
+        'notePrefix': notePrefix,
+        'defaultFolderId': defaultFolderId,
+        'voiceCommandsEnabled': voiceCommandsEnabled,
+        'textNotePrefix': textNotePrefix,
+        'actionItemsEnabled': actionItemsEnabled,
+        'todosEnabled': todosEnabled,
+        'whisperModel': whisperModel,
+        'noteOutputMode': noteOutputMode,
+        'keepScreenAwake': keepScreenAwake,
+        'blockOffensiveWords': blockOffensiveWords,
+        'appLockEnabled': appLockEnabled,
+        'appLockPinHash': appLockPinHash,
+        'biometricEnabled': biometricEnabled,
+        'autoLockTimeoutSeconds': autoLockTimeoutSeconds,
+        'widgetPrivacyLevel': widgetPrivacyLevel,
+        'lastBackupDate': lastBackupDate?.toIso8601String(),
+      };
+
+  factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
+        defaultLanguage: m['defaultLanguage'] as String?,
+        audioQuality: m['audioQuality'] as String? ?? 'standard',
+        notificationsEnabled: m['notificationsEnabled'] as bool? ?? true,
+        quietHoursStartMinutes: m['quietHoursStartMinutes'] as int?,
+        quietHoursEndMinutes: m['quietHoursEndMinutes'] as int?,
+        themeMode: m['themeMode'] as String? ?? 'system',
+        onboardingCompleted: m['onboardingCompleted'] as bool? ?? false,
+        transcriptionMode: m['transcriptionMode'] as String? ?? 'whisper',
+        speakerName: m['speakerName'] as String? ?? 'Speaker 1',
+        notePrefix: m['notePrefix'] as String? ?? 'VOICE',
+        defaultFolderId: m['defaultFolderId'] as String?,
+        voiceCommandsEnabled: m['voiceCommandsEnabled'] as bool? ?? true,
+        textNotePrefix: m['textNotePrefix'] as String? ?? 'TXT',
+        actionItemsEnabled: m['actionItemsEnabled'] as bool? ?? true,
+        todosEnabled: m['todosEnabled'] as bool? ?? true,
+        whisperModel: m['whisperModel'] as String? ?? 'base',
+        noteOutputMode: m['noteOutputMode'] as String? ?? 'english',
+        keepScreenAwake: m['keepScreenAwake'] as bool? ?? false,
+        blockOffensiveWords: m['blockOffensiveWords'] as bool? ?? false,
+        appLockEnabled: m['appLockEnabled'] as bool? ?? false,
+        appLockPinHash: m['appLockPinHash'] as String?,
+        biometricEnabled: m['biometricEnabled'] as bool? ?? false,
+        autoLockTimeoutSeconds: m['autoLockTimeoutSeconds'] as int? ?? 0,
+        widgetPrivacyLevel: m['widgetPrivacyLevel'] as String? ?? 'record_only',
+        lastBackupDate: m['lastBackupDate'] != null
+            ? DateTime.parse(m['lastBackupDate'] as String)
+            : null,
+      );
 }

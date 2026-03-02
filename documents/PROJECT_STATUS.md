@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-03-02
 **Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). All features production-ready. **Next:** Phase 1 Value Proposition Gaps (Steps 8–10.7, 8 features) — pinned notes, AMOLED dark theme, auto-title generation, note templates, trash/soft delete, app lock, home screen widget, and local backup & restore. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). All pre-launch features complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -368,12 +368,17 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 ## Next Steps
 
-### Phase 1 — Complete
-All Phase 1 features are implemented including post-release enhancements (Issues #7–#11).
+### Phase 1 — Value Proposition Gaps (7/8 complete)
+- ~~Step 8: Pinned Notes + AMOLED + Auto-Title~~ ✅
+- ~~Step 9: Note Templates~~ ✅
+- ~~Step 10: Trash / Soft Delete~~ ✅
+- ~~Step 10.5: App Lock — PIN / Biometric~~ ✅
+- ~~Step 10.6: Home Screen Widget~~ ✅
+- **Step 10.7: Local Backup & Restore** ← next
 
 ### Phase 2 — AI-Powered
-1. **Step 8:** Whisper API Transcription (cloud-based, higher accuracy)
-2. **Step 9:** AI Categorization & Structuring (auto-extract actions/todos/reminders, smart due dates)
-3. **Step 10:** n8n Integration & Advanced Features
+1. **Step 11:** Whisper API Transcription (cloud-based, higher accuracy)
+2. **Step 12:** AI Categorization & Structuring (auto-extract actions/todos/reminders, smart due dates)
+3. **Step 13:** n8n Integration & Advanced Features
    - Includes Project Documents Phase 2: AI summary, AI-suggested note additions
    - Includes Tasks Phase 2: recurring reminders, priority levels, Todoist/Apple Reminders API/Google Tasks API

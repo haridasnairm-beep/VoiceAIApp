@@ -34,6 +34,8 @@ class SettingsState {
   final String? appLockPinHash;
   final bool biometricEnabled;
   final int autoLockTimeoutSeconds;
+  final String widgetPrivacyLevel; // 'full', 'record_only', 'minimal'
+  final DateTime? lastBackupDate;
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -60,6 +62,8 @@ class SettingsState {
     this.appLockPinHash,
     this.biometricEnabled = false,
     this.autoLockTimeoutSeconds = 0,
+    this.widgetPrivacyLevel = 'record_only',
+    this.lastBackupDate,
   });
 
   SettingsState copyWith({
@@ -87,6 +91,8 @@ class SettingsState {
     String? Function()? appLockPinHash,
     bool? biometricEnabled,
     int? autoLockTimeoutSeconds,
+    String? widgetPrivacyLevel,
+    DateTime? Function()? lastBackupDate,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -116,6 +122,8 @@ class SettingsState {
       appLockPinHash: appLockPinHash != null ? appLockPinHash() : this.appLockPinHash,
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
       autoLockTimeoutSeconds: autoLockTimeoutSeconds ?? this.autoLockTimeoutSeconds,
+      widgetPrivacyLevel: widgetPrivacyLevel ?? this.widgetPrivacyLevel,
+      lastBackupDate: lastBackupDate != null ? lastBackupDate() : this.lastBackupDate,
     );
   }
 
@@ -190,6 +198,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
       appLockPinHash: settings.appLockPinHash,
       biometricEnabled: settings.biometricEnabled,
       autoLockTimeoutSeconds: settings.autoLockTimeoutSeconds,
+      widgetPrivacyLevel: settings.widgetPrivacyLevel,
+      lastBackupDate: settings.lastBackupDate,
     );
   }
 
@@ -316,6 +326,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setAutoLockTimeout(int seconds) async {
     await ref.read(settingsRepositoryProvider).setAutoLockTimeout(seconds);
     state = state.copyWith(autoLockTimeoutSeconds: seconds);
+  }
+
+  Future<void> setWidgetPrivacyLevel(String level) async {
+    await ref.read(settingsRepositoryProvider).setWidgetPrivacyLevel(level);
+    state = state.copyWith(widgetPrivacyLevel: level);
+  }
+
+  Future<void> setLastBackupDate(DateTime? date) async {
+    await ref.read(settingsRepositoryProvider).setLastBackupDate(date);
+    state = state.copyWith(lastBackupDate: () => date);
   }
 }
 

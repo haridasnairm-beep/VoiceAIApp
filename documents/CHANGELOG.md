@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-02 - Step 10.7: Local Backup & Restore
+
+### Added
+- **`BackupService`** — creates AES-256-CBC encrypted `.vnbak` backup files; file format: 4-byte magic + 4-byte version + 16-byte salt + 16-byte IV + encrypted ZIP; key derived via 10,000 rounds of SHA-256 from user passphrase + random salt
+- **Backup archive contents** — `manifest.json` (metadata), `data.json` (all Hive records serialized to JSON), `images/` (image attachments), `audio/` (recordings, optional)
+- **`BackupRestorePage`** — full backup/restore UI: passphrase input, include-audio toggle, progress indicator, share sheet on backup; file picker, passphrase entry, backup preview (manifest card showing counts + creation date), confirmation dialog, and restore progress on restore
+- **`/backup_restore` route** — new `GoRoute` in `AppRouter`; accessible from Home screen overflow menu (new "Backup & Restore" entry)
+- **`toMap()` / `fromMap()`** serialization methods on all Hive models: `Note`, `ActionItem`, `TodoItem`, `ReminderItem`, `Folder`, `ProjectDocument`, `ProjectBlock`, `TranscriptVersion`, `ImageAttachment`, `UserSettings`
+- **`lastBackupDate`** (HiveField 24, `DateTime?`) on `UserSettings` — persists the timestamp of the last successful backup
+- **`setLastBackupDate()`** on `SettingsRepository` and `SettingsNotifier`; `lastBackupDate` field wired through `SettingsState` / `copyWith` / `build()`
+
+### Changed
+- `pubspec.yaml` — added `archive: ^4.0.0`, `encrypt: ^5.0.3`, `file_picker: ^8.0.0`
+- `home_page.dart` — added "Backup & Restore" entry to overflow popup menu (between Storage and Help & Support)
+
+### New Dependencies
+- `archive: ^4.0.0` — pure-Dart ZIP encode/decode (in-memory)
+- `encrypt: ^5.0.3` — AES-256-CBC encryption via PointyCastle
+- `file_picker: ^8.0.0` — cross-platform file selection for restore
+
+---
+
+## [Unreleased] - 2026-03-02 - Step 10.6: Home Screen Widget
+
+### Added
+- **Quick Record widget (2×1)** — tap anywhere to open the Recording screen directly; no content displayed, always safe regardless of App Lock state
+- **Dashboard widget (4×2)** — shows note count, open task count, and latest note preview; content adapts to Widget Privacy setting when App Lock is enabled
+- **Widget Privacy setting** — new option in Settings → Security (visible only when App Lock is on); three levels: Full (counts + preview), Record-Only (counts only, default), Minimal (icon + record only)
+- `HomeWidgetService` — Flutter service that pushes note/task data to the widget; respects App Lock + Widget Privacy to determine what data to expose
+- `VoiceNotesWidgetSmall.kt` — Android AppWidgetProvider for the Quick Record widget
+- `VoiceNotesWidgetDashboard.kt` — Android AppWidgetProvider for the Dashboard widget; reads `HomeWidgetPreferences` SharedPreferences written by `home_widget`
+- Widget layout XML: `widget_small.xml`, `widget_dashboard.xml`
+- Widget info XML: `widget_small_info.xml`, `widget_dashboard_info.xml`
+- Widget drawable resources: `widget_background.xml`, `widget_btn_background.xml`
+- Widget click deep-link via `HomeWidgetLaunchIntent` — widget record taps emit `voicenotesai://record` URI to `HomeWidget.widgetClicked` stream
+- `_onWidgetClicked` / `_checkWidgetLaunch` in `main.dart` — routes widget tap URI to `/recording` screen
+- Widget data refresh on app foreground (`didChangeAppLifecycleState` resumed)
+
+### Changed
+- `UserSettings` — added `widgetPrivacyLevel` (HiveField 23, default `'record_only'`)
+- `SettingsRepository` — added `setWidgetPrivacyLevel()`
+- `SettingsState` / `SettingsNotifier` — expose `widgetPrivacyLevel` field and setter
+- `AndroidManifest.xml` — added `VoiceNotesWidgetSmall` and `VoiceNotesWidgetDashboard` widget receivers; added `HOME_WIDGET_LAUNCH_ACTION` intent-filter to MainActivity
+- `SecurityPage` — added Widget Privacy picker row (only shown when App Lock enabled); updated info text
+- `main.dart` — `HomeWidgetService.initialize()` on startup; `HomeWidget.widgetClicked` stream listener; widget refresh on resume
+
+### New Dependencies
+- `home_widget: ^0.9.0` — cross-platform home screen widget support
+
+### Platform Notes
+- **Android:** Fully functional. Add the widget via long-press on home screen → Widgets → VoiceNotes AI.
+- **iOS:** Requires additional Xcode setup (App Group, WidgetKit extension). `HomeWidgetService.initialize()` sets the app group ID; native extension not yet created.
+
+---
+
 ## [Unreleased] - 2026-03-02 - Documentation: Release Status & Value Gaps Integration
 
 ### Documentation

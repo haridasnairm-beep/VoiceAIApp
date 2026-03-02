@@ -161,6 +161,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                     ),
                     PopupMenuItem(
+                      value: AppRoutes.backupRestore,
+                      child: Row(
+                        children: [
+                          Icon(Icons.backup_rounded, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 12),
+                          const Text('Backup & Restore'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
                       value: AppRoutes.support,
                       child: Row(
                         children: [

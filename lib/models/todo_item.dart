@@ -26,4 +26,20 @@ class TodoItem extends HiveObject {
     this.dueDate,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'text': text,
+        'isCompleted': isCompleted,
+        'dueDate': dueDate?.toIso8601String(),
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory TodoItem.fromMap(Map<String, dynamic> m) => TodoItem(
+        id: m['id'] as String,
+        text: m['text'] as String,
+        isCompleted: m['isCompleted'] as bool? ?? false,
+        dueDate: m['dueDate'] != null ? DateTime.parse(m['dueDate'] as String) : null,
+        createdAt: DateTime.parse(m['createdAt'] as String),
+      );
 }

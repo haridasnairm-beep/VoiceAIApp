@@ -41,4 +41,28 @@ class ProjectDocument extends HiveObject {
   })  : blocks = blocks ?? [],
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'description': description,
+        'blocks': blocks.map((b) => b.toMap()).toList(),
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+        'isDeleted': isDeleted,
+        'deletedAt': deletedAt?.toIso8601String(),
+      };
+
+  factory ProjectDocument.fromMap(Map<String, dynamic> m) => ProjectDocument(
+        id: m['id'] as String,
+        title: m['title'] as String,
+        description: m['description'] as String?,
+        blocks: (m['blocks'] as List? ?? [])
+            .map((b) => ProjectBlock.fromMap(b as Map<String, dynamic>))
+            .toList(),
+        createdAt: DateTime.parse(m['createdAt'] as String),
+        updatedAt: DateTime.parse(m['updatedAt'] as String),
+        isDeleted: m['isDeleted'] as bool? ?? false,
+        deletedAt: m['deletedAt'] != null ? DateTime.parse(m['deletedAt'] as String) : null,
+      );
 }
