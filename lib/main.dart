@@ -58,7 +58,7 @@ class VoiceNotesApp extends ConsumerWidget {
       title: 'VoiceNotes AI',
       debugShowCheckedModeBanner: false,
       theme: lightTheme,
-      darkTheme: darkTheme,
+      darkTheme: settings.isAmoled ? amoledTheme : darkTheme,
       themeMode: settings.themeMode,
       routerConfig: AppRouter.router,
     );

@@ -74,6 +74,11 @@ class AppColors {
   static const darkOnError = Color(0xFF63171B);
   static const darkSuccess = Color(0xFF48BB78);
   static const darkDivider = Color(0xFF4A5568);
+
+  // AMOLED Dark Mode (pure black backgrounds for OLED screens)
+  static const amoledBackground = Color(0xFF000000);
+  static const amoledSurface = Color(0xFF0A0A0A);
+  static const amoledDivider = Color(0xFF1A1A1A);
 }
 
 // =============================================================================
@@ -145,6 +150,43 @@ ThemeData get darkTheme => ThemeData(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           side: const BorderSide(color: AppColors.darkDivider, width: 1),
+        ),
+      ),
+      textTheme: _buildTextTheme(
+        primaryColor: AppColors.darkPrimaryText,
+        secondaryColor: AppColors.darkSecondaryText,
+      ),
+      iconTheme: const IconThemeData(color: AppColors.darkPrimaryText),
+    );
+
+ThemeData get amoledTheme => ThemeData(
+      useMaterial3: true,
+      colorScheme: const ColorScheme.dark(
+        primary: AppColors.darkPrimary,
+        onPrimary: AppColors.darkOnPrimary,
+        secondary: AppColors.darkSecondary,
+        onSecondary: AppColors.darkOnSecondary,
+        tertiary: AppColors.darkAccent,
+        error: AppColors.darkError,
+        onError: AppColors.darkOnError,
+        surface: AppColors.amoledSurface,
+        onSurface: AppColors.darkOnSurface,
+        outline: AppColors.amoledDivider,
+      ),
+      scaffoldBackgroundColor: AppColors.amoledBackground,
+      dividerColor: AppColors.amoledDivider,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.amoledBackground,
+        foregroundColor: AppColors.darkPrimaryText,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.amoledSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: const BorderSide(color: AppColors.amoledDivider, width: 1),
         ),
       ),
       textTheme: _buildTextTheme(

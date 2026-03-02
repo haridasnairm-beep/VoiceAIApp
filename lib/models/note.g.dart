@@ -39,13 +39,16 @@ class NoteAdapter extends TypeAdapter<Note> {
       imageAttachmentIds: (fields[19] as List?)?.cast<String>(),
       contentFormat: fields[20] as String?,
       transcriptionModel: fields[21] as String?,
+      isPinned: fields[22] == null ? false : fields[22] as bool,
+      pinnedAt: fields[23] as DateTime?,
+      isUserEditedTitle: fields[24] == null ? false : fields[24] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, Note obj) {
     writer
-      ..writeByte(22)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -89,7 +92,13 @@ class NoteAdapter extends TypeAdapter<Note> {
       ..writeByte(20)
       ..write(obj.contentFormat)
       ..writeByte(21)
-      ..write(obj.transcriptionModel);
+      ..write(obj.transcriptionModel)
+      ..writeByte(22)
+      ..write(obj.isPinned)
+      ..writeByte(23)
+      ..write(obj.pinnedAt)
+      ..writeByte(24)
+      ..write(obj.isUserEditedTitle);
   }
 
   @override

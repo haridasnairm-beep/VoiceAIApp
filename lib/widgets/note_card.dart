@@ -141,6 +141,11 @@ class NoteCard extends StatelessWidget {
                     color: theme.hintColor,
                   ),
                 ),
+                if (note.isPinned) ...[
+                  const Spacer(),
+                  Icon(Icons.push_pin_rounded,
+                      size: 14, color: theme.colorScheme.primary),
+                ],
               ],
             ),
 

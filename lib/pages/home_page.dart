@@ -11,6 +11,7 @@ import '../providers/tasks_provider.dart';
 import '../widgets/speed_dial_fab.dart';
 import '../widgets/tasks_tab.dart';
 import '../widgets/note_card.dart';
+import '../widgets/template_picker_sheet.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -287,109 +288,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                     // Notes List or Empty State
                     if (notes.isEmpty)
                       _buildEmptyState(context)
-                    else
-                      ...notes.map((note) {
-                        // Resolve folder names (reverse lookup)
-                        final noteFolderNames = folders
-                            .where((f) => f.noteIds.contains(note.id))
-                            .map((f) => f.name)
-                            .toList();
-
-                        // Resolve project names
-                        final noteProjectNames = note.projectDocumentIds
-                            .map((id) {
-                              try {
-                                return projects
-                                    .firstWhere((d) => d.id == id)
-                                    .title;
-                              } catch (_) {
-                                return null;
-                              }
-                            })
-                            .whereType<String>()
-                            .toList();
-
-                        final card = NoteCard(
-                          note: note,
-                          timestamp: _formatDate(note.createdAt),
-                          folderNames: noteFolderNames,
-                          projectNames: noteProjectNames,
-                          isSelected: _selectedNoteIds.contains(note.id),
-                          selectionMode: _selectionMode,
-                          onTap: _selectionMode
-                              ? () => _toggleSelection(note.id)
-                              : () => context.push(
-                                    AppRoutes.noteDetail,
-                                    extra: {'noteId': note.id},
-                                  ),
-                          onDelete: () =>
-                              _confirmAndDelete(context, ref, note),
-                          onLongPress: _selectionMode
-                              ? () => _toggleSelection(note.id)
-                              : () => _enterSelectionMode(note.id),
-                          onFolderTap: _selectionMode
-                              ? null
-                              : (_) => _showFolderChangePicker(
-                                  context, ref, note),
-                          onProjectTap: _selectionMode
-                              ? null
-                              : (_) => _showProjectChangePicker(
-                                  context, ref, note),
-                        );
-
-                        // Disable swipe in selection mode
-                        if (_selectionMode) return card;
-
-                        return Dismissible(
-                          key: ValueKey(note.id),
-                          background: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E88E5),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.md),
-                            ),
-                            alignment: Alignment.centerLeft,
-                            padding: const EdgeInsets.only(left: 24),
-                            child: const Icon(Icons.open_in_new_rounded,
-                                color: Colors.white, size: 24),
-                          ),
-                          secondaryBackground: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.md),
-                            ),
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 24),
-                            child: const Icon(Icons.delete_rounded,
-                                color: Colors.white, size: 24),
-                          ),
-                          confirmDismiss: (direction) async {
-                            if (direction ==
-                                DismissDirection.startToEnd) {
-                              context.push(
-                                AppRoutes.noteDetail,
-                                extra: {'noteId': note.id},
-                              );
-                              return false;
-                            } else {
-                              return await _confirmDelete(
-                                  context, note);
-                            }
-                          },
-                          onDismissed: (direction) {
-                            if (direction ==
-                                DismissDirection.endToStart) {
-                              ref
-                                  .read(notesProvider.notifier)
-                                  .deleteNote(note.id);
-                            }
-                          },
-                          child: card,
-                        );
-                      }),
+                    else ...[
+                      // Split into pinned and unpinned
+                      ..._buildPinnedSection(
+                        context, ref, notes, folders, projects),
+                    ],
                   ] else ...[
                     // Tasks tab
                     const TasksTab(),
@@ -452,19 +355,36 @@ class _HomePageState extends ConsumerState<HomePage> {
                                       context, ref, note);
                                 },
                               ),
+                              Builder(builder: (_) {
+                                final noteId = _selectedNoteIds.first;
+                                final note = notes.firstWhere(
+                                    (n) => n.id == noteId,
+                                    orElse: () => notes.first);
+                                return _ActionBarButton(
+                                  icon: note.isPinned
+                                      ? Icons.push_pin_outlined
+                                      : Icons.push_pin_rounded,
+                                  label: note.isPinned ? 'Unpin' : 'Pin',
+                                  onTap: () async {
+                                    final ok = await ref
+                                        .read(notesProvider.notifier)
+                                        .togglePin(noteId);
+                                    if (!ok && mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Max 10 pinned notes. Unpin one first.'),
+                                      ));
+                                    }
+                                    _exitSelectionMode();
+                                  },
+                                );
+                              }),
                               _ActionBarButton(
                                 icon: Icons.folder_rounded,
                                 label: 'Folder',
                                 onTap: () {
                                   _showBulkFolderPicker(
-                                      context, ref, notes);
-                                },
-                              ),
-                              _ActionBarButton(
-                                icon: Icons.article_rounded,
-                                label: 'Project',
-                                onTap: () {
-                                  _showBulkProjectPicker(
                                       context, ref, notes);
                                 },
                               ),
@@ -545,12 +465,25 @@ class _HomePageState extends ConsumerState<HomePage> {
                     SpeedDialItem(
                       icon: Icons.edit_note_rounded,
                       label: 'Text Note',
-                      onTap: () {
+                      onTap: () async {
                         setState(() => _selectedTab = 0);
-                        context.push(
-                          AppRoutes.noteDetail,
-                          extra: {'isNewTextNote': true},
+                        final template = await showModalBottomSheet<dynamic>(
+                          context: context,
+                          builder: (_) => const TemplatePickerSheet(),
                         );
+                        // null from "Blank Note", NoteTemplate from a template,
+                        // or nothing if sheet dismissed
+                        if (!mounted) return;
+                        if (template == false) return; // dismissed
+                        final extras = <String, dynamic>{
+                          'isNewTextNote': true,
+                        };
+                        if (template != null) {
+                          extras['templateContent'] = template.content;
+                          extras['templateTitle'] =
+                              '${template.name} — ${_formatDate(DateTime.now())}';
+                        }
+                        context.push(AppRoutes.noteDetail, extra: extras);
                       },
                     ),
                     SpeedDialItem(
@@ -614,6 +547,161 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   // --- Dialogs ---
+
+  List<Widget> _buildPinnedSection(
+    BuildContext context,
+    WidgetRef ref,
+    List<Note> notes,
+    List<dynamic> folders,
+    List<dynamic> projects,
+  ) {
+    final pinned = notes.where((n) => n.isPinned).toList()
+      ..sort((a, b) =>
+          (b.pinnedAt ?? DateTime.now()).compareTo(a.pinnedAt ?? DateTime.now()));
+    final unpinned = notes.where((n) => !n.isPinned).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    final widgets = <Widget>[];
+
+    // Pinned section header + items
+    if (pinned.isNotEmpty) {
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Icon(Icons.push_pin_rounded,
+                size: 16,
+                color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 6),
+            Text(
+              'Pinned (${pinned.length})',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+          ],
+        ),
+      ));
+      for (final note in pinned) {
+        widgets.add(_buildNoteItem(context, ref, note, folders, projects));
+      }
+      // Recent section header
+      if (unpinned.isNotEmpty) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 8),
+          child: Text(
+            'Recent',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).hintColor,
+                ),
+          ),
+        ));
+      }
+    }
+
+    // Unpinned notes
+    for (final note in unpinned) {
+      widgets.add(_buildNoteItem(context, ref, note, folders, projects));
+    }
+
+    return widgets;
+  }
+
+  Widget _buildNoteItem(
+    BuildContext context,
+    WidgetRef ref,
+    Note note,
+    List<dynamic> folders,
+    List<dynamic> projects,
+  ) {
+    final noteFolderNames = folders
+        .where((f) => f.noteIds.contains(note.id))
+        .map((f) => f.name as String)
+        .toList();
+
+    final noteProjectNames = note.projectDocumentIds
+        .map((id) {
+          try {
+            return projects.firstWhere((d) => d.id == id).title as String;
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<String>()
+        .toList();
+
+    final card = NoteCard(
+      note: note,
+      timestamp: _formatDate(note.createdAt),
+      folderNames: noteFolderNames,
+      projectNames: noteProjectNames,
+      isSelected: _selectedNoteIds.contains(note.id),
+      selectionMode: _selectionMode,
+      onTap: _selectionMode
+          ? () => _toggleSelection(note.id)
+          : () => context.push(
+                AppRoutes.noteDetail,
+                extra: {'noteId': note.id},
+              ),
+      onDelete: () => _confirmAndDelete(context, ref, note),
+      onLongPress: _selectionMode
+          ? () => _toggleSelection(note.id)
+          : () => _enterSelectionMode(note.id),
+      onFolderTap: _selectionMode
+          ? null
+          : (_) => _showFolderChangePicker(context, ref, note),
+      onProjectTap: _selectionMode
+          ? null
+          : (_) => _showProjectChangePicker(context, ref, note),
+    );
+
+    if (_selectionMode) return card;
+
+    return Dismissible(
+      key: ValueKey(note.id),
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E88E5),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 24),
+        child: const Icon(Icons.open_in_new_rounded,
+            color: Colors.white, size: 24),
+      ),
+      secondaryBackground: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        child: const Icon(Icons.delete_rounded,
+            color: Colors.white, size: 24),
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          context.push(
+            AppRoutes.noteDetail,
+            extra: {'noteId': note.id},
+          );
+          return false;
+        } else {
+          return await _confirmDelete(context, note);
+        }
+      },
+      onDismissed: (direction) {
+        if (direction == DismissDirection.endToStart) {
+          ref.read(notesProvider.notifier).deleteNote(note.id);
+        }
+      },
+      child: card,
+    );
+  }
 
   Future<bool> _confirmDelete(BuildContext context, Note note) async {
     final result = await showDialog<bool>(

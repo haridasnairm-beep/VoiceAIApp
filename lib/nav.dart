@@ -98,9 +98,15 @@ class AppRouter {
             if (f is String && f.isNotEmpty) folderId = f;
           }
           bool isNewTextNote = false;
+          String? templateContent;
+          String? templateTitle;
           if (extra is Map) {
             final txt = extra['isNewTextNote'];
             if (txt == true) isNewTextNote = true;
+            final tc = extra['templateContent'];
+            if (tc is String) templateContent = tc;
+            final tt = extra['templateTitle'];
+            if (tt is String) templateTitle = tt;
           }
           return NoTransitionPage(
               child: NoteDetailPage(
@@ -111,6 +117,8 @@ class AppRouter {
             detectedLanguage: detectedLanguage,
             folderId: folderId,
             isNewTextNote: isNewTextNote,
+            templateContent: templateContent,
+            templateTitle: templateTitle,
           ));
         },
       ),

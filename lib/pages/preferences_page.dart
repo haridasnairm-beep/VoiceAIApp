@@ -14,16 +14,20 @@ class PreferencesPage extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
 
     String themeModeDisplay;
-    switch (settings.themeMode) {
-      case ThemeMode.light:
-        themeModeDisplay = 'Light';
-        break;
-      case ThemeMode.dark:
-        themeModeDisplay = 'Dark';
-        break;
-      case ThemeMode.system:
-        themeModeDisplay = 'System';
-        break;
+    if (settings.isAmoled) {
+      themeModeDisplay = 'AMOLED Dark';
+    } else {
+      switch (settings.themeMode) {
+        case ThemeMode.light:
+          themeModeDisplay = 'Light';
+          break;
+        case ThemeMode.dark:
+          themeModeDisplay = 'Dark';
+          break;
+        case ThemeMode.system:
+          themeModeDisplay = 'System';
+          break;
+      }
     }
 
     return Scaffold(
@@ -245,7 +249,7 @@ class PreferencesPage extends ConsumerWidget {
                     type: SettingsType.value,
                     valueText: themeModeDisplay,
                     onTap: () async {
-                      final picked = await showDialog<ThemeMode>(
+                      final picked = await showDialog<String>(
                         context: context,
                         builder: (ctx) {
                           return SimpleDialog(
@@ -253,27 +257,37 @@ class PreferencesPage extends ConsumerWidget {
                             children: [
                               SimpleDialogOption(
                                 onPressed: () =>
-                                    Navigator.pop(ctx, ThemeMode.system),
+                                    Navigator.pop(ctx, 'system'),
                                 child: const Text('System'),
                               ),
                               SimpleDialogOption(
                                 onPressed: () =>
-                                    Navigator.pop(ctx, ThemeMode.light),
+                                    Navigator.pop(ctx, 'light'),
                                 child: const Text('Light'),
                               ),
                               SimpleDialogOption(
                                 onPressed: () =>
-                                    Navigator.pop(ctx, ThemeMode.dark),
+                                    Navigator.pop(ctx, 'dark'),
                                 child: const Text('Dark'),
+                              ),
+                              SimpleDialogOption(
+                                onPressed: () =>
+                                    Navigator.pop(ctx, 'amoled'),
+                                child: const Text('AMOLED Dark'),
                               ),
                             ],
                           );
                         },
                       );
                       if (picked != null) {
-                        ref
-                            .read(settingsProvider.notifier)
-                            .setThemeMode(picked);
+                        final notifier = ref.read(settingsProvider.notifier);
+                        if (picked == 'amoled') {
+                          notifier.setThemeMode(ThemeMode.dark, amoled: true);
+                        } else {
+                          notifier.setThemeMode(
+                            SettingsState.parseThemeMode(picked),
+                          );
+                        }
                       }
                     },
                   ),

@@ -74,6 +74,15 @@ class Note extends HiveObject {
   @HiveField(21)
   String? transcriptionModel; // Whisper model used: 'base', 'small', etc. null = unknown/pre-feature
 
+  @HiveField(22, defaultValue: false)
+  bool isPinned;
+
+  @HiveField(23)
+  DateTime? pinnedAt;
+
+  @HiveField(24, defaultValue: false)
+  bool isUserEditedTitle;
+
   Note({
     required this.id,
     required this.title,
@@ -97,6 +106,9 @@ class Note extends HiveObject {
     List<String>? imageAttachmentIds,
     this.contentFormat,
     this.transcriptionModel,
+    this.isPinned = false,
+    this.pinnedAt,
+    this.isUserEditedTitle = false,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         topics = topics ?? [],

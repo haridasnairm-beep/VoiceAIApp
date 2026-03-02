@@ -10,6 +10,7 @@ import '../services/notes_repository.dart';
 import '../services/notification_service.dart';
 import '../services/voice_command_processor.dart';
 import '../services/whisper_service.dart';
+import '../services/title_generator_service.dart';
 import '../utils/profanity_filter.dart';
 import 'folders_provider.dart';
 import 'project_documents_provider.dart';
@@ -109,6 +110,26 @@ class NotesNotifier extends Notifier<List<Note>> {
     return note;
   }
 
+  /// Toggle pin status. Returns false if max 10 pinned notes reached.
+  Future<bool> togglePin(String noteId) async {
+    final note = getNoteById(noteId);
+    if (note == null) return false;
+
+    if (!note.isPinned) {
+      // Check max 10 pinned
+      final pinnedCount = state.where((n) => n.isPinned).length;
+      if (pinnedCount >= 10) return false;
+      note.isPinned = true;
+      note.pinnedAt = DateTime.now();
+    } else {
+      note.isPinned = false;
+      note.pinnedAt = null;
+    }
+    note.updatedAt = DateTime.now();
+    await updateNote(note);
+    return true;
+  }
+
   /// Transcribe a WAV file in the background using Whisper and update the note.
   /// If voice commands are enabled, parses for folder/project keywords and
   /// auto-links the note (only when user didn't manually select from dropdown).
@@ -199,6 +220,20 @@ class NotesNotifier extends Notifier<List<Note>> {
       note.isProcessed = true;
       note.detectedLanguage = 'auto';
       note.transcriptionModel = WhisperService.instance.currentModelName;
+
+      // Auto-generate title from transcription if user hasn't manually edited it
+      if (!note.isUserEditedTitle && note.rawTranscription.isNotEmpty) {
+        final autoTitle = TitleGeneratorService.generate(
+          note.rawTranscription,
+          todos: note.todos.map((t) => t.text).toList(),
+          actions: note.actions.map((a) => a.text).toList(),
+          reminders: note.reminders.map((r) => r.text).toList(),
+        );
+        if (autoTitle != null) {
+          note.title = autoTitle;
+        }
+      }
+
       await updateNote(note);
     } catch (_) {
       final note = getNoteById(noteId);
@@ -250,6 +285,14 @@ class NotesNotifier extends Notifier<List<Note>> {
       note.transcriptionModel = WhisperService.instance.currentModelName;
       note.isProcessed = true;
       note.updatedAt = DateTime.now();
+
+      // Auto-generate title if user hasn't manually edited it
+      if (!note.isUserEditedTitle && note.rawTranscription.isNotEmpty) {
+        final autoTitle = TitleGeneratorService.generate(note.rawTranscription);
+        if (autoTitle != null) {
+          note.title = autoTitle;
+        }
+      }
 
       // Reset rich text format since re-transcription produces plain text
       if (note.contentFormat == 'quill_delta') {

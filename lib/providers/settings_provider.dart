@@ -29,6 +29,7 @@ class SettingsState {
   final String noteOutputMode; // 'english' or 'native'
   final bool keepScreenAwake; // Keep screen on during recording
   final bool blockOffensiveWords; // Filter offensive words from transcription
+  final bool isAmoled; // True when user selected AMOLED dark theme
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -50,6 +51,7 @@ class SettingsState {
     this.noteOutputMode = 'english',
     this.keepScreenAwake = true,
     this.blockOffensiveWords = false,
+    this.isAmoled = false,
   });
 
   SettingsState copyWith({
@@ -72,6 +74,7 @@ class SettingsState {
     String? noteOutputMode,
     bool? keepScreenAwake,
     bool? blockOffensiveWords,
+    bool? isAmoled,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -96,6 +99,7 @@ class SettingsState {
       noteOutputMode: noteOutputMode ?? this.noteOutputMode,
       keepScreenAwake: keepScreenAwake ?? this.keepScreenAwake,
       blockOffensiveWords: blockOffensiveWords ?? this.blockOffensiveWords,
+      isAmoled: isAmoled ?? this.isAmoled,
     );
   }
 
@@ -104,6 +108,7 @@ class SettingsState {
       case 'light':
         return ThemeMode.light;
       case 'dark':
+      case 'amoled':
         return ThemeMode.dark;
       default:
         return ThemeMode.system;
@@ -164,6 +169,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       noteOutputMode: settings.noteOutputMode,
       keepScreenAwake: settings.keepScreenAwake,
       blockOffensiveWords: settings.blockOffensiveWords,
+      isAmoled: settings.themeMode == 'amoled',
     );
   }
 
@@ -199,11 +205,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
     );
   }
 
-  Future<void> setThemeMode(ThemeMode mode) async {
-    await ref
-        .read(settingsRepositoryProvider)
-        .setThemeMode(SettingsState.themeModeToString(mode));
-    state = state.copyWith(themeMode: mode);
+  Future<void> setThemeMode(ThemeMode mode, {bool amoled = false}) async {
+    final modeString = amoled ? 'amoled' : SettingsState.themeModeToString(mode);
+    await ref.read(settingsRepositoryProvider).setThemeMode(modeString);
+    state = state.copyWith(themeMode: mode, isAmoled: amoled);
   }
 
   Future<void> setOnboardingCompleted(bool completed) async {

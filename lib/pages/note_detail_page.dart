@@ -37,6 +37,8 @@ class NoteDetailPage extends ConsumerStatefulWidget {
   final String? detectedLanguage;
   final String? folderId;
   final bool isNewTextNote;
+  final String? templateContent;
+  final String? templateTitle;
 
   const NoteDetailPage({
     super.key,
@@ -47,6 +49,8 @@ class NoteDetailPage extends ConsumerStatefulWidget {
     this.detectedLanguage,
     this.folderId,
     this.isNewTextNote = false,
+    this.templateContent,
+    this.templateTitle,
   });
 
   @override
@@ -97,22 +101,28 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
       _resolvedNoteId = widget.noteId;
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadAudioForNote());
     } else if (widget.isNewTextNote) {
-      // Create a new text-only note (no audio)
+      // Create a new text-only note (no audio), optionally from template
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final note = await ref.read(notesProvider.notifier).addNote(
               audioFilePath: '',
               audioDurationSeconds: 0,
-              rawTranscription: '',
+              rawTranscription: widget.templateContent ?? '',
               detectedLanguage: 'text',
+              title: widget.templateTitle,
             );
         if (mounted) {
+          final doc = Document();
+          if (widget.templateContent != null &&
+              widget.templateContent!.isNotEmpty) {
+            doc.insert(0, widget.templateContent!);
+          }
           setState(() {
             _resolvedNoteId = note.id;
             _isEditingTranscription = true;
-            _isEditingTitle = true;
+            _isEditingTitle = widget.templateContent == null;
             _titleController.text = note.title;
             _quillController = QuillController(
-              document: Document(),
+              document: doc,
               selection: const TextSelection.collapsed(offset: 0),
             );
           });
@@ -251,6 +261,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     final newTitle = _titleController.text.trim();
     if (newTitle.isNotEmpty && newTitle != note.title) {
       note.title = newTitle;
+      note.isUserEditedTitle = true;
       note.updatedAt = DateTime.now();
       ref.read(notesProvider.notifier).updateNote(note);
     }
@@ -481,6 +492,15 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _togglePin(Note note) async {
+    final ok = await ref.read(notesProvider.notifier).togglePin(note.id);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Max 10 pinned notes. Unpin one first.')),
+      );
+    }
   }
 
   Future<void> _retranscribeNote(Note note) async {
@@ -1222,8 +1242,24 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                     icon: const Icon(Icons.more_vert_rounded),
                     onSelected: (value) {
                       if (value == 'retranscribe') _retranscribeNote(note);
+                      if (value == 'pin') _togglePin(note);
                     },
                     itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'pin',
+                        child: Row(
+                          children: [
+                            Icon(
+                              note.isPinned
+                                  ? Icons.push_pin_outlined
+                                  : Icons.push_pin_rounded,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(note.isPinned ? 'Unpin' : 'Pin to Top'),
+                          ],
+                        ),
+                      ),
                       if (note.audioFilePath.isNotEmpty)
                         const PopupMenuItem(
                           value: 'retranscribe',
