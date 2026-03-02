@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 import 'services/app_lock_service.dart';
+import 'services/home_widget_service.dart';
 import 'services/hive_service.dart';
 import 'services/notification_service.dart';
 import 'services/folders_repository.dart';
@@ -29,6 +31,7 @@ void main() async {
   await HiveService.migrateDefaultTranscriptionMode();
   await HiveService.ensureDefaultFolder();
   await NotificationService.instance.initialize();
+  await HomeWidgetService.initialize();
   SharingService.cleanupTempExports(); // fire-and-forget
   // Auto-purge trash items older than 30 days
   NotesRepository().purgeExpiredTrash();
@@ -53,7 +56,13 @@ class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     // Show lock on cold start after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkColdStartLock());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkColdStartLock();
+      _checkWidgetLaunch();
+      _refreshWidget();
+    });
+    // Listen for widget taps while app is running
+    HomeWidget.widgetClicked.listen(_onWidgetClicked);
   }
 
   @override
@@ -76,6 +85,8 @@ class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
         AppLockService.instance.lock();
         _showLockScreen();
       }
+      // Keep widget data fresh whenever the app comes back to foreground
+      _refreshWidget();
     }
   }
 
@@ -86,6 +97,31 @@ class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
         AppLockService.instance.isLocked) {
       _showLockScreen();
     }
+  }
+
+  /// Handle URI from a widget tap that launched the app cold.
+  Future<void> _checkWidgetLaunch() async {
+    final uri = await HomeWidget.initiallyLaunchedFromHomeWidget();
+    _onWidgetClicked(uri);
+  }
+
+  /// Route a widget-click URI to the appropriate screen.
+  void _onWidgetClicked(Uri? uri) {
+    if (uri == null) return;
+    if (uri.toString() == 'voicenotesai://record') {
+      // Navigate straight to Recording — App Lock will gate reading notes
+      // once the user returns to the main app.
+      AppRouter.router.go(AppRoutes.recording);
+    }
+  }
+
+  /// Push fresh data to the home screen widget (fire-and-forget).
+  void _refreshWidget() {
+    final settings = ref.read(settingsProvider);
+    HomeWidgetService.updateWidgetData(
+      appLockEnabled: settings.appLockEnabled,
+      widgetPrivacyLevel: settings.widgetPrivacyLevel,
+    );
   }
 
   void _showLockScreen() {

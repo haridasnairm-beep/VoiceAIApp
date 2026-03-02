@@ -126,6 +126,17 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
               valueText: _timeoutLabel(settings.autoLockTimeoutSeconds),
               onTap: () => _showTimeoutPicker(settings.autoLockTimeoutSeconds),
             ),
+            const Divider(height: 1, indent: 56),
+            SettingsItem(
+              icon: Icons.widgets_rounded,
+              iconBg: const Color(0xFFE8EAF6),
+              iconColor: const Color(0xFF3949AB),
+              label: 'Widget Privacy',
+              type: SettingsType.value,
+              valueText: _privacyLabel(settings.widgetPrivacyLevel),
+              onTap: () =>
+                  _showWidgetPrivacyPicker(settings.widgetPrivacyLevel),
+            ),
           ],
           const SizedBox(height: 24),
           // Info text
@@ -133,7 +144,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               settings.appLockEnabled
-                  ? 'Your notes are protected. The app will lock after the timeout period.'
+                  ? 'Your notes are protected. Widget Privacy controls what the home screen widget shows while locked.'
                   : 'Enable App Lock to protect your notes with a PIN or biometric authentication.',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.hintColor),
@@ -191,6 +202,62 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
                 ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  String _privacyLabel(String level) {
+    switch (level) {
+      case 'full':
+        return 'Full';
+      case 'minimal':
+        return 'Minimal';
+      default:
+        return 'Record-Only';
+    }
+  }
+
+  void _showWidgetPrivacyPicker(String current) {
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Widget Privacy'),
+        children: [
+          for (final entry in {
+            'full': 'Full — counts + note preview',
+            'record_only': 'Record-Only — counts only (default)',
+            'minimal': 'Minimal — icon + record button only',
+          }.entries)
+            SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                ref
+                    .read(settingsProvider.notifier)
+                    .setWidgetPrivacyLevel(entry.key);
+              },
+              child: Row(
+                children: [
+                  if (entry.key == current)
+                    Icon(Icons.check_rounded,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary)
+                  else
+                    const SizedBox(width: 18),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(entry.value)),
+                ],
+              ),
+            ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Text(
+              'Controls what the Dashboard widget shows when App Lock is enabled.',
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Theme.of(context).hintColor),
+            ),
+          ),
         ],
       ),
     );
