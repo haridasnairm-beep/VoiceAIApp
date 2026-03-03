@@ -10,6 +10,7 @@ import '../providers/folders_provider.dart';
 import '../providers/project_documents_provider.dart';
 import '../models/note.dart';
 import '../widgets/settings_widgets.dart' show friendlyLanguageName;
+import '../widgets/empty_state_illustrated.dart';
 
 class SearchPage extends ConsumerStatefulWidget {
   /// Optional pre-selected folder ID for contextual search.
@@ -324,25 +325,14 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
     if (results.isEmpty) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(48.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.search_off_rounded,
-                  color: Theme.of(context).hintColor, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                _query.isNotEmpty
-                    ? "No results found for '$_query'"
-                    : "No notes in this filter",
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).hintColor,
-                    ),
-              ),
-            ],
-          ),
+        child: EmptyStateIllustrated(
+          icon: Icons.search_off_rounded,
+          title: _query.isNotEmpty
+              ? "No results for '$_query'"
+              : 'No notes in this filter',
+          subtitle:
+              'Try different keywords or search across\nnotes, tasks, and reminders',
+          iconColor: Theme.of(context).colorScheme.secondary,
         ),
       );
     }

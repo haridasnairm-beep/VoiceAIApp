@@ -12,6 +12,8 @@ import '../widgets/speed_dial_fab.dart';
 import '../widgets/tasks_tab.dart';
 import '../widgets/note_card.dart';
 import '../widgets/template_picker_sheet.dart';
+import '../widgets/empty_state_illustrated.dart';
+import '../providers/settings_provider.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -56,7 +58,22 @@ class _HomePageState extends ConsumerState<HomePage> {
     final folders = ref.watch(foldersProvider);
     final projects = ref.watch(projectDocumentsProvider);
     final allTasks = ref.watch(tasksProvider);
+    final settings = ref.watch(settingsProvider);
     final openTaskCount = allTasks.where((t) => !t.isCompleted).length;
+
+    // Progressive disclosure: show stats cards once user has 5+ notes and 2+ folders
+    final showStats = notes.length >= 5 && folders.length >= 2;
+
+    // Guided first-recording banner: show when not completed and no notes yet
+    final showGuidedBanner =
+        !settings.guidedRecordingCompleted && notes.isEmpty;
+
+    // Auto-dismiss guided banner once the user has recorded their first note
+    if (settings.guidedRecordingCompleted == false && notes.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(settingsProvider.notifier).setGuidedRecordingCompleted(true);
+      });
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -223,8 +240,8 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Statistics cards (always visible)
-                  Row(
+                  // Statistics cards — progressive disclosure (5+ notes, 2+ folders)
+                  if (showStats) Row(
                     children: [
                       Expanded(
                         child: _CategoryCard(
@@ -274,7 +291,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  if (showStats) const SizedBox(height: 16),
 
                   // Notes / Tasks tab bar (below stats)
                   SegmentedButton<int>(
@@ -315,10 +332,14 @@ class _HomePageState extends ConsumerState<HomePage> {
 
                   // Tab content
                   if (_selectedTab == 0) ...[
+                    // Guided first-recording banner
+                    if (showGuidedBanner)
+                      _buildGuidedBanner(context, ref),
+
                     // Notes List or Empty State
-                    if (notes.isEmpty)
+                    if (notes.isEmpty && !showGuidedBanner)
                       _buildEmptyState(context)
-                    else ...[
+                    else if (notes.isNotEmpty) ...[
                       // Split into pinned and unpinned
                       ..._buildPinnedSection(
                         context, ref, notes, folders, projects),
@@ -535,43 +556,75 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.mic_rounded,
-                size: 40,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "No notes yet",
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
+    return EmptyStateIllustrated(
+      icon: Icons.mic_none_rounded,
+      title: 'No notes yet',
+      subtitle: 'Tap the mic button to capture\nyour first voice note',
+      ctaLabel: 'Record a Note',
+      onCta: () => context.push(AppRoutes.recording),
+    );
+  }
+
+  Widget _buildGuidedBanner(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: theme.colorScheme.primary.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.mic_none_rounded,
+              color: theme.colorScheme.primary, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ready to capture your first thought?',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
                   ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "Tap the record button to create\nyour first voice note",
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap the mic button below and start speaking.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.secondary,
+                    height: 1.4,
                   ),
+                ),
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () => context.push(AppRoutes.recording),
+                  child: Text(
+                    'Start recording →',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          IconButton(
+            icon: Icon(Icons.close_rounded,
+                size: 18, color: theme.colorScheme.secondary),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () => ref
+                .read(settingsProvider.notifier)
+                .setGuidedRecordingCompleted(true),
+          ),
+        ],
       ),
     );
   }

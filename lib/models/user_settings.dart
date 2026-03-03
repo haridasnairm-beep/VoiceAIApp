@@ -79,6 +79,12 @@ class UserSettings extends HiveObject {
   @HiveField(24)
   DateTime? lastBackupDate; // When the user last created a successful backup
 
+  @HiveField(25, defaultValue: true)
+  bool soundCuesEnabled; // Play subtle beep on recording start/stop
+
+  @HiveField(26, defaultValue: false)
+  bool guidedRecordingCompleted; // True once first-recording coaching is dismissed or completed
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -105,6 +111,8 @@ class UserSettings extends HiveObject {
     this.autoLockTimeoutSeconds = 0,
     this.widgetPrivacyLevel = 'record_only',
     this.lastBackupDate,
+    this.soundCuesEnabled = true,
+    this.guidedRecordingCompleted = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -133,6 +141,8 @@ class UserSettings extends HiveObject {
         'autoLockTimeoutSeconds': autoLockTimeoutSeconds,
         'widgetPrivacyLevel': widgetPrivacyLevel,
         'lastBackupDate': lastBackupDate?.toIso8601String(),
+        'soundCuesEnabled': soundCuesEnabled,
+        'guidedRecordingCompleted': guidedRecordingCompleted,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -163,5 +173,7 @@ class UserSettings extends HiveObject {
         lastBackupDate: m['lastBackupDate'] != null
             ? DateTime.parse(m['lastBackupDate'] as String)
             : null,
+        soundCuesEnabled: m['soundCuesEnabled'] as bool? ?? true,
+        guidedRecordingCompleted: m['guidedRecordingCompleted'] as bool? ?? false,
       );
 }

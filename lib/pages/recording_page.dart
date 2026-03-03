@@ -16,6 +16,8 @@ import 'package:voicenotes_ai/providers/notes_provider.dart';
 import 'package:voicenotes_ai/providers/folders_provider.dart';
 import 'package:voicenotes_ai/providers/project_documents_provider.dart';
 import 'package:voicenotes_ai/utils/profanity_filter.dart';
+import '../services/haptic_service.dart';
+import '../services/sound_service.dart';
 
 class RecordingPage extends ConsumerStatefulWidget {
   final String? folderId;
@@ -26,7 +28,8 @@ class RecordingPage extends ConsumerStatefulWidget {
   ConsumerState<RecordingPage> createState() => _RecordingPageState();
 }
 
-class _RecordingPageState extends ConsumerState<RecordingPage> {
+class _RecordingPageState extends ConsumerState<RecordingPage>
+    with SingleTickerProviderStateMixin {
   final AudioRecorderService _recorder = AudioRecorderService.instance;
   final TranscriptionService _transcription = TranscriptionService.instance;
   final WhisperService _whisper = WhisperService.instance;
@@ -51,6 +54,11 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   String? _selectedFolderId;
   String? _selectedProjectId;
 
+  // UI feedback state
+  bool _isSaving = false;
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+
   @override
   void initState() {
     super.initState();
@@ -59,12 +67,23 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
     // Ensure WhisperService uses the user's selected model
     final selectedModel = ref.read(settingsProvider).whisperModel;
     WhisperService.instance.switchModel(selectedModel);
+
+    // Pulse animation for the recording indicator dot
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
     _startRecording();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _pulseController.dispose();
     _scrollController.dispose();
     WakelockPlus.disable(); // Safety net — always release wakelock
     if (!_useWhisperMode) {
@@ -214,6 +233,12 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       });
       _startTimer();
 
+      // Haptic + sound cue: recording started
+      HapticService.medium();
+      if (ref.read(settingsProvider).soundCuesEnabled) {
+        SoundService.instance.playStart();
+      }
+
       // Pre-load Whisper model in background
       _whisper.ensureModelReady();
     } else {
@@ -248,6 +273,12 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
           _isStarting = false;
         });
         _startTimer();
+
+        // Haptic + sound cue: live recording started
+        HapticService.medium();
+        if (ref.read(settingsProvider).soundCuesEnabled) {
+          SoundService.instance.playStart();
+        }
       } else {
         // Fallback: STT unavailable, use audio recorder only
         final path = await _recorder.start();
@@ -321,6 +352,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
         _timer?.cancel();
       }
       if (!mounted) return;
+      HapticService.light();
       setState(() => _isPaused = !_isPaused);
     } catch (e) {
       debugPrint('Pause/resume failed: $e');
@@ -330,6 +362,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   Future<void> _discard() async {
     _timer?.cancel();
     WakelockPlus.disable();
+    HapticService.heavy();
     if (_useWhisperMode) {
       await _recorder.cancelAndDelete();
     } else if (_speechAvailable) {
@@ -346,9 +379,14 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   }
 
   Future<void> _saveAndProcess() async {
-    if (_isStarting) return;
+    if (_isStarting || _isSaving) return;
     _timer?.cancel();
     WakelockPlus.disable();
+    HapticService.medium();
+    if (ref.read(settingsProvider).soundCuesEnabled) {
+      SoundService.instance.playStop();
+    }
+    setState(() => _isSaving = true);
 
     if (_useWhisperMode) {
       // Whisper mode: save note immediately, transcribe in background
@@ -591,14 +629,21 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: _isPaused
-                                    ? Theme.of(context).colorScheme.secondary
-                                    : AppColors.lightSuccess,
-                                shape: BoxShape.circle,
+                            AnimatedBuilder(
+                              animation: _pulseAnimation,
+                              builder: (context, child) => Transform.scale(
+                                scale: _isPaused ? 1.0 : _pulseAnimation.value,
+                                child: child,
+                              ),
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: _isPaused
+                                      ? Theme.of(context).colorScheme.secondary
+                                      : AppColors.lightSuccess,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -767,6 +812,33 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
               ),
               ),
 
+              // Saving overlay
+              if (_isSaving)
+                Positioned.fill(
+                  child: Container(
+                    color: Theme.of(context)
+                        .scaffoldBackgroundColor
+                        .withValues(alpha: 0.75),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Saving…',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

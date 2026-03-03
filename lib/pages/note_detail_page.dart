@@ -28,6 +28,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/image_attachment_repository.dart';
 import 'image_viewer_page.dart';
 import '../widgets/share_preview_sheet.dart';
+import '../services/haptic_service.dart';
 
 class NoteDetailPage extends ConsumerStatefulWidget {
   final String? recordingPath;
@@ -613,12 +614,13 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           ),
           ...note.actions.map(
             (action) => GestureDetector(
-              onTap: () => ref
-                  .read(notesProvider.notifier)
-                  .toggleActionCompleted(
+              onTap: () {
+                HapticService.selection();
+                ref.read(notesProvider.notifier).toggleActionCompleted(
                     noteId: note.id,
                     actionId: action.id,
-                  ),
+                  );
+              },
               child: _TaskItem(
                 content: action.text,
                 checked: action.isCompleted,
@@ -659,12 +661,13 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           ),
           ...note.todos.map(
             (todo) => GestureDetector(
-              onTap: () => ref
-                  .read(notesProvider.notifier)
-                  .toggleTodoCompleted(
-                    noteId: note.id,
-                    todoId: todo.id,
-                  ),
+              onTap: () {
+                HapticService.selection();
+                ref.read(notesProvider.notifier).toggleTodoCompleted(
+                      noteId: note.id,
+                      todoId: todo.id,
+                    );
+              },
               child: _TaskItem(
                 content: todo.text,
                 checked: todo.isCompleted,
@@ -713,12 +716,13 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           ),
           ...note.reminders.map(
             (reminder) => GestureDetector(
-              onTap: () => ref
-                  .read(notesProvider.notifier)
-                  .toggleReminderCompleted(
-                    noteId: note.id,
-                    reminderId: reminder.id,
-                  ),
+              onTap: () {
+                HapticService.selection();
+                ref.read(notesProvider.notifier).toggleReminderCompleted(
+                      noteId: note.id,
+                      reminderId: reminder.id,
+                    );
+              },
               child: _TaskItem(
                 content: reminder.text,
                 checked: reminder.isCompleted,

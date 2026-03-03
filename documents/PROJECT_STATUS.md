@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-03-03
 **Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Wave 1 (Step 11) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Wave 1 (Step 11) + Wave 2 (Step 12) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -14,7 +14,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 **Phase 1 = No AI.** All AI-related UI elements have been removed or replaced. See the AI exclusion table in CLAUDE.md.
 
-**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Wave 1 (Step 11 — UX Launch Blockers) is complete. Next: Phase 1.5 Wave 2 (Step 12 — Core Feel). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Wave 1 (Step 11) and Wave 2 (Step 12 — Core Feel) are complete. Next: Phase 1.5 Wave 3 (Step 13 — Structural Redesign). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 ---
 
@@ -188,6 +188,15 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Widget Privacy setting (Security page): Full / Record-Only (default) / Minimal — controls what data is shown when App Lock is enabled
 - `HomeWidgetService` pushes data to widgets on foreground resume
 - Android `VoiceNotesWidgetSmall.kt` + `VoiceNotesWidgetDashboard.kt` (AppWidgetProvider)
+
+### Step 12 (Wave 2): Core Feel ✅
+- `HapticService` — static utility wrapping `HapticFeedback` (light/medium/heavy/selection); wired to recording start/stop/pause/discard and all task checkbox toggles
+- `SoundService` — programmatic WAV generator (no binary assets); plays 523 Hz start cue and 392 Hz stop cue via `just_audio`; guarded by `soundCuesEnabled` preference (HiveField 25)
+- Recording pulse animation — dot pulses with 0.6→1.0 scale loop; "Saving…" overlay prevents duplicate saves
+- `EmptyStateIllustrated` widget — reusable illustrated empty state (icon circle, title, subtitle, optional CTA); replaces all 4 empty states: Home notes tab, Tasks tab, Library, Search
+- Progressive disclosure — stats cards hidden until user has ≥5 notes and ≥2 folders
+- Guided first recording banner — coaching card on Home for new users; auto-dismisses on first note; persisted via `guidedRecordingCompleted` flag (HiveField 26)
+- Task completion micro-interactions — `TaskListItem` scale-bounce animation + 450ms green highlight on completion; haptic on every checkbox tap
 
 ### Step 11 (Wave 1): UX Launch Blockers ✅
 - AI expectation section added to About page (on-device Whisper explanation + AI features coming soon)

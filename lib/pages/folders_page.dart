@@ -7,6 +7,7 @@ import '../models/project_block.dart';
 import '../providers/folders_provider.dart';
 import '../providers/project_documents_provider.dart';
 import '../widgets/speed_dial_fab.dart';
+import '../widgets/empty_state_illustrated.dart';
 
 class FoldersPage extends ConsumerStatefulWidget {
   const FoldersPage({super.key});
@@ -103,40 +104,8 @@ class _FoldersPageState extends ConsumerState<FoldersPage> {
         child: Stack(
           children: [
             !hasContent
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.folder_rounded,
-                          size: 64,
-                          color: Theme.of(context).hintColor,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No folders or projects yet',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color:
-                                    Theme.of(context).colorScheme.onSurface,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tap + to create your first folder or project',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(
-                                color:
-                                    Theme.of(context).colorScheme.secondary,
-                              ),
-                        ),
-                      ],
-                    ),
+                ? _EmptyLibraryState(
+                    onCreateFolder: () => _showNewFolderDialog(context),
                   )
                 : SingleChildScrollView(
                     padding: const EdgeInsets.all(20.0),
@@ -826,6 +795,24 @@ class _ProjectCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _EmptyLibraryState extends StatelessWidget {
+  final VoidCallback onCreateFolder;
+
+  const _EmptyLibraryState({required this.onCreateFolder});
+
+  @override
+  Widget build(BuildContext context) {
+    return EmptyStateIllustrated(
+      icon: Icons.folder_open_rounded,
+      title: 'No folders yet',
+      subtitle: 'Create folders to organize your notes\nand keep ideas grouped together',
+      ctaLabel: 'Create a Folder',
+      onCta: onCreateFolder,
+      iconColor: Theme.of(context).colorScheme.secondary,
     );
   }
 }

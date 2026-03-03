@@ -43,13 +43,15 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       widgetPrivacyLevel:
           fields[23] == null ? 'record_only' : fields[23] as String,
       lastBackupDate: fields[24] as DateTime?,
+      soundCuesEnabled: fields[25] == null ? true : fields[25] as bool,
+      guidedRecordingCompleted: fields[26] == null ? false : fields[26] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(27)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -99,7 +101,11 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(23)
       ..write(obj.widgetPrivacyLevel)
       ..writeByte(24)
-      ..write(obj.lastBackupDate);
+      ..write(obj.lastBackupDate)
+      ..writeByte(25)
+      ..write(obj.soundCuesEnabled)
+      ..writeByte(26)
+      ..write(obj.guidedRecordingCompleted);
   }
 
   @override

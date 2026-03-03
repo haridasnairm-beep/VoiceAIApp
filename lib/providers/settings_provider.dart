@@ -36,6 +36,8 @@ class SettingsState {
   final int autoLockTimeoutSeconds;
   final String widgetPrivacyLevel; // 'full', 'record_only', 'minimal'
   final DateTime? lastBackupDate;
+  final bool soundCuesEnabled; // Play subtle beep on recording start/stop
+  final bool guidedRecordingCompleted; // First-recording coaching done
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -64,6 +66,8 @@ class SettingsState {
     this.autoLockTimeoutSeconds = 0,
     this.widgetPrivacyLevel = 'record_only',
     this.lastBackupDate,
+    this.soundCuesEnabled = true,
+    this.guidedRecordingCompleted = false,
   });
 
   SettingsState copyWith({
@@ -93,6 +97,8 @@ class SettingsState {
     int? autoLockTimeoutSeconds,
     String? widgetPrivacyLevel,
     DateTime? Function()? lastBackupDate,
+    bool? soundCuesEnabled,
+    bool? guidedRecordingCompleted,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -124,6 +130,8 @@ class SettingsState {
       autoLockTimeoutSeconds: autoLockTimeoutSeconds ?? this.autoLockTimeoutSeconds,
       widgetPrivacyLevel: widgetPrivacyLevel ?? this.widgetPrivacyLevel,
       lastBackupDate: lastBackupDate != null ? lastBackupDate() : this.lastBackupDate,
+      soundCuesEnabled: soundCuesEnabled ?? this.soundCuesEnabled,
+      guidedRecordingCompleted: guidedRecordingCompleted ?? this.guidedRecordingCompleted,
     );
   }
 
@@ -200,6 +208,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
       autoLockTimeoutSeconds: settings.autoLockTimeoutSeconds,
       widgetPrivacyLevel: settings.widgetPrivacyLevel,
       lastBackupDate: settings.lastBackupDate,
+      soundCuesEnabled: settings.soundCuesEnabled,
+      guidedRecordingCompleted: settings.guidedRecordingCompleted,
     );
   }
 
@@ -336,6 +346,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setLastBackupDate(DateTime? date) async {
     await ref.read(settingsRepositoryProvider).setLastBackupDate(date);
     state = state.copyWith(lastBackupDate: () => date);
+  }
+
+  Future<void> setSoundCuesEnabled(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setSoundCuesEnabled(enabled);
+    state = state.copyWith(soundCuesEnabled: enabled);
+  }
+
+  Future<void> setGuidedRecordingCompleted(bool completed) async {
+    await ref.read(settingsRepositoryProvider).setGuidedRecordingCompleted(completed);
+    state = state.copyWith(guidedRecordingCompleted: completed);
   }
 }
 

@@ -159,4 +159,16 @@ class SettingsRepository {
     settings.lastBackupDate = date;
     await saveSettings(settings);
   }
+
+  Future<void> setSoundCuesEnabled(bool enabled) async {
+    final settings = getSettings();
+    settings.soundCuesEnabled = enabled;
+    await saveSettings(settings);
+  }
+
+  Future<void> setGuidedRecordingCompleted(bool completed) async {
+    final settings = getSettings();
+    settings.guidedRecordingCompleted = completed;
+    await saveSettings(settings);
+  }
 }

@@ -1021,6 +1021,22 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
                           .setKeepScreenAwake(value);
                     },
                   ),
+                  const Divider(height: 1, indent: 56),
+                  SettingsItem(
+                    icon: Icons.music_note_rounded,
+                    iconBg: const Color(0xFFF3E5F5),
+                    iconColor: const Color(0xFF7B1FA2),
+                    label: "Recording Sound Cues",
+                    sublabel: 'Subtle beep when recording starts and stops',
+                    type: SettingsType.toggle,
+                    switchValue: settings.soundCuesEnabled,
+                    hasSublabel: true,
+                    onChanged: (value) {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setSoundCuesEnabled(value);
+                    },
+                  ),
                 ],
               ),
             ],

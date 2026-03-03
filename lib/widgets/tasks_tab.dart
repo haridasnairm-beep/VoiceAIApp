@@ -5,6 +5,7 @@ import '../models/task_item.dart';
 import '../nav.dart';
 import '../providers/notes_provider.dart';
 import '../providers/tasks_provider.dart';
+import 'empty_state_illustrated.dart';
 import 'task_list_item.dart';
 
 /// Tasks tab content widget for the Home page.
@@ -152,32 +153,16 @@ class _TasksTabState extends ConsumerState<TasksTab> {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(Icons.task_alt_rounded,
-                size: 48, color: Theme.of(context).hintColor),
-            const SizedBox(height: 12),
-            Text(
-              _filterType != null
-                  ? 'No ${_filterType == TaskType.todo ? 'todos' : _filterType == TaskType.action ? 'actions' : 'reminders'} found'
-                  : 'No tasks yet',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Tasks from your notes will appear here',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).hintColor,
-                  ),
-            ),
-          ],
-        ),
-      ),
+    final label = _filterType == null
+        ? 'No tasks yet'
+        : 'No ${_filterType == TaskType.todo ? 'todos' : _filterType == TaskType.action ? 'actions' : 'reminders'} found';
+    return EmptyStateIllustrated(
+      icon: Icons.task_alt_rounded,
+      title: label,
+      subtitle: 'Tasks you create in your notes\nwill appear here',
+      ctaLabel: 'Open Voice Commands Help',
+      onCta: () => context.push(AppRoutes.support),
+      iconColor: Theme.of(context).colorScheme.secondary,
     );
   }
 

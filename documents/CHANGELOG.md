@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-03 - Step 12 (Wave 2): Core Feel
+
+### Added
+- **`HapticService`** (`lib/services/haptic_service.dart`) — static utility wrapping Flutter's `HapticFeedback` with `light()`, `medium()`, `heavy()`, `selection()` methods; used across recording, task toggles, and discard actions
+- **`SoundService`** (`lib/services/sound_service.dart`) — singleton that generates WAV audio programmatically (pure Dart, no binary assets); 523 Hz / 80ms start cue and 392 Hz / 100ms stop cue; plays via `just_audio`; respects `soundCuesEnabled` setting
+- **Recording sound cues** — subtle start/stop beep fires when Whisper or Live recording begins/ends (guarded by `soundCuesEnabled` preference)
+- **Recording pulse animation** — the recording dot pulses with a 0.6→1.0 scale loop using `AnimationController` (900ms, repeat + reverse) for clear visual feedback that recording is active
+- **Saving overlay** — when `_isSaving` is true after save, a semi-transparent `Positioned.fill` overlay with `CircularProgressIndicator` + "Saving…" text prevents duplicate saves
+- **`EmptyStateIllustrated` widget** (`lib/widgets/empty_state_illustrated.dart`) — reusable illustrated empty state with large icon in a colored circle, title, subtitle, and optional `FilledButton.tonal` CTA
+- **Improved empty states** — all four empty state screens updated to use `EmptyStateIllustrated`: Home notes tab (mic CTA → recording), Tasks tab (CTA → Voice Commands Help), Library/Folders page (CTA → Create Folder), Search page (contextual "no results" messaging)
+- **Progressive disclosure** — stats cards on Home screen hidden until `notes.length >= 5 && folders.length >= 2` to reduce clutter for new users
+- **Guided first recording banner** — coaching banner on Home notes tab for users with zero notes (not yet dismissed); shows mic icon + "Tap the mic and say what's on your mind" + "Start recording →" link + dismiss X button; auto-dismisses when first note is created; persisted via `guidedRecordingCompleted` flag in `UserSettings`
+- **Task completion micro-interactions** — `TaskListItem` upgraded to `StatefulWidget`; on completion (false→true) plays a scale-bounce animation (1.0→1.08→1.0, 280ms) and a 450ms green highlight fade; `HapticService.selection()` fires on every checkbox tap
+- **Haptic feedback on checkboxes** — `HapticService.selection()` added to action/todo/reminder toggle `onTap` handlers in `NoteDetailPage`
+- **Haptic feedback on recording** — `HapticService.medium()` on record start/save, `HapticService.light()` on pause/resume, `HapticService.heavy()` on discard
+
+### Changed
+- `UserSettings` — added HiveField 25 `soundCuesEnabled: bool` (default: true) and HiveField 26 `guidedRecordingCompleted: bool` (default: false); adapters regenerated
+- `SettingsRepository` + `SettingsNotifier` / `SettingsState` — wired `soundCuesEnabled` and `guidedRecordingCompleted` through the full settings layer
+- `AudioSettingsPage` — added "Recording Sound Cues" toggle item (purple, `music_note_rounded` icon)
+
+---
+
 ## [Unreleased] - 2026-03-03 - Step 11 (Wave 1): UX Launch Blockers
 
 ### Added
