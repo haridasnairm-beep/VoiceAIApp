@@ -38,6 +38,7 @@ class SettingsState {
   final DateTime? lastBackupDate;
   final bool soundCuesEnabled; // Play subtle beep on recording start/stop
   final bool guidedRecordingCompleted; // First-recording coaching done
+  final bool crashReportingEnabled; // Opt-in anonymous crash reporting
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -68,6 +69,7 @@ class SettingsState {
     this.lastBackupDate,
     this.soundCuesEnabled = true,
     this.guidedRecordingCompleted = false,
+    this.crashReportingEnabled = false,
   });
 
   SettingsState copyWith({
@@ -99,6 +101,7 @@ class SettingsState {
     DateTime? Function()? lastBackupDate,
     bool? soundCuesEnabled,
     bool? guidedRecordingCompleted,
+    bool? crashReportingEnabled,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -132,6 +135,7 @@ class SettingsState {
       lastBackupDate: lastBackupDate != null ? lastBackupDate() : this.lastBackupDate,
       soundCuesEnabled: soundCuesEnabled ?? this.soundCuesEnabled,
       guidedRecordingCompleted: guidedRecordingCompleted ?? this.guidedRecordingCompleted,
+      crashReportingEnabled: crashReportingEnabled ?? this.crashReportingEnabled,
     );
   }
 
@@ -210,6 +214,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       lastBackupDate: settings.lastBackupDate,
       soundCuesEnabled: settings.soundCuesEnabled,
       guidedRecordingCompleted: settings.guidedRecordingCompleted,
+      crashReportingEnabled: settings.crashReportingEnabled,
     );
   }
 
@@ -356,6 +361,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setGuidedRecordingCompleted(bool completed) async {
     await ref.read(settingsRepositoryProvider).setGuidedRecordingCompleted(completed);
     state = state.copyWith(guidedRecordingCompleted: completed);
+  }
+
+  Future<void> setCrashReportingEnabled(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setCrashReportingEnabled(enabled);
+    state = state.copyWith(crashReportingEnabled: enabled);
   }
 }
 

@@ -341,6 +341,22 @@ class PreferencesPage extends ConsumerWidget {
                       },
                     );
                   }),
+                  const Divider(height: 1, indent: 56),
+                  SettingsItem(
+                    icon: Icons.bug_report_outlined,
+                    iconBg: const Color(0xFFEDE7F6),
+                    iconColor: const Color(0xFF5E35B1),
+                    label: "Anonymous Crash Reports",
+                    sublabel: "Help improve the app (no personal data)",
+                    type: SettingsType.toggle,
+                    switchValue: settings.crashReportingEnabled,
+                    hasSublabel: true,
+                    onChanged: (val) {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setCrashReportingEnabled(val);
+                    },
+                  ),
                 ],
               ),
             ],

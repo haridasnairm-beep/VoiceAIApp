@@ -171,4 +171,10 @@ class SettingsRepository {
     settings.guidedRecordingCompleted = completed;
     await saveSettings(settings);
   }
+
+  Future<void> setCrashReportingEnabled(bool enabled) async {
+    final settings = getSettings();
+    settings.crashReportingEnabled = enabled;
+    await saveSettings(settings);
+  }
 }

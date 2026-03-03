@@ -10,6 +10,7 @@ import 'services/folders_repository.dart';
 import 'services/notes_repository.dart';
 import 'services/project_documents_repository.dart';
 import 'services/sharing_service.dart';
+import 'services/crash_reporting_service.dart';
 import 'pages/lock_screen_page.dart';
 import 'theme.dart';
 import 'nav.dart';
@@ -31,9 +32,16 @@ void main() async {
   await HiveService.migrateDefaultTranscriptionMode();
   await HiveService.ensureDefaultFolder();
   await HiveService.migrateProjectsIntoFolders();
+  await HiveService.validateIntegrity();
   await NotificationService.instance.initialize();
   await HomeWidgetService.initialize();
   SharingService.cleanupTempExports(); // fire-and-forget
+  // Initialize crash reporting if user opted in
+  final settings = HiveService.settingsBox.get('user_settings');
+  if (settings?.crashReportingEnabled == true) {
+    await CrashReportingService.instance.initialize();
+    CrashReportingService.setupFlutterErrorHandler();
+  }
   // Auto-purge trash items older than 30 days
   NotesRepository().purgeExpiredTrash();
   FoldersRepository().purgeExpiredTrash();

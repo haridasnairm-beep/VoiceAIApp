@@ -45,13 +45,14 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       lastBackupDate: fields[24] as DateTime?,
       soundCuesEnabled: fields[25] == null ? true : fields[25] as bool,
       guidedRecordingCompleted: fields[26] == null ? false : fields[26] as bool,
+      crashReportingEnabled: fields[27] == null ? false : fields[27] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(27)
+      ..writeByte(28)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -105,7 +106,9 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(25)
       ..write(obj.soundCuesEnabled)
       ..writeByte(26)
-      ..write(obj.guidedRecordingCompleted);
+      ..write(obj.guidedRecordingCompleted)
+      ..writeByte(27)
+      ..write(obj.crashReportingEnabled);
   }
 
   @override

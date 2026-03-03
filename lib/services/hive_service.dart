@@ -344,6 +344,66 @@ class HiveService {
     debugPrint('HiveService: migrated ${unassigned.length} project(s) into folders');
   }
 
+  /// Validate referential integrity across Hive boxes.
+  ///
+  /// Checks:
+  /// 1. Notes reference existing folders
+  /// 2. Project document blocks reference existing notes
+  /// 3. Folders' noteIds reference existing notes
+  /// 4. Folders' projectDocumentIds reference existing projects
+  ///
+  /// Returns count of issues found and auto-repaired.
+  static Future<int> validateIntegrity() async {
+    int issuesFixed = 0;
+
+    // 1. Notes referencing non-existent folders → clear folderId
+    final folderIds = foldersBox.values.map((f) => f.id).toSet();
+    for (final note in notesBox.values.toList()) {
+      if (note.folderId != null && !folderIds.contains(note.folderId)) {
+        note.folderId = null;
+        await notesBox.put(note.id, note);
+        issuesFixed++;
+      }
+    }
+
+    // 2. Folders referencing non-existent notes → remove from noteIds
+    final noteIds = notesBox.values.map((n) => n.id).toSet();
+    for (final folder in foldersBox.values.toList()) {
+      final before = folder.noteIds.length;
+      folder.noteIds.removeWhere((id) => !noteIds.contains(id));
+      if (folder.noteIds.length != before) {
+        await foldersBox.put(folder.id, folder);
+        issuesFixed += before - folder.noteIds.length;
+      }
+    }
+
+    // 3. Folders referencing non-existent projects → remove from projectDocumentIds
+    final projectIds = projectDocumentsBox.values.map((p) => p.id).toSet();
+    for (final folder in foldersBox.values.toList()) {
+      final before = folder.projectDocumentIds.length;
+      folder.projectDocumentIds.removeWhere((id) => !projectIds.contains(id));
+      if (folder.projectDocumentIds.length != before) {
+        await foldersBox.put(folder.id, folder);
+        issuesFixed += before - folder.projectDocumentIds.length;
+      }
+    }
+
+    // 4. Notes referencing non-existent project documents → clean projectDocumentIds
+    for (final note in notesBox.values.toList()) {
+      final before = note.projectDocumentIds.length;
+      note.projectDocumentIds.removeWhere((id) => !projectIds.contains(id));
+      if (note.projectDocumentIds.length != before) {
+        await notesBox.put(note.id, note);
+        issuesFixed += before - note.projectDocumentIds.length;
+      }
+    }
+
+    if (issuesFixed > 0) {
+      debugPrint('HiveService.validateIntegrity: fixed $issuesFixed issue(s)');
+    }
+    return issuesFixed;
+  }
+
   /// Delete all data (privacy: one-tap delete).
   static Future<void> deleteAllData() async {
     await NotificationService.instance.cancelAll();

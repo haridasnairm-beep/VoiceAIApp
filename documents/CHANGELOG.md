@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-03 - Step 14 (Wave 4): Quality Foundation
+
+### Added
+- **Unit tests** (55 total, all passing):
+  - `test/utils/voice_command_parser_test.dart` — 25 tests: folder/project/tag extraction, task keywords, to-do normalization, Whisper punctuation handling, combined keywords, edge cases
+  - `test/services/title_generator_test.dart` — 17 tests: filler phrase removal, sentence extraction, truncation, trailing conjunction removal, task-based fallbacks, capitalization
+  - `test/utils/profanity_filter_test.dart` — 13 tests: basic filtering, whole-word matching (no false positives), case insensitivity, asterisk length, enabled flag
+- **`CrashReportingService`** (`lib/services/crash_reporting_service.dart`) — singleton wrapping Sentry; opt-in only, no personal data; `captureException`, `captureMessage`, `setupFlutterErrorHandler`; DSN placeholder (empty = no-op until production)
+- **`crashReportingEnabled`** (HiveField 27, `bool`, default: false) on `UserSettings`; wired through `SettingsRepository`, `SettingsState`, `SettingsNotifier`
+- **Crash reporting toggle** on Preferences page — "Anonymous Crash Reports" with sublabel "Help improve the app (no personal data)"
+- **`HiveService.validateIntegrity()`** — startup referential integrity checker; fixes: notes→folders, folders→notes, folders→projects, notes→projects; auto-repairs broken references and logs count
+- Sentry initialization in `main.dart` — only when user has opted in; `FlutterError.onError` wrapper installed
+
+### New Dependencies
+- `sentry_flutter: ^9.14.0` — opt-in anonymous crash reporting
+
+---
+
 ## [Unreleased] - 2026-03-03 - Step 13 (Wave 3): Structural Redesign
 
 ### Added — Tags System (13.2)

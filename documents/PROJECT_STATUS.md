@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-03-03
 **Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Waves 1–3 (Steps 11–13) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Waves 1–4 (Steps 11–14) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -14,7 +14,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 **Phase 1 = No AI.** All AI-related UI elements have been removed or replaced. See the AI exclusion table in CLAUDE.md.
 
-**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Waves 1–3 (Steps 11–13) are complete. Next: Phase 1.5 Wave 4 (Step 14 — Quality Foundation). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Waves 1–4 (Steps 11–14) are complete. App is **Play Store ready**. Next: Wave 5 (Step 15 — Discoverability & Polish, post-launch). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 ---
 
@@ -188,6 +188,12 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Widget Privacy setting (Security page): Full / Record-Only (default) / Minimal — controls what data is shown when App Lock is enabled
 - `HomeWidgetService` pushes data to widgets on foreground resume
 - Android `VoiceNotesWidgetSmall.kt` + `VoiceNotesWidgetDashboard.kt` (AppWidgetProvider)
+
+### Step 14 (Wave 4): Quality Foundation ✅
+- **55 unit tests** — voice command parser (25), title generator (17), profanity filter (13); all passing
+- **Crash reporting** — `sentry_flutter` with opt-in `CrashReportingService`; `crashReportingEnabled` (HiveField 27) in UserSettings; toggle on Preferences page; no personal data
+- **Data integrity validation** — `HiveService.validateIntegrity()` runs on startup; auto-repairs broken references (notes→folders, folders→notes, folders→projects, notes→projects)
+- **Play Store submission point** — Waves 1–4 complete; app ready for Play Store
 
 ### Step 13 (Wave 3): Structural Redesign ✅
 - **Projects inside folders** — `ProjectDocument` gets `folderId` (HiveField 8), `Folder` gets `projectDocumentIds` (HiveField 9); migration assigns unlinked projects to folders on startup

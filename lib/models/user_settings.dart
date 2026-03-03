@@ -85,6 +85,9 @@ class UserSettings extends HiveObject {
   @HiveField(26, defaultValue: false)
   bool guidedRecordingCompleted; // True once first-recording coaching is dismissed or completed
 
+  @HiveField(27, defaultValue: false)
+  bool crashReportingEnabled; // Opt-in anonymous crash reporting via Sentry
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -113,6 +116,7 @@ class UserSettings extends HiveObject {
     this.lastBackupDate,
     this.soundCuesEnabled = true,
     this.guidedRecordingCompleted = false,
+    this.crashReportingEnabled = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -143,6 +147,7 @@ class UserSettings extends HiveObject {
         'lastBackupDate': lastBackupDate?.toIso8601String(),
         'soundCuesEnabled': soundCuesEnabled,
         'guidedRecordingCompleted': guidedRecordingCompleted,
+        'crashReportingEnabled': crashReportingEnabled,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -175,5 +180,6 @@ class UserSettings extends HiveObject {
             : null,
         soundCuesEnabled: m['soundCuesEnabled'] as bool? ?? true,
         guidedRecordingCompleted: m['guidedRecordingCompleted'] as bool? ?? false,
+        crashReportingEnabled: m['crashReportingEnabled'] as bool? ?? false,
       );
 }
