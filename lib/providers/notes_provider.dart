@@ -40,6 +40,40 @@ class NotesNotifier extends Notifier<List<Note>> {
     return ref.read(notesRepositoryProvider).getAllNotes();
   }
 
+  /// Recover stuck transcriptions — notes with isProcessed=false that are
+  /// older than [staleThreshold]. These notes were being transcribed when the
+  /// app was killed or crashed. We retry transcription if the audio file exists,
+  /// otherwise mark them as processed with a fallback message.
+  Future<void> recoverStuckTranscriptions({
+    Duration staleThreshold = const Duration(minutes: 2),
+  }) async {
+    final repo = ref.read(notesRepositoryProvider);
+    final stuckNotes = repo.getAllNotes().where((n) =>
+        !n.isProcessed &&
+        DateTime.now().difference(n.createdAt) > staleThreshold);
+
+    for (final note in stuckNotes) {
+      if (note.audioFilePath.isNotEmpty && File(note.audioFilePath).existsSync()) {
+        // Retry transcription
+        debugPrint('RecoverStuck: retrying transcription for ${note.id}');
+        transcribeInBackground(
+          note.id,
+          note.audioFilePath,
+          language: note.detectedLanguage.isNotEmpty ? note.detectedLanguage : 'en',
+        );
+      } else {
+        // No audio file — mark as processed with fallback
+        note.isProcessed = true;
+        note.rawTranscription = note.rawTranscription.isEmpty
+            ? 'Transcription interrupted — no audio file available'
+            : note.rawTranscription;
+        await repo.updateNote(note);
+        debugPrint('RecoverStuck: marked ${note.id} as processed (no audio)');
+      }
+    }
+    if (stuckNotes.isNotEmpty) refresh();
+  }
+
   void refresh() {
     state = ref.read(notesRepositoryProvider).getAllNotes();
   }

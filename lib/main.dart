@@ -15,6 +15,7 @@ import 'pages/lock_screen_page.dart';
 import 'theme.dart';
 import 'nav.dart';
 import 'providers/settings_provider.dart';
+import 'providers/notes_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +70,8 @@ class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
       _checkColdStartLock();
       _checkWidgetLaunch();
       _refreshWidget();
+      // Recover any transcriptions that were interrupted by app kill
+      ref.read(notesProvider.notifier).recoverStuckTranscriptions();
     });
     // Listen for widget taps while app is running
     HomeWidget.widgetClicked.listen(_onWidgetClicked);
