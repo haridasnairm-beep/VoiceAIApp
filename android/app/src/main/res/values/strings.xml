@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_small_description">Quick Record: tap to start a voice note</string>
+    <string name="widget_dashboard_description">Dashboard: note count, open tasks, latest note</string>
+</resources>

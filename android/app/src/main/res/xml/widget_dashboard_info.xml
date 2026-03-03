@@ -7,6 +7,6 @@
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_dashboard"
     android:widgetCategory="home_screen"
-    android:description="Dashboard — note count, open tasks, latest note"
+    android:description="@string/widget_dashboard_description"
     android:previewImage="@mipmap/ic_launcher"
     android:resizeMode="horizontal|vertical" />
