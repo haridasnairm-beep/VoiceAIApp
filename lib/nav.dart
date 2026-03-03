@@ -212,7 +212,6 @@ class AppRouter {
           return NoTransitionPage(
             child: SearchPage(
               initialFolderId: extras?['folderId'] as String?,
-              initialProjectId: extras?['projectId'] as String?,
             ),
           );
         },
