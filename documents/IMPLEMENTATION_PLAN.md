@@ -1,1053 +1,730 @@
 # VoiceNotes AI - Implementation Plan
 
-**Version:** 3.0
-**Last Updated:** 2026-03-02
+**Version:** 4.0
+**Last Updated:** 2026-03-03
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md) | [Phase 1 Value Gaps](FEATURE_PHASE1_VALUE_GAPS.md)
+**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md) | [Phase 1 Value Gaps](FEATURE_PHASE1_VALUE_GAPS.md) | [UX Audit](UX_PRODUCT_AUDIT.md)
 
 ---
 
 ## Overview
 
-This plan is split into two phases:
+This plan covers three phases:
 
-- **Phase 1 (On-Device):** A fully functional voice note-taking app with recording, on-device transcription, local storage, folders, search, playback, and notifications — all without any AI/cloud dependency.
-- **Phase 2 (AI-Powered):** Adds AI categorization, smart structuring, Whisper API transcription, auto-folder assignment, and n8n integration.
+- **Phase 1 (On-Device):** A fully functional voice note-taking app — completed (v1.0.0). Steps 1–10.7 all done.
+- **Phase 1.5 (UX & Launch Readiness):** Seven implementation waves addressing launch blockers, UX polish, structural redesign, quality foundations, discoverability, power-user features, and differentiation. Based on comprehensive UX/product audit.
+- **Phase 2 (AI-Powered):** AI categorization, Whisper API, n8n integration, cloud sync.
 
-**Current state:** Phase 1 core complete (all 7 steps + Steps 4.5/4.6/4.7 + bonus features + post-release enhancements Issues #7–#12). Current version: **v1.0.0** (Release). **Next:** Phase 1 Value Proposition Gaps (Steps 8–10.7, 8 features) — features to match competitor expectations before Play Store launch.
-**Phase 1 target:** Privacy-first voice note app with on-device transcription, local Hive storage, audio playback, reminder notifications, project documents, voice command auto-linking, interactive tasks & aggregated tasks view, hybrid reminders with OS calendar bridge, sharing/export with PDF, rich text editing, share preview with toggles, photo attachments, word count, find & replace, profanity filter, voice commands for task creation, **pinned notes, AMOLED dark theme, auto-title generation, note templates, trash/soft delete, home screen widget, app lock (PIN/biometric), and local backup & restore**.
+**Current state:** Phase 1 core + value gap features complete (v1.0.0). All 7 original steps + Steps 4.5/4.6/4.7 + bonus features + post-release enhancements + 8 value gap features (Steps 8–10.7) done.
 
----
-
-# PHASE 1 — On-Device Features (No AI Required)
+**Next:** Phase 1.5 — UX & Launch Readiness (7 waves, 38 items). Ship to Play Store after Wave 4.
 
 ---
 
-## Step 1: Project Alignment & Branding Fixes ✅ COMPLETED
+# PHASE 1 — On-Device Features ✅ COMPLETE
 
-**Goal:** Align the codebase with the concept document.
-
-### Tasks:
-1. ~~Update Android app label — "VoiceNotes AI"~~
-2. ~~Update iOS app name~~
-3. ~~Fix app title in main.dart~~
-4. ~~Mark login_page.dart as Not In Use~~
-5. ~~Update onboarding flow → Home (no login gate)~~
-6. ~~Clean up pubspec.yaml~~
-
----
-
-## Step 2: State Management Migration (Riverpod) ✅ COMPLETED
-
-**Goal:** Replace Provider with Riverpod.
-
-### Tasks:
-1. ~~Add flutter_riverpod, wrap app with ProviderScope~~
-2. ~~Create providers: settings, notes, folders, recording, connectivity~~
-3. ~~Use Notifier/NotifierProvider (Riverpod 3.x API)~~
-
----
-
-## Step 3: Data Models & Hive Database ✅ COMPLETED
-
-**Goal:** Implement encrypted local storage with Hive.
-
-### Tasks:
-1. ~~Create 6 Hive models (Note, ActionItem, TodoItem, ReminderItem, Folder, UserSettings)~~
-2. ~~Generate type adapters with build_runner~~
-3. ~~AES-256 encrypted boxes for notes, folders, settings~~
-4. ~~Repository layer (notes, folders, settings)~~
-5. ~~Connect repositories to Riverpod providers~~
-
----
-
-## Step 4: Wire UI to Data Layer ✅ COMPLETED
-
-**Goal:** Connect all screen UIs to real Hive data through Riverpod providers.
-
-### Tasks:
-1. **Home Page:**
-   - Display notes from Hive via `notesProvider`
-   - Note cards show: title, date, language tag, preview text
-   - Filter chips (All, Actions, Todos, Reminders, Notes) filter the note list
-   - Search bar queries notes by keyword
-   - Record button navigates to recording screen
-   - Tapping a note card opens Note Detail
-
-2. **Note Detail Page:**
-   - Display full transcription from Hive note
-   - Render sections (actions, todos, reminders, general notes) — manually added for now
-   - Checkboxes toggle `isCompleted` and persist to Hive
-   - Edit button allows editing transcription text
-   - Delete button with confirmation dialog
-   - Show detected language label
-
-3. **Folders Page:**
-   - List all folders from `foldersProvider`
-   - Show note count per folder
-   - Create new folder dialog
-   - Rename / delete folder
-
-4. **Folder Detail Page:**
-   - Display notes belonging to selected folder
-   - Chronological timeline view
-   - Remove note from folder
-
-5. **Settings Page:**
-   - Read/write settings from Hive via `settingsProvider`
-   - Language preference toggle (auto-detect vs specific)
-   - Audio quality selector
-   - Notification toggle
-   - Storage usage display (Hive box sizes + audio files)
-   - Privacy dashboard (data summary, delete all data button)
-   - Theme mode toggle (light/dark/system)
-
-6. **Search Page:**
-   - Query notes by keyword (rawTranscription, title)
-   - Filter by date range, language
-   - Display results as note cards
-
-### Deliverables:
-- All screens display and mutate real persistent data
-- CRUD operations work end-to-end through the UI
-- Notes persist, appear in lists, can be edited and deleted
-
-### Estimated effort: Large
-
----
-
-## Step 4.5: Project Documents ✅ COMPLETED
-
-**Goal:** Implement the Project Documents feature — rich, composite documents assembled from individual voice notes with free-text blocks, section headers, drag-and-drop reordering, bi-directional transcript editing, and version history. All on-device, no AI.
-
-**Feature Spec:** [FEATURE_PROJECT_DOCUMENTS.md](FEATURE_PROJECT_DOCUMENTS.md)
-
-### Sub-step A: Data Model & Storage
-
-1. Create `ProjectDocument` Hive model (typeId: 6) — id, title, description, blocks, createdAt, updatedAt
-2. Create `ProjectBlock` Hive model (typeId: 7) — id, type, sortOrder, noteId, content, createdAt, updatedAt
-3. Create `TranscriptVersion` Hive model (typeId: 8) — id, text, versionNumber, editSource, createdAt, isOriginal
-4. Create `BlockType` enum (note_reference, free_text, section_header)
-5. Add `projectDocumentsBox` to HiveService initialization (AES-256 encrypted)
-6. Modify existing `Note` model:
-   - Add `transcriptVersions: List<TranscriptVersion>` field
-   - Add `projectDocumentIds: List<String>` field
-7. Write data migration: on app start, if a Note has no transcriptVersions, create v1 from rawTranscription
-8. Run `build_runner` to regenerate type adapters
-
-### Sub-step B: Repository & Provider Layer
-
-1. Create `ProjectDocumentsRepository` — CRUD for project documents and blocks
-2. Add transcript versioning methods to `NotesRepository` (addTranscriptVersion, getTranscriptVersions, restoreTranscriptVersion)
-3. Add projectDocumentIds management methods to `NotesRepository`
-4. Create `projectDocumentsProvider` (Notifier/NotifierProvider)
-5. Wire provider to repository with proper state management
-
-### Sub-step C: UI — Project Documents List Screen
-
-1. Create `/project-documents` route and `project_documents_page.dart`
-2. Implement project document card widget (title, description, block count, last updated)
-3. Implement "New Project" creation dialog (title + optional description)
-4. Implement rename and delete actions with confirmation
-5. Implement search/filter within project documents
-6. Implement empty state
-7. Add "Projects" navigation entry from Home page
-
-### Sub-step D: UI — Project Document Detail Screen
-
-1. Create `/project-documents/:id` route and `project_document_detail_page.dart`
-2. Implement block rendering engine (switch on block type → render card)
-3. Implement Note Reference Block widget (transcript, timestamp, language badge, in-place editing, overflow menu)
-4. Implement Free-Text Block widget (editable text area, overflow menu)
-5. Implement Section Header Block widget (large/bold editable text, optional divider)
-6. Implement "Add Block" action sheet (Add Voice Note / Add Free Text / Add Section Header)
-7. Implement reorder mode with drag handles
-8. Wire all edit/save/delete actions to provider
-
-### Sub-step E: UI — Note Picker & Supporting Screens
-
-1. Create note picker screen with search and multi-select
-2. Show "already linked" indicator on notes in picker
-3. Implement "Add to Project" action on Note Detail page
-4. Implement "Linked Projects" section on Note Detail page
-5. Implement optional "Add to Project?" prompt after saving a new recording
-6. Create Version History screen/bottom sheet (list versions, "Restore this version" action)
-
-### Sub-step F: Integration & Polish
-
-1. Handle note deletion — update project document blocks to show "Note deleted" placeholder
-2. Handle project document deletion — clean up note references (remove documentId from all linked notes)
-3. Ensure search indexes include project document titles
-4. Test with large documents (50+ blocks) — use ListView.builder for lazy rendering
-5. Accessibility: screen reader labels, drag-and-drop alternatives (move up/down buttons)
-6. Empty states for all new screens
-
-### New Files:
-| File | Purpose |
-|---|---|
-| `lib/models/project_document.dart` | ProjectDocument Hive model |
-| `lib/models/project_block.dart` | ProjectBlock Hive model |
-| `lib/models/transcript_version.dart` | TranscriptVersion Hive model |
-| `lib/services/project_documents_repository.dart` | CRUD for project documents |
-| `lib/providers/project_documents_provider.dart` | Riverpod provider |
-| `lib/pages/project_documents_page.dart` | List screen |
-| `lib/pages/project_document_detail_page.dart` | Detail / canvas screen |
-| `lib/pages/note_picker_page.dart` | Multi-select note picker |
-| `lib/pages/version_history_page.dart` | Transcript version history |
-| `lib/widgets/note_reference_block.dart` | Block widget |
-| `lib/widgets/free_text_block.dart` | Block widget |
-| `lib/widgets/section_header_block.dart` | Block widget |
-| `lib/widgets/project_document_card.dart` | Card for list screen |
-
-### Modified Files:
-| File | Change |
-|---|---|
-| `lib/models/note.dart` | Add `transcriptVersions` and `projectDocumentIds` fields |
-| `lib/services/hive_service.dart` | Add `projectDocumentsBox` initialization |
-| `lib/services/notes_repository.dart` | Add versioning and project reference methods |
-| `lib/providers/notes_provider.dart` | Expose new repository methods |
-| `lib/nav.dart` | Add 4 new routes |
-| `lib/pages/home_page.dart` | Add Projects navigation entry |
-| `lib/pages/note_detail_page.dart` | Add "Linked Projects" section and "Add to Project" button |
-| `lib/pages/recording_page.dart` | Add optional "Add to Project" prompt post-save |
-
-### Estimated effort: Large
-
----
-
-## Step 4.6: Interactive Tasks & Reminder Enhancement ✅ COMPLETED
-
-**Goal:** Make todos, actions, and reminders interactive across all surfaces; add aggregated tasks view on Home page; enhance reminders with OS calendar bridge and reschedule capability. All on-device, no AI.
-
-**Feature Spec:** [FEATURE_TASKS_AND_REMINDERS.md](FEATURE_TASKS_AND_REMINDERS.md)
-
-### Sub-step A: Interactive Checkboxes on Note Detail
-
-1. Update todo item rendering — add interactive checkbox widget with strikethrough + muted styling when completed
-2. Update action item rendering — add interactive checkbox widget with same visual treatment
-3. Add overdue date highlighting (red badge) for todos with past due dates
-4. Wire checkbox taps to `NotesProvider.toggleTodoCompleted()` / `toggleActionCompleted()`
-5. Add "Add Task" button to Todos section — inline text field + optional due date picker
-6. Add "Add Action" button to Actions section — inline text field
-7. Add overflow menu (⋮) on each item: Edit text, Delete, Set/change due date (todos only)
-8. Implement `NotesRepository` methods: `toggleTodoCompleted`, `toggleActionCompleted`, `addTodoItem`, `addActionItem`, `updateTodoItem`, `updateActionItem`, `deleteTodoItem`, `deleteActionItem`
-9. Expose above methods through `NotesProvider`
-
-### Sub-step B: Checkboxes in Project Document Blocks
-
-1. Add collapsible "Tasks" sub-section to `note_reference_block` widget
-2. Render todos and actions from the linked note with interactive checkboxes
-3. Show task count indicator in collapsed state: "3 tasks (1 completed)"
-4. Wire checkbox taps to `NotesProvider` (same as Note Detail — bi-directional sync)
-5. Auto-expand when tasks exist, collapse when none
-
-### Sub-step C: Aggregated Tasks View
-
-1. Create `TaskItem` view model class (`lib/models/task_item.dart`) — NOT a Hive model
-2. Create `TaskType` enum: `todo`, `action`, `reminder`
-3. Create `tasksProvider` — derived Riverpod provider that reads `notesProvider` and assembles flat `TaskItem` list
-4. Add segmented control / tab bar to Home page: `[ Notes ]  [ Tasks ]`
-5. Implement Tasks tab UI: open task count header, filter chips (All / Todos / Actions), task list
-6. Implement task list row: checkbox, text, source note link (tappable → Note Detail), due date badge, type indicator
-7. Include reminders in the aggregated view with bell icon and scheduled time
-8. Implement "Show completed" toggle — completed items grouped at bottom with strikethrough
-9. Implement sorting: overdue first → due date soonest → creation date newest
-10. Implement open task count badge on Tasks tab label
-11. Implement empty states ("No open tasks — you're all caught up!" / filter-specific messages)
-12. Wire checkbox taps and source note navigation
-
-### Sub-step D: Reminder Enhancement (Hybrid Model)
-
-1. Add `add_2_calendar` package to `pubspec.yaml`
-2. Create `lib/services/os_reminder_service.dart` — bridge to OS calendar via `add_2_calendar`
-3. Create reminder destination bottom sheet (`lib/widgets/reminder_destination_sheet.dart`):
-   - "Keep in VoiceNotes AI" (existing behavior)
-   - "Also add to OS Reminders" (creates in-app + opens native calendar pre-filled)
-4. Show bottom sheet after each reminder creation — user chooses per-reminder
-5. Implement calendar event creation with pre-filled title, description ("From VoiceNotes AI: [note title]"), start time
-6. Add "Reschedule" action to reminder items on Note Detail (clock icon / overflow menu)
-7. Implement reschedule date/time picker pre-filled with current time; cancel old notification, schedule new
-8. Add `NotesRepository.rescheduleReminder(noteId, reminderId, newTime)` method
-9. Handle edge case: no calendar app available → SnackBar fallback
-10. (Stretch) Add notification action buttons: "Done" (marks complete) and "Snooze 1hr" (reschedules +1 hour)
-
-### Sub-step E: Polish & Integration
-
-1. Ensure checkbox state syncs across all surfaces (Note Detail ↔ Project Document ↔ Tasks View) via `ref.watch()`
-2. Test with notes that have many tasks (20+ items per note, 100+ total across notes)
-3. Verify reminder notification deep-links still work
-4. Update "Delete All Data" to handle any new state
-5. Accessibility: checkbox labels, screen reader support for task counts
-6. Test OS calendar integration on Android + iOS (calendar app not installed edge case)
-7. Validate overdue sorting, empty states, filter combinations
-
-### New Files:
-
-| File | Purpose |
-|---|---|
-| `lib/models/task_item.dart` | TaskItem view model + TaskType enum for aggregated tasks |
-| `lib/providers/tasks_provider.dart` | Derived provider aggregating todos + actions + reminders across all notes |
-| `lib/widgets/task_list_item.dart` | Reusable task row widget (checkbox + text + source + date) |
-| `lib/widgets/tasks_tab.dart` | Tasks tab content for Home page |
-| `lib/widgets/interactive_todo_item.dart` | Todo item with checkbox, strikethrough, overflow menu |
-| `lib/widgets/interactive_action_item.dart` | Action item with checkbox, strikethrough, overflow menu |
-| `lib/widgets/reminder_destination_sheet.dart` | Bottom sheet for "Keep in-app / Also add to OS" choice |
-| `lib/widgets/task_creation_inline.dart` | Inline text field for adding new tasks |
-| `lib/services/os_reminder_service.dart` | Bridge to OS calendar/reminders via add_2_calendar |
-
-### Modified Files:
-
-| File | Change |
-|---|---|
-| `lib/pages/note_detail_page.dart` | Interactive checkboxes, manual task/action creation, reschedule, "Also add to OS" flow |
-| `lib/pages/home_page.dart` | Add Tasks tab with segmented control, task count badge |
-| `lib/widgets/note_reference_block.dart` | Add collapsible Tasks sub-section with interactive checkboxes |
-| `lib/services/notes_repository.dart` | Add toggle, CRUD, and reschedule methods for todos/actions/reminders |
-| `lib/providers/notes_provider.dart` | Expose new repository methods |
-| `lib/services/notification_service.dart` | Add reschedule method, (stretch) notification action buttons |
-| `pubspec.yaml` | Add `add_2_calendar` dependency |
-
-### Estimated effort: Medium-Large
-
----
-
-## Step 4.7: Sharing, Rich Text & Image Blocks ✅ COMPLETED
-
-**Goal:** Extend Project Documents with sharing/export, rich text formatting in free-text blocks, and image blocks (photos). Add note-level sharing and photo attachments. All on-device, no AI.
-
-**Feature Spec:** [FEATURE_PROJECT_DOCUMENTS.md — Addendum A](FEATURE_PROJECT_DOCUMENTS.md)
-
-### Sub-step A: Data Model & Storage Extensions
-
-1. Create `ImageAttachment` Hive model with type adapter (typeId: 9)
-2. Add `image_block` to `BlockType` enum
-3. Add `imageAttachmentId: String?` field to `ProjectBlock` model
-4. Add `contentFormat: String?` field to `ProjectBlock` model ("plain" or "quill_delta")
-5. Add `imageAttachmentIds: List<String>` field to `Note` model
-6. Add `imageAttachmentsBox` to HiveService initialization (AES-256 encrypted)
-7. Create `Documents/images/` directory on app initialization
-8. Run `build_runner` to regenerate all type adapters
-9. Write migration: existing free-text blocks get `contentFormat: "plain"`
-
-### Sub-step B: Repository & Provider Extensions
-
-1. Create `ImageAttachmentRepository` — CRUD for imageAttachmentsBox + file management
-   - `saveImage(file, sourceType)` → process, store, return ImageAttachment
-   - `getImageAttachment(id)` → return metadata
-   - `deleteImageAttachment(id)` → delete metadata AND file from disk
-   - `getImageFile(id)` → return File reference for display
-2. Add image methods to `NotesRepository`: `addImageAttachment`, `removeImageAttachment`
-3. Add image block methods to `ProjectDocumentsRepository`: `addImageBlock(documentId, attachmentId, caption?)`
-4. Extend `projectDocumentsProvider` with image, sharing, and export methods
-5. Create `SharingService` — assemble share text for notes and project documents, generate export files (.md, .txt)
-
-### Sub-step C: UI — Sharing & Export
-
-1. Add share button to Note Detail page — assemble note text → `share_plus`
-2. Add share button to note card overflow menu on Home page
-3. Add share button to Project Document Detail toolbar — assemble all blocks in order → `share_plus`
-4. Add export option to Project Document overflow menu (⋮): Markdown (.md) or plain text (.txt)
-5. Generate export file in temp directory → share via `share_plus` with file path
-6. File naming: `[document_title]_[date].md` or `.txt`
-
-### Sub-step D: UI — Rich Text Formatting (Free-Text Blocks)
-
-1. Add `flutter_quill` package to `pubspec.yaml`
-2. Integrate `flutter_quill` editor into free-text block widget
-3. Implement compact formatting toolbar: `[ B ] [ I ] [ • ] [ H1 ] [ H2 ] [ 🔗 ]`
-   - Toolbar appears only when editing a free-text block
-   - Active formatting states highlighted
-   - Link insertion: select text → tap link → enter URL dialog
-4. Implement Quill Delta JSON serialization to/from `ProjectBlock.content`
-5. Set `ProjectBlock.contentFormat = "quill_delta"` for rich text blocks
-6. Implement Delta → Markdown conversion for export (`delta_to_markdown` or custom)
-7. Implement Delta → plain text stripping for share
-8. Migration: existing plain-text blocks converted to simple Delta on first load
-
-### Sub-step E: UI — Image Blocks (Project Documents)
-
-1. Add `image_picker`, `image_cropper`, `photo_view`, `flutter_image_compress` packages
-2. Add "Add Image" option to "Add Block" action sheet (alongside Voice Note / Free Text / Section Header)
-3. Implement image source selection bottom sheet (Gallery / Camera)
-4. Implement crop/resize flow: free-form crop, auto-resize >2048px, JPEG 85% quality
-5. Implement Image Block widget: full-width image, optional caption, overflow menu (edit caption, replace, remove, view full screen)
-6. Implement full-screen image viewer page (pinch-to-zoom, pan via `photo_view`)
-7. Image blocks support drag-and-drop reorder like other blocks
-
-### Sub-step F: Note Detail — Photo Attachments
-
-1. Add "Attachments" section to Note Detail page (below structured output, above audio playback)
-2. Implement horizontal scrollable thumbnail row (or 2-column grid for 3+)
-3. Implement "Add Photo" button — gallery/camera picker + crop/resize
-4. Implement full-screen photo viewer on tap
-5. Implement photo deletion with confirmation
-6. Note reference blocks in Project Documents show photo indicator (📎 N photos)
-
-### Sub-step G: Integration & Polish
-
-1. Handle image cleanup on note deletion (delete associated ImageAttachments + files)
-2. Handle image cleanup on project document deletion (delete image_block attachments + files)
-3. Update "Delete All Data" to include imageAttachmentsBox and image files
-4. Update storage display in Settings to include image file sizes
-5. Handle edge cases: image file missing from disk (placeholder), camera/gallery permission denied (fallback), low storage (<100MB warning)
-6. Test with large images, many photos (20+), low storage scenarios
-7. Accessibility: image alt-text from caption, screen reader labels
-
-### New Files:
-
-| File | Purpose |
-|---|---|
-| `lib/models/image_attachment.dart` | ImageAttachment Hive model |
-| `lib/services/image_attachment_repository.dart` | Image CRUD + file management |
-| `lib/services/sharing_service.dart` | Assemble share text, generate export files |
-| `lib/services/image_processing_service.dart` | Crop, resize, compress, save |
-| `lib/widgets/image_block_widget.dart` | Image block for Project Document |
-| `lib/widgets/note_attachments_section.dart` | Photo section on Note Detail |
-| `lib/widgets/formatting_toolbar.dart` | Rich text toolbar for free-text blocks |
-| `lib/pages/image_viewer_page.dart` | Full-screen image viewer |
-
-### Modified Files:
-
-| File | Change |
-|---|---|
-| `lib/models/project_block.dart` | Add `imageAttachmentId`, `contentFormat` fields, `image_block` to BlockType |
-| `lib/models/note.dart` | Add `imageAttachmentIds` field |
-| `lib/services/hive_service.dart` | Add `imageAttachmentsBox`, image directory creation |
-| `lib/services/project_documents_repository.dart` | Add image block methods |
-| `lib/services/notes_repository.dart` | Add image attachment methods |
-| `lib/providers/project_documents_provider.dart` | Add image, sharing, export methods |
-| `lib/pages/project_document_detail_page.dart` | Image blocks, rich text editor, share/export buttons |
-| `lib/pages/note_detail_page.dart` | Attachments section, share button |
-| `lib/widgets/free_text_block.dart` | Replace plain TextField with flutter_quill editor |
-| `lib/pages/settings_page.dart` | Update storage display to include images |
-| `pubspec.yaml` | Add 7 new packages |
-
-### New Package Dependencies:
-
-| Package | Purpose |
-|---|---|
-| `share_plus` | Native OS share sheet |
-| `flutter_quill` | Rich text editing and viewing |
-| `delta_to_markdown` | Export Delta → Markdown |
-| `image_picker` | Gallery and camera photo selection |
-| `image_cropper` | Crop and resize UI |
-| `photo_view` | Full-screen image viewer with zoom |
-| `flutter_image_compress` | Image compression and resizing |
-
-### Estimated effort: Large
-
----
-
-## Step 5: Speech-to-Text Integration (On-Device) ✅ COMPLETED
-
-**Goal:** Add on-device transcription to the recording flow using `speech_to_text` package (free, no API key needed).
-
-### How it works:
-- Uses Google STT engine on Android and Apple Speech on iOS — both run on-device
-- Supports 50+ languages with auto-detection
-- Real-time text display while speaking
-- No cloud API calls, no cost, fully private
-
-### Tasks:
-1. **Add dependency:** `speech_to_text` package
-2. **Create transcription service** — `lib/services/transcription_service.dart`
-   - Initialize speech recognizer
-   - Start/stop listening tied to recording state
-   - Capture interim and final transcription results
-   - Detect language from recognition result
-3. **Update Recording Page:**
-   - Display live transcription text below waveform while recording
-   - Show detected language indicator
-   - Visual feedback when speech is detected vs silence
-4. **Update recording flow:**
-   - User records → speech is transcribed in real-time
-   - User taps "Save" → transcription + audio saved to Hive note
-   - Navigate to Note Detail to view saved note
-5. **Handle edge cases:**
-   - Microphone permission denied → show permission dialog
-   - No speech detected → save note with empty transcription, allow manual entry
-   - Long recordings → handle speech_to_text session timeouts by auto-restarting listener
-
-### Deliverables:
-- Recording → On-device transcription → Saved Note flow works end-to-end
-- Language auto-detected
-- No API key or internet connection required
-
-### Estimated effort: Medium
-
----
-
-## Step 6: Waveform, Audio Playback & Notifications ✅ COMPLETED
-
-**Goal:** Polish the recording experience and add reminder notifications.
-
-### Tasks:
-1. **Waveform visualizer:**
-   - Add `audio_waveforms` package
-   - Display real-time waveform on Recording Page
-   - Replace or complement current amplitude-based visualization
-   - Smooth animation, matches app's warm design language
-
-2. **Audio playback on Note Detail:**
-   - Add `just_audio` package
-   - Play/pause/seek controls on Note Detail screen
-   - Show playback progress bar
-   - Display recording duration
-
-3. **Reminder notifications:**
-   - Add `flutter_local_notifications` package
-   - Manual reminder creation — user picks date/time from Note Detail
-   - Notification taps open the relevant note
-   - Respect quiet hours from settings
-   - Cancel notifications when reminder marked complete
-
-### Deliverables:
-- Rich waveform visualization during recording
-- Audio playback from note detail screen
-- Manual reminders trigger device notifications at scheduled times
-
-### Estimated effort: Medium
-
----
-
-## Step 7: Testing, Polish & Release Prep ✅ COMPLETED
-
-**Goal:** Ensure quality, fix edge cases, prepare for release.
-
-### Tasks:
-1. **Unit tests:**
-   - Test Hive repository CRUD operations
-   - Test transcription service
-   - Test provider state management
-
-2. **Widget tests:**
-   - Test key UI flows (record → save → view note)
-   - Test filter/search behavior
-   - Test settings persistence
-
-3. **Integration tests:**
-   - End-to-end: record → transcribe (on-device) → save → search
-   - Reminder notification scheduling
-
-4. **Edge cases & error handling:**
-   - Very long recordings (>30 min)
-   - Empty recordings (user records silence)
-   - Mixed-language edge cases
-   - Hive corruption recovery
-   - Low storage scenarios
-
-5. **Performance:**
-   - Profile app startup time (Hive initialization)
-   - Ensure smooth scrolling with large note lists
-   - Optimize recording memory usage
-
-6. **Accessibility:**
-   - Screen reader support for all interactive elements
-   - Sufficient color contrast in both themes
-   - Semantic labels on icons and buttons
-
-7. **Release preparation:**
-   - Create proper app icon
-   - Write App Store / Play Store descriptions
-   - Take screenshots for store listings
-   - Set up signing configs (Android keystore, iOS provisioning)
-   - Configure ProGuard rules for release build
-   - Test release builds on physical devices
-
-### Deliverables:
-- Test coverage for critical paths
-- App stable on both iOS and Android
-- Ready for store submission
-
-### Estimated effort: Large
-
----
-
-# PHASE 1 — Value Proposition Gaps (Pre-Launch Enhancements)
-
-**Spec:** [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md)
-
-These 8 features address competitive gaps that users expect at launch. They require no AI and remain fully on-device/privacy-first.
-
----
-
-## Step 8: Pinned Notes + AMOLED Dark Theme + Auto-Title Generation ⬜ PENDING
-
-**Goal:** Three small, independent features that can be implemented in parallel.
-
-### Sub-step A: Pinned Notes
-
-**Goal:** Allow users to pin important notes to the top of the Home page feed.
-
-#### Tasks:
-1. Add `isPinned` (bool) and `pinnedAt` (DateTime?) fields to Note Hive model → `build_runner`
-2. Update `notesProvider` to return pinned list (sorted by `pinnedAt` desc) and unpinned list (sorted by `createdAt` desc)
-3. Add "Pinned" section header (collapsible, with count badge) above regular notes feed on Home page
-4. Add pin icon on pinned note cards (top-right corner)
-5. Add "Pin to Top" / "Unpin" action in:
-   - Long-press note card overflow menu
-   - Note Detail AppBar overflow menu
-   - Multi-select bottom action bar
-6. Enforce max 10 pinned notes with warning SnackBar
-7. Pinned notes still appear in folder views and search (without special positioning)
-
-#### New files:
-- `lib/widgets/pinned_section_widget.dart` — Pinned section header + list
-
-#### Modified files:
-- `lib/models/note.dart` — Add `isPinned`, `pinnedAt` HiveFields
-- `lib/providers/notes_provider.dart` — Pinned/unpinned split
-- `lib/pages/home_page.dart` — Pinned section above feed
-- `lib/pages/note_detail_page.dart` — Pin/unpin in overflow menu
-
-### Sub-step B: AMOLED Dark Theme
-
-**Goal:** Add a pure black theme option for OLED screens.
-
-#### Tasks:
-1. Create `amoledDarkTheme` ThemeData in `lib/theme.dart` — copy `darkTheme`, override scaffold/surface/card/appbar backgrounds to `#000000`, cards to `#0A0A0A`, dividers to `#1A1A1A`
-2. Add theme option to `UserSettings` model (string field: `'light'`, `'dark'`, `'amoled'`, `'system'`)
-3. Update `MaterialApp` to select between three theme data objects
-4. Update Settings → Appearance theme picker to show 4 options (Light, Dark, AMOLED Dark, System)
-
-#### Modified files:
-- `lib/theme.dart` — Add `amoledDarkTheme`
-- `lib/models/user_settings.dart` — Add theme mode field
-- `lib/providers/settings_provider.dart` — Expose new theme
-- `lib/main.dart` — Select theme in MaterialApp
-- `lib/pages/preferences_page.dart` — Theme picker update
-
-### Sub-step C: Auto-Title Generation
-
-**Goal:** Generate meaningful, scannable titles from transcription text using local heuristics (no AI).
-
-#### Tasks:
-1. Create `TitleGeneratorService` — pure Dart utility class
-2. Implement algorithm: strip filler phrases → extract first meaningful sentence → apply fallback patterns (task-based titles) → truncate at 60 chars at word boundary
-3. Call after transcription is finalized (both live STT and Whisper modes)
-4. Only auto-generate if user has not manually edited the title
-5. Add `isUserEditedTitle` flag to Note model to track manual edits
-
-#### New files:
-- `lib/services/title_generator_service.dart`
-
-#### Modified files:
-- `lib/models/note.dart` — Add `isUserEditedTitle` HiveField
-- `lib/pages/recording_page.dart` — Call title generator after transcription
-- `lib/pages/note_detail_page.dart` — Set `isUserEditedTitle = true` on manual title edit
-
-### Estimated effort: Small (all three combined)
-
----
-
-## Step 9: Note Templates ⬜ PENDING
-
-**Goal:** Offer built-in note templates that pre-populate new text notes with structured placeholders.
-
-### Tasks:
-1. Create `NoteTemplate` data class and `lib/constants/note_templates.dart` with 6 built-in templates:
-   - Meeting Notes, Daily Journal, Idea Capture, Grocery List, Project Planning, Quick Checklist
-2. Create `TemplatePickerSheet` bottom sheet widget — shows Blank Note + 6 templates with icons
-3. Integrate with SpeedDialFab "New Text Note" action — show template picker first
-4. Pre-fill Quill Delta content in new note from selected template
-5. Auto-generate title from template name (e.g., "Meeting Notes — Mar 2, 2026")
-
-### New files:
-- `lib/constants/note_templates.dart` — Template definitions
-- `lib/widgets/template_picker_sheet.dart` — Bottom sheet picker UI
-
-### Modified files:
-- `lib/pages/home_page.dart` — SpeedDialFab "New Text Note" shows picker
-- `lib/pages/note_detail_page.dart` — Accept pre-filled template content
-
-### Estimated effort: Small
-
----
-
-## Step 10: Trash / Soft Delete ⬜ PENDING
-
-**Goal:** Replace permanent deletion with a Trash system offering 30-day recovery.
-
-### Sub-step A: Data Model Changes
-
-#### Tasks:
-1. Add to Note model: `isDeleted` (bool), `deletedAt` (DateTime?), `previousFolderId` (String?), `previousProjectIds` (List<String>?)
-2. Add to Folder model: `isDeleted` (bool), `deletedAt` (DateTime?)
-3. Add to ProjectDocument model: `isDeleted` (bool), `deletedAt` (DateTime?)
-4. Run `build_runner` for Hive adapter regeneration
-5. Data migration: existing items get `isDeleted = false` by default
-
-### Sub-step B: Repository & Provider Filtering
-
-#### Tasks:
-1. Update all note/folder/project queries to filter out `isDeleted == true` items
-2. Add `softDeleteNote()`, `softDeleteFolder()`, `softDeleteProject()` methods to repositories
-3. Add `restoreFromTrash()` methods — re-link to original folder/projects
-4. Add `permanentlyDelete()` methods — actual Hive removal + file cleanup
-5. Add `getTrashItems()` methods — return items where `isDeleted == true`
-6. Add auto-purge logic on app launch — permanently delete items where `deletedAt` > 30 days ago
-7. Update tasks provider to exclude tasks from trashed notes
-8. Update search to exclude trashed items
-
-### Sub-step C: Trash Screen UI
-
-#### Tasks:
-1. Create `TrashPage` with:
-   - Header with item count
-   - "Items are permanently deleted after 30 days" info bar
-   - Sections for Notes, Folders, Projects (with counts)
-   - Each item shows: title, "Deleted X days ago", days remaining badge
-   - Swipe/overflow menu: Restore, Delete Permanently
-   - "Empty Trash" button with confirmation dialog
-2. Add route `/trash` to go_router
-3. Add "Trash" entry to App Menu (3-dot overflow) with item count badge
-
-### Sub-step D: Integration & Polish
-
-#### Tasks:
-1. Update all delete dialogs: "Move to Trash? You can restore within 30 days."
-2. Add Undo SnackBar after soft delete (5 seconds): "Note moved to Trash [Undo]"
-3. Project document blocks show "Note in Trash" placeholder for trashed notes (with Restore quick action)
-4. Update storage display: show trash storage separately
-5. "Delete All Data" in Danger Zone bypasses Trash (with explicit warning)
-6. Stats cards exclude trashed items from counts
-
-### New files:
-- `lib/pages/trash_page.dart` — Trash screen
-
-### Modified files:
-- `lib/models/note.dart`, `lib/models/folder.dart`, `lib/models/project_document.dart` — Soft delete fields
-- `lib/services/notes_repository.dart`, `lib/services/folders_repository.dart`, `lib/services/project_documents_repository.dart` — Soft delete/restore/purge
-- `lib/providers/notes_provider.dart`, `lib/providers/folders_provider.dart`, `lib/providers/project_documents_provider.dart` — Query filtering
-- `lib/providers/tasks_provider.dart` — Exclude trashed
-- `lib/pages/home_page.dart` — Delete → soft delete, stats filtering
-- `lib/pages/search_page.dart` — Exclude trashed
-- `lib/pages/note_detail_page.dart` — Delete → soft delete
-- `lib/pages/folders_page.dart` — Delete → soft delete
-- `lib/pages/project_document_detail_page.dart` — Delete → soft delete, trashed note placeholder
-- `lib/nav.dart` — Add `/trash` route
-
-### Estimated effort: Medium
-
----
-
-## Step 10.5: App Lock — PIN / Biometric ⬜ PENDING
-
-**Goal:** Protect VoiceNotes AI with PIN and/or biometric authentication. Must be built before or in parallel with Home Screen Widget so Widget can read lock state for Widget Privacy.
-
-**Spec:** [FEATURE_PHASE1_VALUE_GAPS.md — Feature 8](FEATURE_PHASE1_VALUE_GAPS.md)
-
-### Sub-step A: Data Model & PIN Storage
-
-#### Tasks:
-1. Add to UserSettings model: `appLockEnabled` (bool), `appLockPinHash` (String?), `biometricEnabled` (bool), `autoLockTimeoutSeconds` (int, default 0 = immediately), `widgetPrivacyLevel` (String, default 'record_only')
-2. Run `build_runner` for Hive adapter regeneration
-3. Store PIN salt in `flutter_secure_storage` (not in Hive) — salted SHA-256 hash only, never raw PIN
-4. Add `local_auth` and `crypto` dependencies
-
-### Sub-step B: App Lock Service
-
-#### Tasks:
-1. Create `AppLockService` — manages lock state, timeout tracking, authentication orchestration
-2. Use `WidgetsBindingObserver` to detect `didChangeAppLifecycleState` — track `lastBackgroundedAt` timestamp
-3. Implement auto-lock logic: compare `lastBackgroundedAt` + timeout vs current time on resume
-4. Lock screen is a full-screen overlay via `Navigator` (not a route — prevents back-button bypass)
-5. Handle incoming notifications: lock screen → authenticate → navigate to deep-link target
-
-### Sub-step C: Lock Screen UI
-
-#### Tasks:
-1. Create `LockScreenPage` — app logo (matching splash screen), "VoiceNotes AI" title, biometric auto-prompt (if enabled), "Use PIN" button
-2. Create custom PIN keypad widget — obscured dots, 4-6 digit support, shake animation on wrong PIN
-3. Implement biometric auth via `local_auth` — check `canCheckBiometrics`, handle success/failure, auto-fallback to PIN after 3 failed attempts
-4. Implement progressive lockout: 30s → 1min → 5min cooldown after repeated wrong PINs (resets on app restart)
-5. Background matches current theme (light/dark/AMOLED)
-
-### Sub-step D: PIN Setup & Settings
-
-#### Tasks:
-1. Create `PinSetupPage` — create PIN flow (enter + confirm), change PIN flow, biometric enable prompt
-2. Add Security section to Settings menu: App Lock toggle, Change PIN, Biometric Unlock toggle, Auto-Lock Timeout picker (Immediately / 1 min / 5 min / 15 min)
-3. Widget Privacy picker (visible only when App Lock ON and widget active): Full / Record-Only / Minimal
-4. Disabling App Lock requires current PIN/biometric confirmation
-5. Show warning during setup: "If you forget your PIN, you'll need to reinstall the app. Make sure you have a backup first."
-
-### Sub-step E: Task Switcher Protection & Notifications
-
-#### Tasks:
-1. Android: set `FLAG_SECURE` on window when App Lock enabled — hides content in task switcher
-2. iOS: overlay blur when app enters background (via lifecycle observer)
-3. Update notification service: use `VISIBILITY_SECRET` when App Lock enabled — shows "VoiceNotes AI reminder" without note content
-4. Optional: FLAG_SECURE also blocks screenshots (user-configurable)
-
-### New files:
-- `lib/services/app_lock_service.dart` — Lock state, timeout, auth orchestration
-- `lib/pages/lock_screen_page.dart` — PIN keypad + biometric prompt overlay
-- `lib/pages/pin_setup_page.dart` — PIN creation and change flow
-- `lib/widgets/widget_privacy_picker.dart` — Privacy level selector (for Widget × App Lock)
-
-### Modified files:
-- `lib/models/user_settings.dart` — App Lock fields (5 new HiveFields)
-- `lib/main.dart` — Add `WidgetsBindingObserver` for auto-lock lifecycle
-- `lib/services/notification_service.dart` — VISIBILITY_SECRET when locked
-- Settings pages — New Security section
-- `pubspec.yaml` — Add `local_auth`
-- `android/app/src/main/AndroidManifest.xml` — FLAG_SECURE support
-
-### New dependencies: `local_auth`, `crypto` (dart:crypto)
-
-### Estimated effort: Medium
-
----
-
-## Step 10.6: Home Screen Widget ✅ COMPLETED
-
-**Goal:** Provide one-tap voice recording from the home screen and glanceable note/task stats. Widget behavior adapts when App Lock (Step 10.5) is enabled via Widget Privacy setting.
-
-**Spec:** [FEATURE_PHASE1_VALUE_GAPS.md — Feature 4](FEATURE_PHASE1_VALUE_GAPS.md)
-
-### Tasks:
-1. Add `home_widget` dependency
-2. Implement Small widget (2×1): App icon + "Tap to Record" → deep-links to Recording screen (unaffected by App Lock — no content displayed)
-3. Implement Dashboard widget (4×2): Record button + note count + open task count + latest note preview
-4. Android: widget layout XML, `AppWidgetProvider`, deep-link intent `voicenotesai://record`
-5. iOS: WidgetKit extension, SwiftUI widget, app group for shared data
-6. Background data refresh via WorkManager (every 30 min) or on app foreground
-7. Widget update triggers on note creation/deletion
-8. **App Lock integration:** Widget reads App Lock + Widget Privacy settings to determine display mode:
-   - App Lock OFF → full display
-   - App Lock ON + "Full" → show everything (user accepted tradeoff)
-   - App Lock ON + "Record-Only" (default) → counts only, no text preview
-   - App Lock ON + "Minimal" → icon + "Tap to Record" only
-9. Record tap: skip App Lock in Full/Record-Only modes (recording is write-only); require auth in Minimal mode
-10. Content tap (counts/preview): always show App Lock screen first if enabled
-11. First-time Widget Privacy prompt when user enables App Lock while widget is active (or adds widget while App Lock is on)
-
-### New files:
-- `android/app/src/main/res/layout/widget_small.xml`
-- `android/app/src/main/res/layout/widget_dashboard.xml`
-- Android `AppWidgetProvider` classes
-- iOS widget extension files
-
-### Modified files:
-- `pubspec.yaml` — Add `home_widget`
-- `lib/main.dart` — Widget data refresh hooks
-
-### New dependency: `home_widget`
-
-### Estimated effort: Medium
-
----
-
-## Step 10.7: Local Backup & Restore ✅ DONE
-
-**Goal:** Allow users to export their entire database as an encrypted archive and restore from it.
-
-### Sub-step A: Backup Service
-
-#### Tasks:
-1. Add `toMap()` / `fromMap()` serialization methods to all Hive models (Note, Folder, ProjectDocument, UserSettings, and nested models)
-2. Create `BackupService` — serializes all Hive boxes to JSON, collects audio/image files, creates ZIP archive, encrypts with AES-256 using user passphrase (PBKDF2 key derivation)
-3. File format: `.vnbak` (renamed ZIP) containing `manifest.json`, `data/*.json`, `audio/*`, `images/*`
-4. `manifest.json` includes: appVersion, backupFormatVersion, creation timestamp, note/folder/project counts, total file count
-5. Process in isolate to avoid UI jank; emit progress events
-
-### Sub-step B: Restore Service
-
-#### Tasks:
-1. Decrypt `.vnbak` file with user passphrase
-2. Validate ZIP integrity and `manifest.json` before proceeding
-3. Check version compatibility (warn if from newer app version)
-4. Preview screen: show backup date, counts, total size
-5. Clear all existing Hive boxes → populate from backup JSON → copy audio/image files to app directories
-6. Apply data migration logic for backups from older versions
-7. Restart app after restore
-
-### Sub-step C: Backup & Restore UI
-
-#### Tasks:
-1. Create `BackupRestorePage` with:
-   - "Last backup: [date] ([size])" or "No backups created"
-   - "Create Backup" button → passphrase dialog (with confirm, strength indicator, warning) → progress → share sheet
-   - "Restore from Backup" button → warning dialog (offer "Create Backup First") → file picker → passphrase → preview → restore → progress → restart
-2. Add route `/backup_restore` to go_router
-3. Add "Backup & Restore" entry to Settings → Data & Storage (between Storage and Danger Zone)
-4. Add `lastBackupDate` to UserSettings model
-
-### New files:
-- `lib/services/backup_service.dart` — Backup & restore logic
-- `lib/pages/backup_restore_page.dart` — UI
-
-### Modified files:
-- All Hive models — Add `toMap()` / `fromMap()` methods
-- `lib/models/user_settings.dart` — Add `lastBackupDate` HiveField
-- `lib/nav.dart` — Add `/backup_restore` route
-- Settings page — Add Backup & Restore section
-- `pubspec.yaml` — Add `archive`, `encrypt`
-
-### New dependencies: `archive`, `encrypt`
-
-### Estimated effort: Medium-Large
-
----
-
-# PHASE 2 — AI-Powered Features (Requires n8n / Cloud APIs)
-
----
-
-## Step 11: AI Transcription (Whisper API)
-
-**Goal:** Add high-accuracy cloud transcription as an upgrade over on-device STT.
-
-### Tasks:
-1. Integrate Whisper API (OpenAI) for batch transcription after recording
-2. Hybrid approach: on-device STT for live preview, Whisper for final accurate text
-3. Offline queue — save unprocessed notes, transcribe when internet available
-4. Queue indicator on Home screen
-5. Auto-process queue when connectivity detected
-
-### API Configuration:
-- API key stored securely (flutter_secure_storage or dart_define env)
-- Stateless — no user-identifying data sent beyond the audio
-- Configurable endpoint for future n8n integration
-
----
-
-## Step 12: AI Categorization & Structuring
-
-**Goal:** Parse transcriptions into actions, todos, reminders, and general notes using AI.
-
-### Tasks:
-1. **Create AI service** — `lib/services/ai_structuring_service.dart`
-   - Stateless API call to OpenAI or Anthropic
-   - Prompt engineering for extraction of actions, todos, reminders, general notes
-   - Extract topics for contextual grouping
-   - Detect follow-up trigger phrases
-   - Generate follow-up questions only if trigger detected
-
-2. **AI prompt design:**
-   ```
-   You are a note structuring assistant. Given a voice note transcription,
-   extract and categorize into:
-   1. Actions — specific things to do
-   2. Todos — task items (include due dates if mentioned)
-   3. Reminders — time-based reminders
-   4. General Notes — everything else
-   5. Topics — key subjects/projects/people mentioned
-   6. Follow-up Questions — only if the user asked for suggestions
-
-   Return as structured JSON. Be precise. Do not invent items.
-   ```
-
-3. **Auto-folder assignment:**
-   - After AI returns topics, compare against existing folder topics
-   - If match found (fuzzy matching), auto-assign note to folder
-   - If new topic, create auto-generated folder
-
-4. **Auto-reminder extraction:**
-   - When AI detects "remind me to..." or time-based phrases
-   - Auto-schedule local notification from extracted date/time
-
-5. **Follow-up questions:**
-   - Check `hasFollowUpTrigger` flag
-   - Display AI-generated questions in Note Detail
-
----
-
-## Step 13: n8n Integration & Advanced Features
-
-**Goal:** Connect to n8n workflows for extensibility.
-
-### Tasks:
-1. n8n webhook integration for transcription + structuring pipeline
-2. AI-generated folder summaries
-3. Smart search (semantic search across notes)
-4. Export capabilities (PDF, text, email)
-5. Multi-device sync considerations
-
----
-
-## Phase Summary
+Steps 1–7 + Steps 4.5/4.6/4.7 + Steps 8–10.7 are all complete. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for full details.
 
 ```
-PHASE 1 — On-Device (No AI)
-├── Step 1: Project Alignment & Branding ────── [Small]  ✅ DONE
-├── Step 2: State Management (Riverpod) ─────── [Medium] ✅ DONE
-├── Step 3: Data Models & Hive Database ─────── [Medium] ✅ DONE
-├── Step 4: Wire UI to Data Layer ───────────── [Large]  ✅ DONE
-├── Step 4.5: Project Documents ─────────────── [Large]  ✅ DONE
-│   ├── A: Data Model & Storage
-│   ├── B: Repository & Provider Layer
-│   ├── C: UI — Project Documents List
-│   ├── D: UI — Project Document Detail
-│   ├── E: UI — Note Picker & Supporting Screens
-│   └── F: Integration & Polish
-├── Step 4.6: Interactive Tasks & Reminders ──── [Med-Lg] ✅ DONE
-│   ├── A: Interactive Checkboxes on Note Detail
-│   ├── B: Checkboxes in Project Document Blocks
-│   ├── C: Aggregated Tasks View (Home tab)
-│   ├── D: Reminder Enhancement (Hybrid Model)
-│   └── E: Polish & Integration
-├── Step 4.7: Sharing, Rich Text & Images ────── [Large]  ✅ DONE
-│   ├── A: Data Model & Storage Extensions
-│   ├── B: Repository & Provider Extensions
-│   ├── C: UI — Sharing & Export
-│   ├── D: UI — Rich Text Formatting
-│   ├── E: UI — Image Blocks (Projects)
-│   ├── F: Note Detail — Photo Attachments
-│   └── G: Integration & Polish
-├── Step 5: On-Device Speech-to-Text ────────── [Medium] ✅ DONE
-├── Step 6: Waveform, Playback & Notifications ─ [Medium] ✅ DONE
-└── Step 7: Testing, Polish & Release ────────── [Large]  ✅ DONE
-    + Bonus: Splash Screen & Multi-page Quick Guide
-    + Bonus: Settings Overhaul (pickers, storage, danger zone)
-    + Bonus: Compact AppBar Headers across all pages
-    + Bonus: Voice Commands (auto-link to folder/project)
-    + Bonus: Unified Library (folders + projects)
-    + Bonus: Whisper UX (auto-scroll + flash highlight)
-    + Post-Release: Issues #7–#12 (multi-select, layout,
-      sectioned search, project rich text, share preview + PDF,
-      word count, find & replace, profanity filter)
-    + Post-Release: UI Polish & Voice Command Fixes
-      (Todo normalization, stats tile consistency, storage
-      layout, voice commands help, whisper cancel button,
-      keep-screen-awake default)
-    + Post-Release: Note Detail Refactor
-      (Tab system for Actions/Todos/Reminders/Photos,
-      simplified audio player, metadata two-row layout,
-      photo grid, onboarding logo animation,
-      share preview rich text fix)
-    + Post-Release: Rich Text Version History &
-      Picker Enhancements (richContentJson in
-      TranscriptVersion, QuillEditor preview in
-      version history, restore rich/plain, inline
-      New Folder/New Project in all pickers)
-                                                    │
-                                             PHASE 1 CORE COMPLETE (v1.0.0)
+PHASE 1 — On-Device (No AI) — ALL COMPLETE
+├── Step 1: Project Alignment & Branding ────── [Small]  ✅
+├── Step 2: State Management (Riverpod) ─────── [Medium] ✅
+├── Step 3: Data Models & Hive Database ─────── [Medium] ✅
+├── Step 4: Wire UI to Data Layer ───────────── [Large]  ✅
+├── Step 4.5: Project Documents ─────────────── [Large]  ✅
+├── Step 4.6: Interactive Tasks & Reminders ──── [Med-Lg] ✅
+├── Step 4.7: Sharing, Rich Text & Images ────── [Large]  ✅
+├── Step 5: On-Device Speech-to-Text ────────── [Medium] ✅
+├── Step 6: Waveform, Playback & Notifications ─ [Medium] ✅
+├── Step 7: Testing, Polish & Release ────────── [Large]  ✅
+├── Step 8: Pinned Notes + AMOLED + Auto-Title ─ [Small]  ✅
+├── Step 9: Note Templates ───────────────────── [Small]  ✅
+├── Step 10: Trash / Soft Delete ─────────────── [Medium] ✅
+├── Step 10.5: App Lock (PIN/Biometric) ──────── [Medium] ✅
+├── Step 10.6: Home Screen Widget ────────────── [Medium] ✅
+└── Step 10.7: Local Backup & Restore ────────── [Med-Lg] ✅
+```
 
-PHASE 1 — Value Proposition Gaps (Pre-Launch)
-├── Step 8: Pinned Notes + AMOLED + Auto-Title ── [Small]
-├── Step 9: Note Templates ───────────────────── [Small]
-├── Step 10: Trash / Soft Delete ─────────────── [Medium]
-├── Step 10.5: App Lock (PIN/Biometric) ──────── [Medium]
-├── Step 10.6: Home Screen Widget ────────────── [Medium]  ✅ DONE
-└── Step 10.7: Local Backup & Restore ────────── [Medium-Large]  (includes App Lock settings)
-    (Spec: FEATURE_PHASE1_VALUE_GAPS.md — 8 features)
-                                                    │
-                                             PHASE 1 RELEASE (Play Store)
+---
+
+# PHASE 1.5 — UX & Launch Readiness
+
+Based on comprehensive UX/product audit. Organized into 7 waves, each building on the previous. Play Store submission target: after Wave 4.
+
+**Approach rationale:** Waves are ordered so each builds on the previous. Wave 1 unblocks publishing. Wave 2 makes the first impression great. Wave 3 simplifies the mental model. Wave 4 ensures stability. Wave 5 helps users discover features. Wave 6 rewards power users. Wave 7 differentiates from competitors.
+
+---
+
+## Wave 1: Launch Blockers (Week 1) — Step 11 ✅ COMPLETE
+
+**Goal:** Remove hard blockers that prevent Play Store submission and manage user expectations.
+
+### 11.1 Privacy Policy & Terms of Service ✅
+
+**Priority:** BLOCKER — Cannot submit to Play Store without this.
+
+#### Tasks:
+1. ✅ Privacy Policy page (`/privacy_policy`) — already exists in-app
+2. ✅ Terms & Conditions page (`/terms_conditions`) — already exists in-app
+3. ⬜ Host web versions at a public URL for Play Store listing *(outside code scope)*
+4. ✅ Linked from About page (Legal section)
+5. ⬜ Add consent acknowledgment to onboarding (informational, not blocking) *(Wave 2+)*
+
+### 11.2 AI Expectation Management ✅
+
+**Priority:** Critical — prevents 1-star reviews from "where's the AI?" confusion.
+
+#### Tasks:
+1. ✅ Added "About Transcription & AI" section to About page — explains on-device Whisper + announces AI features as future update
+2. ⬜ Draft Play Store description *(outside code scope)*
+3. ⬜ Store listing AI qualifier *(outside code scope)*
+
+### 11.3 Recording Mode Clarity ✅
+
+**Priority:** High — prevents user confusion about the Android mic limitation.
+
+#### Tasks:
+1. ✅ Add one-line description below mode selector on Recording screen:
+   - Live: "Instant text as you speak — no audio replay"
+   - Whisper: "Audio saved, transcribed after recording"
+2. ✅ Add info tooltip (ⓘ) on Audio Settings transcription mode picker explaining the tradeoff in detail
+3. ✅ If user is in Live mode and taps the playback area on Note Detail, show explanatory message instead of empty player
+
+### Estimated effort: Small (3-5 days)
+### Status: ✅ COMPLETE (2026-03-03)
+
+---
+
+## Wave 2: Core Feel (Weeks 2-3) — Step 12
+
+**Goal:** Transform how the app *feels* during the first 60 seconds of use. Make the core recording → save → view cycle warm, responsive, and delightful.
+
+### 12.1 Haptic Feedback System
+
+#### Tasks:
+1. Create `HapticService` utility class with methods: `light()`, `medium()`, `heavy()`, `selection()`
+2. Add haptic feedback to:
+   - Record start / stop / pause / resume
+   - Checkbox completion (tasks, actions, reminders)
+   - Pin / Unpin actions
+   - Drag-and-drop reorder (on grab and on drop)
+   - Save confirmation
+   - Delete confirmation
+3. Respect device haptic settings (check `HapticFeedback` availability)
+
+### 12.2 Recording Sound Cues
+
+#### Tasks:
+1. Add subtle audio tone assets (record_start.mp3, record_stop.mp3) — short, non-intrusive
+2. Play on recording start and stop
+3. Respect device silent mode — no sound if muted
+4. Add setting toggle if users prefer silence (Audio & Recording settings)
+
+### 12.3 Recording Experience Animations
+
+#### Tasks:
+1. Subtle pulse animation on mic icon when speech is detected vs silence
+2. Animated "Saving…" transition when user taps Save — note visually "lands" in the feed (scale + fade)
+3. Smooth transition from recording screen back to home with saved note appearing at top
+
+### 12.4 Empty State Improvements
+
+#### Tasks:
+1. Design contextual empty state illustrations for:
+   - Home feed (Notes tab) — "Tap the mic to capture your first thought"
+   - Tasks tab — "Tasks you create in your notes appear here" with link to voice commands help
+   - Library — "Create folders to organize your notes"
+   - Projects (inside folder) — brief visual of what a project document looks like
+   - Search — "Search across all your notes, tasks, and reminders"
+2. Each empty state includes one actionable CTA (button or tappable text)
+
+### 12.5 Home Screen Progressive Disclosure
+
+#### Tasks:
+1. Hide stats cards until user has 5+ notes and 2+ folders
+2. New users see a clean, uncluttered home with just the notes feed and FAB
+3. Stats cards fade in with a subtle animation when thresholds are met
+4. Store threshold state in UserSettings to avoid recalculating on every load
+
+### 12.6 Task Completion Micro-Interactions
+
+#### Tasks:
+1. Soft check animation on checkbox completion (scale bounce)
+2. Light haptic feedback (via HapticService)
+3. Temporary green highlight (300ms) on the completed row
+4. Smooth collapse animation when hiding completed tasks in Tasks tab
+5. Apply consistently across all surfaces: Note Detail, Project Documents, Tasks View
+
+### 12.7 Guided First Recording Experience
+
+#### Tasks:
+1. After onboarding completes (first launch only), navigate to Home with a coached overlay
+2. Overlay highlights the record FAB with animated pointer: "Let's try it! Tap the mic and say something."
+3. When user taps record, overlay updates: "Great! Speak naturally, then tap Save when done."
+4. After save, overlay highlights the new note: "Here's your note! Tap to see the full transcription."
+5. Store `guidedRecordingCompleted: true` in UserSettings after completion
+6. Dismissible at any point — user can skip with an X button
+
+### New Files:
+| File | Purpose |
+|---|---|
+| `lib/services/haptic_service.dart` | Centralized haptic feedback utility |
+| `lib/widgets/guided_recording_overlay.dart` | First-recording coached experience |
+| `lib/widgets/empty_state_illustrated.dart` | Reusable empty state with illustration and CTA |
+
+### Estimated effort: Medium (8-12 days)
+
+---
+
+## Wave 3: Structural Redesign (Weeks 4-6) — Step 13
+
+**Goal:** Simplify the app's information architecture. Move projects inside folders, implement tags, and redesign for progressive disclosure.
+
+### 13.1 Move Projects Inside Folders
+
+**Impact:** Largest structural change — affects navigation, data models, providers, and multiple screens.
+
+#### Data Model Changes:
+1. Add `projectDocumentIds: List<String>` field to `Folder` model
+2. Add `folderId: String` field to `ProjectDocument` model (required — every project lives in a folder)
+3. Migration: existing project documents auto-assigned to "General" folder (or user's default folder)
+4. Run `build_runner` to regenerate type adapters
+
+#### Repository & Provider Changes:
+1. Update `ProjectDocumentsRepository` — CRUD now requires folderId
+2. Update `FoldersRepository` — add methods to manage projectDocumentIds list
+3. Update `projectDocumentsProvider` — filter by folderId
+4. Remove separate projects count from home stats
+
+#### UI Changes:
+1. **Home page:** Stats cards show Notes + Folders only (2 cards, not 3)
+2. **Library page:** Shows only folders (no separate Projects section). Remove collapsible section headers.
+3. **Folder Detail page:** Show notes AND project documents together with visual distinction. Add toggle/filter for Notes only / Projects only / All. Add "New Project" button.
+4. **SpeedDialFab (Home):** Remove "New Project" — project creation happens inside folders
+5. **SpeedDialFab (Library):** Record Note, New Folder only
+6. **Note card chips:** Remove project capsule chips from home feed (projects are accessed via folders)
+7. **Recording page:** Remove Project dropdown — only folder assignment before save
+8. **Multi-select:** Remove "Add to Project" from bulk operations on home page
+
+#### Migration:
+1. On first app launch after update, auto-migrate all existing ProjectDocuments:
+   - If a ProjectDocument has linked notes that all share the same folder → assign that folder
+   - If linked notes span multiple folders → assign to default folder
+   - If no linked notes → assign to "General" folder
+2. Show one-time migration notice: "Projects are now organized inside folders for simpler navigation"
+
+### 13.2 Tags System
+
+#### Data Model Changes:
+1. Add `tags: List<String>` field to `Note` model (HiveField)
+2. Add `allTags: List<String>` to track all known tags (stored in a lightweight Hive box or derived from notes)
+3. Run `build_runner` to regenerate type adapters
+
+#### Repository & Provider Changes:
+1. Add tag methods to `NotesRepository`: `addTag(noteId, tag)`, `removeTag(noteId, tag)`, `getAllTags()`
+2. Create `tagsProvider` — derived provider that collects all unique tags across all notes with counts
+3. Wire to search — tags as a filter criterion
+
+#### UI — Note Detail:
+1. Tag pills section below metadata (above structured output)
+2. "+" button to add tag — shows text input with autocomplete from existing tags
+3. Tap existing tag pill → remove option
+4. Tags saved immediately on add/remove
+
+#### UI — Home Feed:
+1. Tag pills displayed on note cards (inline, after folder chip)
+2. Tapping a tag pill on a card filters the feed to show only notes with that tag
+
+#### UI — Search:
+1. Add tag filter to search screen — multi-select from existing tags
+2. Tag matches included in search results
+
+#### UI — Tags Management:
+1. Tags page accessible from Library (or Settings)
+2. List all tags with note count per tag
+3. Rename tag (updates across all notes)
+4. Merge two tags into one
+5. Delete tag (removes from all notes)
+
+#### Voice Commands:
+1. Extend parser to support "Tag \<name\>" keyword (alongside existing "Folder")
+2. Multiple tags supported: "Folder Kitchen Tag Budget Tag Urgent Start..."
+3. Tags auto-created if they don't exist
+
+#### Multi-Select:
+1. Add "Add Tags" option to multi-select bottom bar
+2. Shows tag picker with autocomplete and create-new option
+
+### 13.3 Progressive Disclosure Audit
+
+#### Tasks:
+1. Audit every screen for information density
+2. Define three feature visibility tiers:
+   - **Tier 1** (everyone sees immediately): Recording, notes feed, basic search, folders
+   - **Tier 2** (discover in first week): Tasks tab, reminders, pinning, tags, templates
+   - **Tier 3** (power users when invested): Project documents, rich text, voice commands, PDF export, backup/restore, app lock, find & replace
+3. Ensure Tier 3 features are not visible on the default home screen
+4. Verify that each tier's features have corresponding contextual tips (Wave 5)
+5. Document the progressive disclosure map for future feature additions
+
+### New Files:
+| File | Purpose |
+|---|---|
+| `lib/providers/tags_provider.dart` | Derived provider for tag management |
+| `lib/pages/tags_page.dart` | Tags management screen |
+| `lib/widgets/tag_pills.dart` | Reusable tag pill display + editing widget |
+| `lib/widgets/tag_picker.dart` | Tag selection with autocomplete |
+
+### Modified Files:
+| File | Change |
+|---|---|
+| `lib/models/note.dart` | Add `tags` field |
+| `lib/models/folder.dart` | Add `projectDocumentIds` field |
+| `lib/models/project_document.dart` | Add `folderId` field |
+| `lib/pages/home_page.dart` | 2 stats cards, remove project references |
+| `lib/pages/library_page.dart` | Folders only, no separate projects section |
+| `lib/pages/folder_detail_page.dart` | Mixed notes + projects view, new project button |
+| `lib/pages/recording_page.dart` | Remove project dropdown, add tag support to voice commands |
+| `lib/pages/note_detail_page.dart` | Add tags section |
+| `lib/pages/search_page.dart` | Add tag filter |
+| `lib/services/notes_repository.dart` | Tag CRUD methods |
+| `lib/services/project_documents_repository.dart` | Folder-scoped CRUD |
+| `lib/utils/voice_command_parser.dart` | Add Tag keyword support |
+| `lib/utils/voice_command_processor.dart` | Tag creation/lookup |
+
+### Estimated effort: Large (12-18 days)
+
+---
+
+## Wave 4: Quality Foundation (Weeks 6-8) — Step 14
+
+**Goal:** Establish stability infrastructure before Play Store submission. Tests, crash reporting, and data integrity.
+
+### 14.1 Test Coverage Foundation
+
+**Target:** 70% coverage on repositories and core services.
+
+#### Unit Tests:
+1. All Hive repository CRUD operations (notes, folders, settings, project_documents, image_attachments)
+2. Data migration logic (especially projects-into-folders migration from Wave 3)
+3. Tag operations (add, remove, rename, merge, delete)
+4. Voice command parser (folder, tag, start, edge cases)
+5. Title generation algorithm (filler removal, fallbacks, truncation)
+6. Profanity filter
+7. Sharing service (text assembly, Markdown conversion)
+
+#### Widget Tests:
+1. Core flow: record → save → view note → edit → delete
+2. Search: keyword entry → results → filters → clear
+3. Task completion: checkbox → strikethrough → sync across surfaces
+4. Folder management: create → rename → archive → delete
+5. Tag management: add → remove → rename → merge
+
+#### Integration Tests:
+1. End-to-end: record → transcribe (on-device) → save → search → find
+2. Backup → restore → verify all data intact
+3. Soft delete → trash → restore → verify
+4. App lock → lock → unlock → verify navigation
+5. Project inside folder: create → add notes → edit → share
+
+### 14.2 Crash Reporting (Opt-In)
+
+#### Tasks:
+1. Add `sentry_flutter` (or `firebase_crashlytics`) dependency
+2. Create `CrashReportingService` — initialize only when opted in
+3. Add opt-in prompt during onboarding (final page): "Help improve VoiceNotes AI by sharing anonymous crash reports. No personal data is ever included."
+4. Add toggle in Preferences page: "Anonymous Crash Reporting"
+5. Store preference in `UserSettings.crashReportingEnabled`
+6. Wrap app with error boundary — capture unhandled exceptions and Flutter errors
+7. No personal data, no note content, no audio — only stack traces + device metadata
+
+### 14.3 Hive Data Integrity Checks
+
+#### Tasks:
+1. On app startup, attempt to open each Hive box in a try-catch
+2. If any box fails to open:
+   - Log the error (to crash reporting if enabled)
+   - Show recovery screen with options:
+     a. "Try Again" — reattempt opening
+     b. "Restore from Backup" — navigate to backup restore flow
+     c. "Reset App" — clear all data and start fresh (last resort)
+3. If a box opens but contains corrupt entries, skip those entries and log the count
+4. Show a one-time notice: "X items could not be loaded and were skipped"
+5. Validate referential integrity: notes reference existing folders, project blocks reference existing notes
+
+### New Files:
+| File | Purpose |
+|---|---|
+| `test/repositories/notes_repository_test.dart` | Unit tests |
+| `test/repositories/folders_repository_test.dart` | Unit tests |
+| `test/repositories/project_documents_repository_test.dart` | Unit tests |
+| `test/services/voice_command_parser_test.dart` | Unit tests |
+| `test/services/title_generator_test.dart` | Unit tests |
+| `test/widgets/recording_flow_test.dart` | Widget test |
+| `test/widgets/task_completion_test.dart` | Widget test |
+| `test/integration/backup_restore_test.dart` | Integration test |
+| `test/integration/full_flow_test.dart` | Integration test |
+| `lib/services/crash_reporting_service.dart` | Opt-in crash reporting |
+| `lib/pages/recovery_page.dart` | Data corruption recovery screen |
+
+### Estimated effort: Large (12-16 days)
+
+---
+
+### 🚀 PLAY STORE SUBMISSION POINT
+
+After Wave 4, the app is ready for Play Store submission:
+- Privacy policy and ToS in place (Wave 1)
+- Core experience polished and delightful (Wave 2)
+- Information architecture simplified (Wave 3)
+- Test coverage and crash reporting active (Wave 4)
+
+Waves 5-7 ship as post-launch updates.
+
+---
+
+## Wave 5: Discoverability & Polish (Weeks 8-10) — Step 15
+
+**Goal:** Help users discover features they'd otherwise miss. Layer on polish details.
+
+### 15.1 Contextual First-Time Tips System
+
+#### Tasks:
+1. Create `TipService` — manages which tips have been shown; checks against `UserSettings.dismissedTips`
+2. Create `ContextualTip` widget — small tooltip overlay with message, dismiss button, and optional CTA
+3. Implement tips for:
+   - First note with tasks → "Tip: Create tasks by voice — say 'Todo' followed by your task"
+   - First project document → "Tip: Drag blocks to reorder your document"
+   - First search → "Tip: Filter by tag, folder, date, or category"
+   - First swipe on note card → "Swipe right to pin, left for more actions"
+   - First time in folder with 5+ notes → "Tip: You can create project documents to compose your notes"
+   - First recording in Whisper mode → "Tip: Say 'Folder Kitchen Tag Budget Start...' to auto-organize"
+4. Tips are one-time, dismissible, non-blocking
+
+### 15.2 Overdue Task Badge on Note Cards
+
+#### Tasks:
+1. Check each note's todos for overdue items (dueDate < now && !isCompleted)
+2. Show small red badge indicator on note card (top-right area, near pin icon)
+3. Badge shows count of overdue items
+4. Only shown on home feed note cards, not in search results or folder views (to avoid clutter)
+
+### 15.3 Smart Backup Reminder
+
+#### Tasks:
+1. After user reaches 10 notes and has never created a backup → show non-intrusive banner at top of home screen: "Protect your notes — create your first backup" with Backup button
+2. If backup exists but is older than 30 days → show subtle reminder on home screen
+3. Banner dismissible; reappears on next condition match
+4. Check `UserSettings.lastBackupDate` on app foreground
+
+### 15.4 Auto-Title Edge Case Fixes
+
+#### Tasks:
+1. Test title generation with: notes under 5 words, notes that are entirely filler, non-English notes, notes with only tasks and no general content
+2. Fix any edge cases where generated title is empty or unhelpful
+3. Ensure fallback patterns always produce a meaningful title
+
+### 15.5 Folder Colors
+
+#### Tasks:
+1. Add color picker to folder creation and edit dialogs (8-10 preset colors)
+2. Store color in `Folder.color` (hex string)
+3. Display as accent stripe on folder cards in Library
+4. Display as colored dot on folder chips throughout the app (home feed, note detail, search)
+5. Default color if none selected (neutral gray)
+
+### 15.6 What's New Screen
+
+#### Tasks:
+1. Create `WhatsNewPage` — list of new features with icons, brief descriptions
+2. On app launch, compare `UserSettings.lastSeenAppVersion` to current version
+3. If different, show What's New before navigating to home
+4. Dismissible, updates `lastSeenAppVersion` on close
+5. Content stored as a simple list in a constants file (easy to update per release)
+
+### 15.7 Undo/Redo for Text Editing
+
+#### Tasks:
+1. Flutter Quill has built-in undo/redo — expose undo/redo buttons in the rich text toolbar
+2. Add undo/redo to note transcription editing (plain text mode — implement simple undo stack)
+3. Wire keyboard shortcuts if applicable (Ctrl+Z / Ctrl+Y for external keyboards)
+
+### 15.8 Loading Skeletons
+
+#### Tasks:
+1. Create `SkeletonLoader` widget — shimmer placeholder matching note card layout
+2. Replace any loading spinners on home feed, search results, folder detail with skeleton placeholders
+3. Skeleton layout matches the actual content layout (card shape, title line, preview lines)
+4. Subtle shimmer animation (left-to-right sweep)
+
+### New Files:
+| File | Purpose |
+|---|---|
+| `lib/services/tip_service.dart` | Contextual tip management |
+| `lib/widgets/contextual_tip.dart` | Tooltip overlay widget |
+| `lib/widgets/backup_reminder_banner.dart` | Smart backup reminder |
+| `lib/pages/whats_new_page.dart` | Post-update changelog |
+| `lib/widgets/skeleton_loader.dart` | Loading skeleton placeholders |
+| `lib/widgets/folder_color_picker.dart` | Color selection for folders |
+
+### Estimated effort: Medium (10-14 days)
+
+---
+
+## Wave 6: Power User Features (Weeks 10-13) — Step 16
+
+**Goal:** Reward users who are already invested. Improve efficiency and depth for daily use.
+
+### 16.1 Android App Shortcuts
+
+#### Tasks:
+1. Add static shortcuts in `AndroidManifest.xml`: "Record Note", "New Text Note"
+2. Long-press app icon → shortcuts appear
+3. Each shortcut deep-links to the appropriate route
+
+### 16.2 Note Sorting Options
+
+#### Tasks:
+1. Add sort selector on home feed (dropdown or icon button)
+2. Sort options: Date (newest first), Date (oldest first), Title (A-Z), Title (Z-A), Duration (longest first)
+3. Persist selection in `UserSettings.noteSortOrder`
+4. Apply sort to notes list via provider
+
+### 16.3 Task Batch Operations
+
+#### Tasks:
+1. Add multi-select mode to Tasks tab (matching home feed pattern — long-press to enter)
+2. Multi-select bottom bar: Bulk Complete, Bulk Delete, Bulk Reschedule
+3. Bulk Complete — marks all selected tasks as completed with animation
+4. Bulk Delete — confirmation dialog, removes from source notes
+5. Bulk Reschedule — date/time picker, applies new date to all selected reminders/todos
+
+### 16.4 Search Keyword Highlighting
+
+#### Tasks:
+1. In search results, highlight matched keywords inline within note preview text
+2. Use `TextSpan` with background highlight color matching section color
+3. Show match count per note in results
+
+### 16.5 Swipe Gestures on Note Cards
+
+#### Tasks:
+1. Implement `Dismissible` or custom swipe widget on note cards
+2. Swipe right → Pin/Unpin (blue background with pin icon)
+3. Swipe left → Reveal action buttons: Delete (red), Move to Folder (blue)
+4. First-time contextual tip (Wave 5 tip system): "Swipe notes for quick actions"
+5. Haptic feedback on swipe threshold
+
+### 16.6 Archive Folders
+
+#### Tasks:
+1. Add `isArchived: bool` field to Folder model (default: false)
+2. Archive action in folder overflow menu — sets flag, removes from main Library view
+3. "Archived" collapsible section at bottom of Library page
+4. Archived folders remain searchable
+5. Unarchive action to restore to main view
+
+### 16.7 Folder Drag-and-Drop Reordering
+
+#### Tasks:
+1. Add `sortOrder: int` field to Folder model
+2. Implement `ReorderableListView` in Library page
+3. Drag handle on each folder card (or long-press to grab)
+4. Persist new order to Hive on drop
+5. New folders default to end of list
+
+### 16.8 Accessibility Pass
+
+#### Tasks:
+1. Add semantic labels to all interactive elements:
+   - Waveform: "Recording waveform, currently recording" / "Recording paused"
+   - Recording controls: "Start recording", "Pause recording", "Stop and save"
+   - Checkboxes: "Mark [task text] as complete"
+   - Drag handles: "Reorder [item name], currently position [N]"
+   - Pin icon: "Pinned note" / "Unpin this note"
+2. Test with TalkBack (Android) and VoiceOver (iOS) — ensure full app navigable
+3. Verify contrast ratios on all 4 themes (Light, Dark, AMOLED, System) — WCAG AA minimum
+4. Test dynamic text scaling — ensure layouts don't break at 150% and 200% text size
+5. Add move up/down buttons as alternative to drag-and-drop in reorder modes
+
+### Modified Files:
+| File | Change |
+|---|---|
+| `android/app/src/main/AndroidManifest.xml` | App shortcuts |
+| `lib/pages/home_page.dart` | Sort selector, swipe gestures |
+| `lib/widgets/tasks_tab.dart` | Multi-select, batch operations |
+| `lib/pages/search_page.dart` | Keyword highlighting |
+| `lib/pages/library_page.dart` | Folder reorder, archive section |
+| `lib/models/folder.dart` | `isArchived`, `sortOrder` fields |
+| Multiple files | Semantic labels, contrast fixes, text scaling |
+
+### Estimated effort: Medium-Large (14-18 days)
+
+---
+
+## Wave 7: Differentiation (Weeks 13-17) — Step 17
+
+**Goal:** Features that set VoiceNotes AI apart from competitors. Long-term competitive advantages.
+
+### 17.1 Calendar / Timeline View
+
+#### Tasks:
+1. Create Calendar page accessible from home (calendar icon in AppBar or new tab)
+2. Monthly calendar grid with dots on days that have recordings
+3. Tap a day → shows that day's notes in a list below the calendar
+4. Upcoming reminders section below calendar — timeline of scheduled reminders
+5. Week view option (toggle between month and week)
+6. Color-code dots: blue for notes, orange for notes with open tasks, red for overdue
+
+#### New Files:
+| File | Purpose |
+|---|---|
+| `lib/pages/calendar_page.dart` | Calendar / timeline view |
+| `lib/widgets/calendar_grid.dart` | Monthly calendar widget |
+| `lib/widgets/day_notes_list.dart` | Notes list for selected day |
+
+### 17.2 Note Export Ecosystem Completion
+
+#### Tasks:
+1. **Markdown export for individual notes** — same as project document markdown export but for single notes; includes metadata header, transcription, tasks
+2. **CSV export for tasks** — all open tasks exported as CSV with columns: Type, Text, Status, Due Date, Source Note, Created At. Filterable by folder/tag before export
+3. **JSON full-data export** — entire app database as JSON for power users who want data portability. Includes notes, folders, tags, projects, tasks, settings (excludes audio files and images — too large). This is distinct from backup (which is encrypted and app-specific)
+4. All exports via share sheet
+
+### 17.3 Voice Command Confirmation & Error Recovery
+
+#### Tasks:
+1. When a voice command is detected and parsed, show a confirmation toast at bottom of screen:
+   - "Created: Todo — buy groceries" or "Folder: Kitchen, Tag: Budget"
+   - Toast includes "Undo" button (5-second window)
+2. If Undo tapped — remove the auto-created task/folder/tag assignment and keep raw transcription
+3. If voice command parsing fails (no "Start" keyword, ambiguous syntax), show warning: "Voice command not recognized — note saved as-is"
+4. Log voice command success/failure rate (anonymous, if crash reporting enabled) to measure command reliability
+
+### 17.4 Transcript-Audio Sync (Whisper Mode Only)
+
+**Note:** This feature is feasible only with Whisper mode, which provides timestamps. Not available for Live STT mode.
+
+#### Tasks:
+1. When Whisper transcribes, capture word-level or segment-level timestamps from the model output
+2. Store timestamps alongside transcription segments in the Note model (new field: `transcriptSegments: List<TranscriptSegment>`)
+3. On Note Detail, make transcript text tappable — tapping a word/sentence seeks audio to that timestamp
+4. During audio playback, auto-scroll and highlight the current segment in the transcript
+5. Visual indicator: subtle background highlight on the currently playing segment
+6. Graceful fallback: if timestamps unavailable (e.g., restored from backup, or Live STT note), disable sync features silently
+
+#### New Data Model:
+```
+TranscriptSegment
+├── text: String
+├── startTimeMs: int
+├── endTimeMs: int
+└── confidence: double?
+```
+
+### 17.5 Smart Filters (Virtual Folders)
+
+#### Tasks:
+1. Create automatically generated filter views based on existing metadata:
+   - "This Week" — notes created in the last 7 days
+   - "With Open Tasks" — notes that have uncompleted todos/actions/reminders
+   - "Reminders Due Soon" — notes with reminders in the next 48 hours
+   - "Unorganized" — notes with no folder assignment and no tags
+   - "Long Recordings" — notes with audio > 5 minutes
+2. Show as a "Smart Filters" section in Library (above folders) — collapsible
+3. Each filter shows count and opens a filtered notes list
+4. No user setup required — derived entirely from existing data
+5. Filters update automatically as data changes
+
+### 17.6 Play Store Launch Optimization
+
+#### Tasks:
+1. **Store listing copy:**
+   - Title: "VoiceNotes AI — Voice to Organized Notes"
+   - Short description (80 chars): "Record your voice. Get organized notes. 100% private."
+   - Long description: Lead with core value, mention key features (transcription, tasks, folders, privacy), note AI features coming soon
+2. **Screenshots strategy:**
+   - Screenshot 1: Recording screen with waveform — "Speak naturally"
+   - Screenshot 2: Note detail with structured output — "Auto-organized"
+   - Screenshot 3: Home feed with folders — "Everything in its place"
+   - Screenshot 4: Tasks view — "Never miss a task"
+   - Screenshot 5: Privacy/lock screen — "100% private, 100% yours"
+3. **Feature graphic** — clean design with app icon + tagline
+4. **Category:** Productivity
+5. **Keywords/ASO:** voice notes, voice recorder, speech to text, note taking, task manager, privacy
+6. **Content rating:** questionnaire completion
+7. **App signing** — verify release keystore and signing config
+8. **Test on physical devices** — minimum 3 Android devices (different screen sizes)
+
+### Estimated effort: Large (16-20 days)
+
+---
+
+## Phase Summary (Updated)
+
+```
+PHASE 1 — On-Device (No AI) ─────────── ALL COMPLETE (v1.0.0)
+│
+PHASE 1.5 — UX & Launch Readiness
+├── Wave 1: Launch Blockers ──────────── [Small]   Step 11
+│   ├── 11.1 Privacy Policy & ToS
+│   ├── 11.2 AI Expectation Management
+│   └── 11.3 Recording Mode Clarity
+├── Wave 2: Core Feel ────────────────── [Medium]  Step 12
+│   ├── 12.1 Haptic Feedback System
+│   ├── 12.2 Recording Sound Cues
+│   ├── 12.3 Recording Experience Animations
+│   ├── 12.4 Empty State Improvements
+│   ├── 12.5 Home Screen Progressive Disclosure
+│   ├── 12.6 Task Completion Micro-Interactions
+│   └── 12.7 Guided First Recording Experience
+├── Wave 3: Structural Redesign ──────── [Large]   Step 13
+│   ├── 13.1 Move Projects Inside Folders
+│   ├── 13.2 Tags System
+│   └── 13.3 Progressive Disclosure Audit
+├── Wave 4: Quality Foundation ───────── [Large]   Step 14
+│   ├── 14.1 Test Coverage Foundation
+│   ├── 14.2 Crash Reporting (Opt-In)
+│   └── 14.3 Hive Data Integrity Checks
+│                                            │
+│                                     🚀 PLAY STORE SUBMISSION
+│
+├── Wave 5: Discoverability & Polish ──── [Medium]  Step 15
+│   ├── 15.1 Contextual First-Time Tips
+│   ├── 15.2 Overdue Task Badge
+│   ├── 15.3 Smart Backup Reminder
+│   ├── 15.4 Auto-Title Edge Cases
+│   ├── 15.5 Folder Colors
+│   ├── 15.6 What's New Screen
+│   ├── 15.7 Undo/Redo for Text Editing
+│   └── 15.8 Loading Skeletons
+├── Wave 6: Power User Features ──────── [Med-Lg]  Step 16
+│   ├── 16.1 Android App Shortcuts
+│   ├── 16.2 Note Sorting Options
+│   ├── 16.3 Task Batch Operations
+│   ├── 16.4 Search Keyword Highlighting
+│   ├── 16.5 Swipe Gestures on Note Cards
+│   ├── 16.6 Archive Folders
+│   ├── 16.7 Folder Reordering
+│   └── 16.8 Accessibility Pass
+└── Wave 7: Differentiation ──────────── [Large]   Step 17
+    ├── 17.1 Calendar / Timeline View
+    ├── 17.2 Export Ecosystem Completion
+    ├── 17.3 Voice Command Confirmation
+    ├── 17.4 Transcript-Audio Sync
+    ├── 17.5 Smart Filters
+    └── 17.6 Play Store Launch Optimization
+                                             │
+                                      PHASE 1.5 COMPLETE
 
 PHASE 2 — AI-Powered
-├── Step 11: Whisper API Transcription ─────────── [Medium]
-├── Step 12: AI Categorization & Structuring ───── [Large]
-└── Step 13: n8n Integration & Advanced ────────── [Large]
-    + Project Documents Phase 2: AI summary, AI-suggested note additions
-    + Tasks Phase 2: AI auto-extraction, smart due dates, recurring reminders,
-      priority levels, Todoist/Apple Reminders API/Google Tasks API
-    (Note: voice commands moved to Phase 1 — v1.3.0)
-    (Note: sharing/export + rich text + images moved to Phase 1 — Step 4.7)
-    (Note: PDF export moved to Phase 1 — Issue #11, v1.15.0)
-                                                    │
-                                             PHASE 2 RELEASE
+├── Step 18: Auth & Account System ────── [Large]
+├── Step 19: AI Auto-Categorization ───── [Large]
+├── Step 20: Cloud Transcription ──────── [Medium]
+├── Step 21: Cloud Backup & Sync ──────── [Large]
+└── Step 22: n8n Integration & Advanced ── [Large]
+                                             │
+                                      PHASE 2 RELEASE
 ```
 
 ---
@@ -1058,10 +735,10 @@ PHASE 2 — AI-Powered
 |---|---|---|---|---|
 | 1 | ~~State management~~ | 1 | ~~Riverpod~~ | ✅ Decided |
 | 2 | On-device STT language scope | 1 | All supported vs top 10 | Affects recording UX |
-| 3 | Whisper API vs Google Cloud STT | 2 | Whisper (batch) vs Google (streaming) | Affects transcription quality |
-| 4 | AI provider | 2 | OpenAI vs Anthropic | Affects structuring quality and cost |
-| 5 | API key management | 2 | flutter_secure_storage vs dart_define env | Affects security approach |
-| 6 | ~~Step numbering~~ | 1 | ~~Renumber Phase 2 to 11-13~~ | ✅ Decided — Steps 8-10.6 for value gaps |
+| 3 | Crash reporting provider | 1.5 | Sentry vs Firebase Crashlytics | Affects privacy posture (Sentry more privacy-friendly) |
+| 4 | Whisper API vs Google Cloud STT | 2 | Whisper (batch) vs Google (streaming) | Affects transcription quality |
+| 5 | AI provider | 2 | OpenAI vs Anthropic | Affects structuring quality and cost |
+| 6 | API key management | 2 | flutter_secure_storage vs dart_define env | Affects security approach |
 
 ---
 
@@ -1071,12 +748,16 @@ PHASE 2 — AI-Powered
 |---|---|---|
 | On-device STT accuracy varies by language | 1 | Allow manual editing of transcription |
 | speech_to_text session timeout on long recordings | 1 | Auto-restart listener, stitch results |
-| Hive database corruption | 1 | Implement integrity checks, backup mechanism |
-| Large note lists slow down UI | 1 | Lazy loading, pagination |
+| Hive database corruption | 1.5 | Integrity checks on startup (Wave 4), backup mechanism |
+| Large note lists slow down UI | 1 | Lazy loading, pagination, loading skeletons |
+| Projects-in-folders migration data loss | 1.5 | Conservative auto-assignment to default folder; one-time notice |
+| Tag proliferation (too many tags) | 1.5 | Tag management page with merge/delete; autocomplete to reuse existing |
+| Contextual tips annoying users | 1.5 | One-time only, dismissible, non-blocking; respect dismissed state |
+| APK size growth (currently 66.4MB) | 1.5 | Audit dependencies; monitor per-wave; crash reporting SDK adds ~2-3MB |
+| Guided first recording feels forced | 1.5 | Dismissible at any point; skip button always visible |
+| Play Store rejection (policy compliance) | 1.5 | Privacy policy, content rating, permissions justification all addressed in Wave 1 |
 | Whisper API costs escalate with usage | 2 | Monitor per-note cost, keep on-device as default |
 | AI categorization quality varies | 2 | Invest in prompt engineering, allow manual override |
 | Large recordings fail API upload | 2 | Chunked uploads, max recording duration |
 | Mixed-language detection unreliable | 2 | Default to user-preferred language for ambiguous segments |
-| Backup passphrase loss = unrecoverable backup | 1 | Clear warning during backup creation; no recovery mechanism by design (privacy-first) |
-| Soft delete increases storage usage (30-day retention) | 1 | Show trash storage in storage display; allow manual empty |
-| Home screen widget platform differences (Android vs iOS) | 1 | Implement Android first; iOS WidgetKit as follow-up if needed |
+| Backup passphrase loss = unrecoverable backup | 1 | Clear warning during backup creation; no recovery by design (privacy-first) |

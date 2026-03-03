@@ -1,8 +1,8 @@
 # VoiceNotes AI - Project Status
 
-**Last Updated:** 2026-03-02
+**Last Updated:** 2026-03-03
 **Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). All pre-launch features complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Wave 1 (Step 11) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -14,7 +14,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 **Phase 1 = No AI.** All AI-related UI elements have been removed or replaced. See the AI exclusion table in CLAUDE.md.
 
-**All 8 value proposition gap features (Steps 8–10.7) are complete.** The app is ready for Play Store submission. Next: Phase 2 (AI-powered). See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Wave 1 (Step 11 — UX Launch Blockers) is complete. Next: Phase 1.5 Wave 2 (Step 12 — Core Feel). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 ---
 
@@ -188,6 +188,14 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Widget Privacy setting (Security page): Full / Record-Only (default) / Minimal — controls what data is shown when App Lock is enabled
 - `HomeWidgetService` pushes data to widgets on foreground resume
 - Android `VoiceNotesWidgetSmall.kt` + `VoiceNotesWidgetDashboard.kt` (AppWidgetProvider)
+
+### Step 11 (Wave 1): UX Launch Blockers ✅
+- AI expectation section added to About page (on-device Whisper explanation + AI features coming soon)
+- Recording mode description text below timer (Live vs Whisper one-liner, dynamically updates)
+- Transcription mode info tooltip in Audio Settings (AlertDialog comparing Live vs Whisper tradeoffs)
+- Live mode no-audio message on Note Detail (descriptive text instead of empty player)
+- `SettingsItem` widget extended with optional `trailing: Widget?` parameter
+- Fixed 4 spec contradictions in `PROJECT_SPECIFICATION.md` (AI Follow-up Questions removed, `/backup` → `/backup_restore`, `appLockPin` → `appLockPinHash`, `autoLockTimeoutMinutes` → `autoLockTimeoutSeconds`)
 
 ### Step 10.7: Local Backup & Restore ✅
 - Creates AES-256-CBC encrypted `.vnbak` backup files (ZIP archive wrapped in encryption)
@@ -435,6 +443,16 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - ~~Step 10.5: App Lock — PIN / Biometric~~ ✅
 - ~~Step 10.6: Home Screen Widget~~ ✅
 - ~~Step 10.7: Local Backup & Restore~~ ✅
+
+### Phase 1.5 — UX & Launch Readiness
+- ~~Step 11 (Wave 1): Launch Blockers~~ ✅
+- Step 12 (Wave 2): Core Feel ⬜
+- Step 13 (Wave 3): Structural Redesign ⬜
+- Step 14 (Wave 4): Quality Foundation ⬜
+- 🚀 **Play Store Submission** (after Wave 4)
+- Step 15 (Wave 5): Discoverability ⬜ *(post-launch)*
+- Step 16 (Wave 6): Power User Features ⬜ *(post-launch)*
+- Step 17 (Wave 7): Differentiation ⬜ *(post-launch)*
 
 ### Phase 2 — AI-Powered
 1. **Step 11:** Whisper API Transcription (cloud-based, higher accuracy)

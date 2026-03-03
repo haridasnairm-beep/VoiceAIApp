@@ -75,6 +75,71 @@ class AboutPage extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
+              // AI Expectation Notice
+              const _SectionHeader(icon: Icons.auto_awesome_rounded, title: 'About Transcription & AI'),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: theme.colorScheme.secondary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.mic_rounded, size: 18, color: theme.colorScheme.secondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Powered by on-device Whisper',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'VoiceNotes AI uses Whisper — a state-of-the-art speech recognition model '
+                      'that runs 100% on your device. No audio ever leaves your phone.',
+                      style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(Icons.rocket_launch_rounded, size: 18, color: primaryColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'AI features coming soon',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'AI-powered auto-categorization, smart task extraction, and intelligent '
+                      'structuring are arriving in a future update. These will be optional, '
+                      'opt-in features that preserve your privacy.',
+                      style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+
               // Development Credits
               _SectionHeader(icon: Icons.code_rounded, title: 'Development Credits'),
               const SizedBox(height: 12),

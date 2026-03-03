@@ -63,6 +63,7 @@ class SettingsItem extends StatelessWidget {
   final bool hasSublabel;
   final ValueChanged<bool>? onChanged;
   final VoidCallback? onTap;
+  final Widget? trailing;
 
   const SettingsItem({
     super.key,
@@ -77,6 +78,7 @@ class SettingsItem extends StatelessWidget {
     this.hasSublabel = false,
     this.onChanged,
     this.onTap,
+    this.trailing,
   });
 
   String _truncateValue(String value) {
@@ -141,6 +143,10 @@ class SettingsItem extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
             ),
+          if (trailing != null) ...[
+            const SizedBox(width: 4),
+            trailing!,
+          ],
         ],
       ),
     );

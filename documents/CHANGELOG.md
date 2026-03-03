@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-03 - Step 11 (Wave 1): UX Launch Blockers
+
+### Added
+- **About page — AI expectation section** — "About Transcription & AI" section between "About This App" and "Development Credits"; explains on-device Whisper transcription and announces AI-powered categorization/smart structuring as a future update; uses `secondaryContainer` info-card style with `auto_awesome_rounded` icon
+- **Recording page — mode description text** — one-line description below the timer: "Instant text as you speak · no audio replay" (Live) or "Audio saved · transcribed after recording" (Whisper); uses `bodySmall` / `onSurfaceVariant` style; dynamically updates when mode changes
+- **Audio Settings — transcription mode info tooltip** — `IconButton` with `info_outline_rounded` icon added as trailing widget to the Transcription Mode `SettingsItem`; tapping opens an `AlertDialog` comparing Live vs Whisper tradeoffs (accuracy, audio saving, playback, offline operation)
+- **Note Detail — Live mode no-audio message** — when a note has no audio file (`audioFilePath.isEmpty`), the audio player section now shows a descriptive message: "Live transcription note — no audio saved. Switch to Whisper mode to record audio with playback." using `subtitles_rounded` icon in a tinted container
+
+### Changed
+- **`SettingsItem` widget** — added optional `trailing: Widget?` parameter to allow custom trailing widgets beyond the built-in toggle/chevron/value types
+- **`PROJECT_SPECIFICATION.md`** — fixed 4 spec contradictions:
+  1. Removed "AI Follow-up Questions" from section 4.6 Note Detail (Phase 2 feature, violates Phase 1 AI exclusion rules)
+  2. Fixed route `/backup` → `/backup_restore` in sections 4.10 and 6.3
+  3. Fixed `appLockPin` → `appLockPinHash` in section 7 UserSettings model
+  4. Fixed `autoLockTimeoutMinutes` → `autoLockTimeoutSeconds` in section 7 UserSettings model
+
+---
+
 ## [Unreleased] - 2026-03-02 - Step 10.7: Local Backup & Restore
 
 ### Added

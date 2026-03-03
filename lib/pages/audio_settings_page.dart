@@ -753,6 +753,57 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
                         ? 'Live'
                         : 'Whisper',
                     hasSublabel: true,
+                    trailing: IconButton(
+                      icon: Icon(
+                        Icons.info_outline_rounded,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      tooltip: 'About transcription modes',
+                      onPressed: () {
+                        showDialog<void>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Transcription Modes'),
+                            content: const SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('Record & Transcribe (Whisper)',
+                                      style: TextStyle(fontWeight: FontWeight.bold)),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    '• Audio is saved to your device\n'
+                                    '• Transcription runs after you stop recording\n'
+                                    '• Supports audio playback\n'
+                                    '• Higher accuracy, especially for non-English\n'
+                                    '• Works offline — nothing leaves your phone',
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text('Live Transcription',
+                                      style: TextStyle(fontWeight: FontWeight.bold)),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    '• Text appears instantly as you speak\n'
+                                    '• No audio file saved — text only\n'
+                                    '• No playback available\n'
+                                    '• Good for quick capture\n'
+                                    '• Output is always in the speaking language',
+                                  ),
+                                ],
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Got it'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     onTap: () async {
                       final picked = await showDialog<String>(
                         context: context,

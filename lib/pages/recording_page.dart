@@ -557,6 +557,21 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                             textAlign: TextAlign.center,
                           ),
                         ],
+                        const SizedBox(height: 8),
+                        Text(
+                          _useWhisperMode
+                              ? 'Audio saved · transcribed after recording'
+                              : 'Instant text as you speak · no audio replay',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
 
