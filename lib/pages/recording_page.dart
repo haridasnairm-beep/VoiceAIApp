@@ -208,6 +208,16 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
     }
 
     if (_useWhisperMode) {
+      // Play sound cue BEFORE starting recorder — playing audio after
+      // the recorder starts can steal audio focus on Samsung devices,
+      // causing the recorder to capture no audio data.
+      HapticService.medium();
+      if (ref.read(settingsProvider).soundCuesEnabled) {
+        await SoundService.instance.playStart();
+        // Brief delay to let audio player release focus
+        await Future.delayed(const Duration(milliseconds: 150));
+      }
+
       // Record-then-transcribe: use audio recorder with WAV format
       final path = await _recorder.startWav();
       if (!mounted) return;
@@ -230,12 +240,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         _isStarting = false;
       });
       _startTimer();
-
-      // Haptic + sound cue: recording started
-      HapticService.medium();
-      if (ref.read(settingsProvider).soundCuesEnabled) {
-        SoundService.instance.playStart();
-      }
 
       // Pre-load Whisper model in background
       _whisper.ensureModelReady();
@@ -381,14 +385,15 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
     _timer?.cancel();
     WakelockPlus.disable();
     HapticService.medium();
-    if (ref.read(settingsProvider).soundCuesEnabled) {
-      SoundService.instance.playStop();
-    }
     setState(() => _isSaving = true);
 
     if (_useWhisperMode) {
-      // Whisper mode: save note immediately, transcribe in background
+      // Stop recorder FIRST, then play sound cue — playing audio while
+      // recording is active can corrupt the audio session on Samsung.
       final path = await _recorder.stop();
+      if (ref.read(settingsProvider).soundCuesEnabled) {
+        SoundService.instance.playStop();
+      }
       if (!mounted || path == null) return;
 
       // Use selected folder or the one passed via constructor
@@ -435,6 +440,10 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         transcription = await _transcription.stopListening();
       } else {
         path = await _recorder.stop();
+      }
+      // Play stop cue after recording/transcription has stopped
+      if (ref.read(settingsProvider).soundCuesEnabled) {
+        SoundService.instance.playStop();
       }
       if (!mounted) return;
 

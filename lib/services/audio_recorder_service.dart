@@ -29,8 +29,9 @@ class AudioRecorderService {
   Future<String> _buildPath({String extension = 'm4a'}) async {
     final dir = await getApplicationDocumentsDirectory();
     final recordingsDir = Directory('${dir.path}/recordings');
-    if (!await recordingsDir.exists())
+    if (!await recordingsDir.exists()) {
       await recordingsDir.create(recursive: true);
+    }
     final ts = DateTime.now().toIso8601String().replaceAll(':', '-');
     return '${recordingsDir.path}/voicenote_$ts.$extension';
   }
@@ -57,16 +58,7 @@ class AudioRecorderService {
         path: path,
       );
 
-      await _amplitudeSub?.cancel();
-      _amplitudeSub = _recorder
-          .onAmplitudeChanged(const Duration(milliseconds: 120))
-          .listen((amp) {
-        final normalized = ((amp.current + 60) / 60).clamp(0.0, 1.0);
-        level.value = normalized;
-      }, onError: (e) {
-        debugPrint('Amplitude stream error: $e');
-      });
-
+      _listenAmplitude();
       return path;
     } catch (e) {
       debugPrint('AudioRecorderService.startWithSource failed: $e');
@@ -91,17 +83,7 @@ class AudioRecorderService {
         path: path,
       );
 
-      await _amplitudeSub?.cancel();
-      _amplitudeSub = _recorder
-          .onAmplitudeChanged(const Duration(milliseconds: 120))
-          .listen((amp) {
-        // amp.current is in dBFS-ish, typically negative. Normalize to 0..1.
-        final normalized = ((amp.current + 60) / 60).clamp(0.0, 1.0);
-        level.value = normalized;
-      }, onError: (e) {
-        debugPrint('Amplitude stream error: $e');
-      });
-
+      _listenAmplitude();
       return path;
     } catch (e) {
       debugPrint('AudioRecorderService.start failed: $e');
@@ -110,6 +92,10 @@ class AudioRecorderService {
   }
 
   /// Start recording in 16kHz mono WAV format (for Whisper transcription).
+  ///
+  /// IMPORTANT: Do not play audio (just_audio, SoundService, etc.) while
+  /// this recorder is active — it will steal audio focus on some Android
+  /// devices and produce an empty file. Play cues BEFORE calling this.
   Future<String?> startWav() async {
     try {
       final ok = await ensurePermission();
@@ -127,21 +113,24 @@ class AudioRecorderService {
         path: path,
       );
 
-      await _amplitudeSub?.cancel();
-      _amplitudeSub = _recorder
-          .onAmplitudeChanged(const Duration(milliseconds: 120))
-          .listen((amp) {
-        final normalized = ((amp.current + 60) / 60).clamp(0.0, 1.0);
-        level.value = normalized;
-      }, onError: (e) {
-        debugPrint('Amplitude stream error: $e');
-      });
-
+      _listenAmplitude();
       return path;
     } catch (e) {
       debugPrint('AudioRecorderService.startWav failed: $e');
       return null;
     }
+  }
+
+  void _listenAmplitude() {
+    _amplitudeSub?.cancel();
+    _amplitudeSub = _recorder
+        .onAmplitudeChanged(const Duration(milliseconds: 120))
+        .listen((amp) {
+      final normalized = ((amp.current + 60) / 60).clamp(0.0, 1.0);
+      level.value = normalized;
+    }, onError: (e) {
+      debugPrint('Amplitude stream error: $e');
+    });
   }
 
   Future<void> pause() async {
