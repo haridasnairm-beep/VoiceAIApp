@@ -186,6 +186,10 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                   _showNewProjectDialog(context, ref);
                 } else if (value == 'rename') {
                   _showRenameDialog(context, folder!);
+                } else if (value == 'archive') {
+                  folder!.isArchived = true;
+                  ref.read(foldersProvider.notifier).updateFolder(folder);
+                  context.pop();
                 } else if (value == 'delete') {
                   _showDeleteDialog(context);
                 }
@@ -194,6 +198,10 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                 const PopupMenuItem(
                   value: 'new_project',
                   child: Text('New Project'),
+                ),
+                const PopupMenuItem(
+                  value: 'archive',
+                  child: Text('Archive'),
                 ),
                 const PopupMenuItem(
                   value: 'rename',

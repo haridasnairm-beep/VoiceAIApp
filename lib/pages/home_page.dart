@@ -14,6 +14,7 @@ import '../widgets/template_picker_sheet.dart';
 import '../widgets/empty_state_illustrated.dart';
 import '../widgets/backup_reminder_banner.dart';
 import '../providers/settings_provider.dart';
+import '../services/haptic_service.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -338,9 +339,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                     if (notes.isEmpty && !showGuidedBanner)
                       _buildEmptyState(context)
                     else if (notes.isNotEmpty) ...[
+                      // Sort selector
+                      _buildSortRow(context, ref, settings.noteSortOrder),
                       // Split into pinned and unpinned
                       ..._buildPinnedSection(
-                        context, ref, notes, folders),
+                        context, ref, notes, folders, settings.noteSortOrder),
                     ],
                   ] else ...[
                     // Tasks tab
@@ -613,17 +616,91 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // --- Dialogs ---
 
+  Widget _buildSortRow(BuildContext context, WidgetRef ref, String currentSort) {
+    const labels = {
+      'newest': 'Newest',
+      'oldest': 'Oldest',
+      'titleAZ': 'A — Z',
+      'titleZA': 'Z — A',
+      'longest': 'Longest',
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          PopupMenuButton<String>(
+            onSelected: (v) =>
+                ref.read(settingsProvider.notifier).setNoteSortOrder(v),
+            itemBuilder: (_) => labels.entries
+                .map((e) => PopupMenuItem(
+                      value: e.key,
+                      child: Row(
+                        children: [
+                          if (e.key == currentSort)
+                            Icon(Icons.check_rounded,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.primary)
+                          else
+                            const SizedBox(width: 16),
+                          const SizedBox(width: 8),
+                          Text(e.value),
+                        ],
+                      ),
+                    ))
+                .toList(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.sort_rounded,
+                    size: 18, color: Theme.of(context).colorScheme.secondary),
+                const SizedBox(width: 4),
+                Text(
+                  labels[currentSort] ?? 'Newest',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static List<Note> _applySortOrder(List<Note> notes, String sortOrder) {
+    final sorted = List<Note>.from(notes);
+    switch (sortOrder) {
+      case 'oldest':
+        sorted.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      case 'titleAZ':
+        sorted.sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      case 'titleZA':
+        sorted.sort(
+            (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+      case 'longest':
+        sorted.sort(
+            (a, b) => b.audioDurationSeconds.compareTo(a.audioDurationSeconds));
+      default: // newest
+        sorted.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+    return sorted;
+  }
+
   List<Widget> _buildPinnedSection(
     BuildContext context,
     WidgetRef ref,
     List<Note> notes,
     List<dynamic> folders,
+    String sortOrder,
   ) {
     final pinned = notes.where((n) => n.isPinned).toList()
       ..sort((a, b) =>
           (b.pinnedAt ?? DateTime.now()).compareTo(a.pinnedAt ?? DateTime.now()));
-    final unpinned = notes.where((n) => !n.isPinned).toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final unpinned = _applySortOrder(
+        notes.where((n) => !n.isPinned).toList(), sortOrder);
 
     final widgets = <Widget>[];
 
@@ -713,13 +790,29 @@ class _HomePageState extends ConsumerState<HomePage> {
       background: Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E88E5),
+          color: Theme.of(context).colorScheme.primary,
           borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 24),
-        child: const Icon(Icons.open_in_new_rounded,
-            color: Colors.white, size: 24),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              note.isPinned
+                  ? Icons.push_pin_outlined
+                  : Icons.push_pin_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              note.isPinned ? 'Unpin' : 'Pin',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
       ),
       secondaryBackground: Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -729,16 +822,24 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
-        child: const Icon(Icons.delete_rounded,
-            color: Colors.white, size: 24),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text('Delete',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
+            SizedBox(width: 6),
+            Icon(Icons.delete_rounded, color: Colors.white, size: 22),
+          ],
+        ),
       ),
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          context.push(
-            AppRoutes.noteDetail,
-            extra: {'noteId': note.id},
-          );
-          return false;
+          // Toggle pin
+          HapticService.light();
+          ref.read(notesProvider.notifier).togglePin(note.id);
+          return false; // Don't actually dismiss
         } else {
           return await _confirmDelete(context, note);
         }

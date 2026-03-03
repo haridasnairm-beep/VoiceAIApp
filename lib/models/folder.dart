@@ -37,6 +37,12 @@ class Folder extends HiveObject {
   @HiveField(10)
   int? colorValue; // Color.value int; null = default
 
+  @HiveField(11, defaultValue: false)
+  bool isArchived;
+
+  @HiveField(12, defaultValue: 0)
+  int sortOrder;
+
   Folder({
     required this.id,
     required this.name,
@@ -45,6 +51,8 @@ class Folder extends HiveObject {
     List<String>? noteIds,
     List<String>? projectDocumentIds,
     this.colorValue,
+    this.isArchived = false,
+    this.sortOrder = 0,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isDeleted = false,
@@ -63,6 +71,8 @@ class Folder extends HiveObject {
         'noteIds': noteIds,
         'projectDocumentIds': projectDocumentIds,
         'colorValue': colorValue,
+        'isArchived': isArchived,
+        'sortOrder': sortOrder,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
         'isDeleted': isDeleted,
@@ -77,6 +87,8 @@ class Folder extends HiveObject {
         noteIds: List<String>.from(m['noteIds'] as List? ?? []),
         projectDocumentIds: List<String>.from(m['projectDocumentIds'] as List? ?? []),
         colorValue: m['colorValue'] as int?,
+        isArchived: m['isArchived'] as bool? ?? false,
+        sortOrder: m['sortOrder'] as int? ?? 0,
         createdAt: DateTime.parse(m['createdAt'] as String),
         updatedAt: DateTime.parse(m['updatedAt'] as String),
         isDeleted: m['isDeleted'] as bool? ?? false,

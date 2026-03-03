@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-03-03
 **Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Waves 1–5 (Steps 11–15) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Waves 1–6 (Steps 11–16) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -14,7 +14,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 **Phase 1 = No AI.** All AI-related UI elements have been removed or replaced. See the AI exclusion table in CLAUDE.md.
 
-**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Waves 1–5 (Steps 11–15) are complete. App is **Play Store ready**. Next: Wave 6 (Step 16 — Power User Features). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Waves 1–6 (Steps 11–16) are complete. App is **Play Store ready**. Next: Wave 7 (Step 17 — Differentiation). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 ---
 
@@ -197,6 +197,13 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - **What's New screen** — version-aware (`lastSeenAppVersion` HiveField 29); 6 feature entries; shows on version change
 - **Loading skeletons** — `NoteCardSkeleton` with shimmer animation; `SkeletonNoteList` for list placeholders
 - **Auto-title edge case fixes** — improved fallback for non-English/short sentences
+
+### Step 16 (Wave 6): Power User Features ✅
+- **Android app shortcuts** — long-press icon shows Record + Search; deep-links to recording/search screens
+- **Note sorting** — 5 sort options (Newest/Oldest/A-Z/Z-A/Longest) on home feed; `noteSortOrder` (HiveField 30) persisted
+- **Swipe gestures** — swipe right to pin/unpin, swipe left to delete with confirmation; haptic feedback
+- **Folder archive** — `isArchived` (HiveField 11), `sortOrder` (HiveField 12); archive from folder detail; archived section in Library
+- **Accessibility** — semantic label on recording save button
 
 ### Step 14 (Wave 4): Quality Foundation ✅
 - **55 unit tests** — voice command parser (25), title generator (17), profanity filter (13); all passing

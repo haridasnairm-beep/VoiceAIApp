@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-03 - Step 16 (Wave 6): Power User Features
+
+### Added
+- **Android app shortcuts** — long-press launcher icon shows "Record" and "Search" shortcuts; deep-links via `voicenotesai://record` and `voicenotesai://search`; `shortcuts.xml` + `AndroidManifest.xml` meta-data
+- **Note sorting on home feed** — sort selector (popup menu) with 5 options: Newest, Oldest, A-Z, Z-A, Longest; persisted in `UserSettings.noteSortOrder` (HiveField 30); applied to unpinned notes, pinned notes always at top
+- **Swipe gestures on note cards** — swipe right to pin/unpin (blue background + pin icon + haptic), swipe left to delete (red background + confirmation dialog); disabled during multi-select mode
+- **Folder archive** — `isArchived: bool` (HiveField 11) + `sortOrder: int` (HiveField 12) on Folder model; "Archive" action in folder detail overflow menu; "N archived" row in Library links to bottom sheet with unarchive option; archived folders hidden from main list
+- **Accessibility: semantic label** on recording save button ("Stop and save recording")
+
+---
+
 ## [Unreleased] - 2026-03-03 - Step 15 (Wave 5): Discoverability & Polish
 
 ### Added

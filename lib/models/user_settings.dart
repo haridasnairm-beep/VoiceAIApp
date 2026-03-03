@@ -94,6 +94,9 @@ class UserSettings extends HiveObject {
   @HiveField(29)
   String? lastSeenAppVersion; // For What's New screen detection
 
+  @HiveField(30, defaultValue: 'newest')
+  String noteSortOrder; // newest, oldest, titleAZ, titleZA, longest
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -125,6 +128,7 @@ class UserSettings extends HiveObject {
     this.crashReportingEnabled = false,
     List<String>? dismissedTips,
     this.lastSeenAppVersion,
+    this.noteSortOrder = 'newest',
   })  : dismissedTips = dismissedTips ?? [];
 
   Map<String, dynamic> toMap() => {
@@ -158,6 +162,7 @@ class UserSettings extends HiveObject {
         'crashReportingEnabled': crashReportingEnabled,
         'dismissedTips': dismissedTips,
         'lastSeenAppVersion': lastSeenAppVersion,
+        'noteSortOrder': noteSortOrder,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -193,5 +198,6 @@ class UserSettings extends HiveObject {
         crashReportingEnabled: m['crashReportingEnabled'] as bool? ?? false,
         dismissedTips: List<String>.from(m['dismissedTips'] as List? ?? []),
         lastSeenAppVersion: m['lastSeenAppVersion'] as String?,
+        noteSortOrder: m['noteSortOrder'] as String? ?? 'newest',
       );
 }

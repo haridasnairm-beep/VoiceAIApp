@@ -471,7 +471,7 @@ Waves 5-7 ship as post-launch updates.
 
 ---
 
-## Wave 6: Power User Features (Weeks 10-13) — Step 16
+## Wave 6: Power User Features (Weeks 10-13) — Step 16 ✅ COMPLETE
 
 **Goal:** Reward users who are already invested. Improve efficiency and depth for daily use.
 

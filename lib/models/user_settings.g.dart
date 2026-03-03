@@ -48,13 +48,14 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       crashReportingEnabled: fields[27] == null ? false : fields[27] as bool,
       dismissedTips: (fields[28] as List?)?.cast<String>(),
       lastSeenAppVersion: fields[29] as String?,
+      noteSortOrder: fields[30] == null ? 'newest' : fields[30] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(30)
+      ..writeByte(31)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -114,7 +115,9 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(28)
       ..write(obj.dismissedTips)
       ..writeByte(29)
-      ..write(obj.lastSeenAppVersion);
+      ..write(obj.lastSeenAppVersion)
+      ..writeByte(30)
+      ..write(obj.noteSortOrder);
   }
 
   @override

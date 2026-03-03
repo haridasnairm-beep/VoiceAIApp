@@ -41,6 +41,7 @@ class SettingsState {
   final bool crashReportingEnabled; // Opt-in anonymous crash reporting
   final List<String> dismissedTips; // Contextual tip IDs dismissed by user
   final String? lastSeenAppVersion; // For What's New screen
+  final String noteSortOrder; // newest, oldest, titleAZ, titleZA, longest
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -74,6 +75,7 @@ class SettingsState {
     this.crashReportingEnabled = false,
     this.dismissedTips = const [],
     this.lastSeenAppVersion,
+    this.noteSortOrder = 'newest',
   });
 
   SettingsState copyWith({
@@ -108,6 +110,7 @@ class SettingsState {
     bool? crashReportingEnabled,
     List<String>? dismissedTips,
     String? Function()? lastSeenAppVersion,
+    String? noteSortOrder,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -144,6 +147,7 @@ class SettingsState {
       crashReportingEnabled: crashReportingEnabled ?? this.crashReportingEnabled,
       dismissedTips: dismissedTips ?? this.dismissedTips,
       lastSeenAppVersion: lastSeenAppVersion != null ? lastSeenAppVersion() : this.lastSeenAppVersion,
+      noteSortOrder: noteSortOrder ?? this.noteSortOrder,
     );
   }
 
@@ -225,6 +229,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       crashReportingEnabled: settings.crashReportingEnabled,
       dismissedTips: settings.dismissedTips,
       lastSeenAppVersion: settings.lastSeenAppVersion,
+      noteSortOrder: settings.noteSortOrder,
     );
   }
 
@@ -376,6 +381,14 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setCrashReportingEnabled(bool enabled) async {
     await ref.read(settingsRepositoryProvider).setCrashReportingEnabled(enabled);
     state = state.copyWith(crashReportingEnabled: enabled);
+  }
+
+  Future<void> setNoteSortOrder(String order) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.noteSortOrder = order;
+    await repo.saveSettings(settings);
+    state = state.copyWith(noteSortOrder: order);
   }
 }
 

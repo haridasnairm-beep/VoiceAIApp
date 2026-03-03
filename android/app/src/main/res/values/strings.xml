@@ -2,4 +2,8 @@
 <resources>
     <string name="widget_small_description">Quick Record: tap to start a voice note</string>
     <string name="widget_dashboard_description">Dashboard: note count, open tasks, latest note</string>
+    <string name="shortcut_record_short">Record</string>
+    <string name="shortcut_record_long">Record Voice Note</string>
+    <string name="shortcut_search_short">Search</string>
+    <string name="shortcut_search_long">Search Notes</string>
 </resources>

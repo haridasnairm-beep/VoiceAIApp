@@ -114,13 +114,14 @@ class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
     _onWidgetClicked(uri);
   }
 
-  /// Route a widget-click URI to the appropriate screen.
+  /// Route a deep-link URI (widget tap or app shortcut) to the appropriate screen.
   void _onWidgetClicked(Uri? uri) {
     if (uri == null) return;
-    if (uri.toString() == 'voicenotesai://record') {
-      // Navigate straight to Recording — App Lock will gate reading notes
-      // once the user returns to the main app.
+    final uriStr = uri.toString();
+    if (uriStr == 'voicenotesai://record') {
       AppRouter.router.go(AppRoutes.recording);
+    } else if (uriStr == 'voicenotesai://search') {
+      AppRouter.router.go(AppRoutes.search);
     }
   }
 

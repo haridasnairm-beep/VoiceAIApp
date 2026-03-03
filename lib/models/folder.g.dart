@@ -24,6 +24,8 @@ class FolderAdapter extends TypeAdapter<Folder> {
       noteIds: (fields[4] as List?)?.cast<String>(),
       projectDocumentIds: (fields[9] as List?)?.cast<String>(),
       colorValue: fields[10] as int?,
+      isArchived: fields[11] == null ? false : fields[11] as bool,
+      sortOrder: fields[12] == null ? 0 : fields[12] as int,
       createdAt: fields[5] as DateTime?,
       updatedAt: fields[6] as DateTime?,
       isDeleted: fields[7] == null ? false : fields[7] as bool,
@@ -34,7 +36,7 @@ class FolderAdapter extends TypeAdapter<Folder> {
   @override
   void write(BinaryWriter writer, Folder obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -56,7 +58,11 @@ class FolderAdapter extends TypeAdapter<Folder> {
       ..writeByte(9)
       ..write(obj.projectDocumentIds)
       ..writeByte(10)
-      ..write(obj.colorValue);
+      ..write(obj.colorValue)
+      ..writeByte(11)
+      ..write(obj.isArchived)
+      ..writeByte(12)
+      ..write(obj.sortOrder);
   }
 
   @override

@@ -31,7 +31,9 @@ class FoldersPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final folders = ref.watch(foldersProvider);
+    final allFolders = ref.watch(foldersProvider);
+    final folders = allFolders.where((f) => !f.isArchived).toList();
+    final archivedFolders = allFolders.where((f) => f.isArchived).toList();
     final tags = ref.watch(tagsProvider);
 
     return Scaffold(
@@ -157,6 +159,40 @@ class FoldersPage extends ConsumerWidget {
                           );
                         }),
 
+                        // Archived folders section
+                        if (archivedFolders.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          GestureDetector(
+                            onTap: () => _showArchivedSheet(
+                                context, ref, archivedFolders),
+                            child: Row(
+                              children: [
+                                Icon(Icons.archive_outlined,
+                                    size: 18,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${archivedFolders.length} archived',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary,
+                                      ),
+                                ),
+                                const Spacer(),
+                                Icon(Icons.chevron_right_rounded,
+                                    size: 18,
+                                    color: Theme.of(context).hintColor),
+                              ],
+                            ),
+                          ),
+                        ],
+
                         const SizedBox(height: 80),
                       ],
                     ),
@@ -243,6 +279,51 @@ class FoldersPage extends ConsumerWidget {
               },
               child: const Text('Create'),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showArchivedSheet(
+      BuildContext context, WidgetRef ref, List<dynamic> archived) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.archive_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Archived Folders',
+                      style: Theme.of(ctx)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            ...archived.map((folder) => ListTile(
+                  leading: const Icon(Icons.folder_rounded),
+                  title: Text(folder.name as String),
+                  subtitle: Text(
+                      '${folder.noteIds.length} notes'),
+                  trailing: TextButton(
+                    onPressed: () {
+                      folder.isArchived = false;
+                      ref
+                          .read(foldersProvider.notifier)
+                          .updateFolder(folder);
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('Unarchive'),
+                  ),
+                )),
+            const SizedBox(height: 8),
           ],
         ),
       ),
