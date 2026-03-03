@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-03-03
 **Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Waves 1–4 (Steps 11–14) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Waves 1–5 (Steps 11–15) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -14,7 +14,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 **Phase 1 = No AI.** All AI-related UI elements have been removed or replaced. See the AI exclusion table in CLAUDE.md.
 
-**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Waves 1–4 (Steps 11–14) are complete. App is **Play Store ready**. Next: Wave 5 (Step 15 — Discoverability & Polish, post-launch). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Waves 1–5 (Steps 11–15) are complete. App is **Play Store ready**. Next: Wave 6 (Step 16 — Power User Features). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 ---
 
@@ -188,6 +188,15 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Widget Privacy setting (Security page): Full / Record-Only (default) / Minimal — controls what data is shown when App Lock is enabled
 - `HomeWidgetService` pushes data to widgets on foreground resume
 - Android `VoiceNotesWidgetSmall.kt` + `VoiceNotesWidgetDashboard.kt` (AppWidgetProvider)
+
+### Step 15 (Wave 5): Discoverability & Polish ✅
+- **Overdue task badge** on NoteCard — red badge with overdue count next to pin icon
+- **Smart backup reminder** — banner on Home screen when 10+ notes and no/old backup; dismissible
+- **Folder colors** — `colorValue` (HiveField 10) on Folder; `FolderColorPicker` with 10 presets; color picker in creation dialog; colored folder icons
+- **Contextual tips system** — `TipService` + `ContextualTip` widget; 5 tip IDs; `dismissedTips` (HiveField 28) persistence
+- **What's New screen** — version-aware (`lastSeenAppVersion` HiveField 29); 6 feature entries; shows on version change
+- **Loading skeletons** — `NoteCardSkeleton` with shimmer animation; `SkeletonNoteList` for list placeholders
+- **Auto-title edge case fixes** — improved fallback for non-English/short sentences
 
 ### Step 14 (Wave 4): Quality Foundation ✅
 - **55 unit tests** — voice command parser (25), title generator (17), profanity filter (13); all passing

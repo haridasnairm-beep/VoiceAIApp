@@ -35,6 +35,18 @@ class NoteCard extends StatelessWidget {
     this.onProjectTap,
   });
 
+  int get _overdueCount {
+    final now = DateTime.now();
+    int count = 0;
+    for (final t in note.todos) {
+      if (!t.isCompleted && t.dueDate != null && t.dueDate!.isBefore(now)) count++;
+    }
+    for (final r in note.reminders) {
+      if (!r.isCompleted && r.reminderTime != null && r.reminderTime!.isBefore(now)) count++;
+    }
+    return count;
+  }
+
   String _formatDuration(int seconds) {
     if (seconds <= 0) return '';
     final m = seconds ~/ 60;
@@ -141,11 +153,36 @@ class NoteCard extends StatelessWidget {
                     color: theme.hintColor,
                   ),
                 ),
-                if (note.isPinned) ...[
-                  const Spacer(),
+                if (note.isPinned || _overdueCount > 0) const Spacer(),
+                if (_overdueCount > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.warning_amber_rounded,
+                            size: 10, color: Colors.white),
+                        const SizedBox(width: 2),
+                        Text(
+                          '$_overdueCount overdue',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (note.isPinned) const SizedBox(width: 6),
+                ],
+                if (note.isPinned)
                   Icon(Icons.push_pin_rounded,
                       size: 14, color: theme.colorScheme.primary),
-                ],
               ],
             ),
 

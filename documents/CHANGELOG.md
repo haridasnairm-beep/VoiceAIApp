@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-03 - Step 15 (Wave 5): Discoverability & Polish
+
+### Added
+- **Overdue task badge** on NoteCard — red badge with count of overdue todos/reminders; displayed next to pin icon in metadata row
+- **Smart backup reminder** (`lib/widgets/backup_reminder_banner.dart`) — non-intrusive `tertiaryContainer` banner on Home screen; shows when 10+ notes and never backed up, or last backup > 30 days old; dismissible per session; links to Backup & Restore page
+- **Folder colors** — `colorValue: int?` (HiveField 10) on Folder model; `FolderColorPicker` widget with 10 preset colors; color picker in folder creation dialog; folder card icons use folder color with 15% opacity background
+- **Contextual tips system** — `TipService` manages dismissed tip IDs via `UserSettings.dismissedTips` (HiveField 28); `ContextualTip` widget for non-blocking discovery tooltips; 5 tip IDs defined (voice_task, project_reorder, search_filter, voice_organize, folder_project)
+- **What's New screen** (`lib/pages/whats_new_page.dart`) — version-aware feature highlight screen; compares `UserSettings.lastSeenAppVersion` (HiveField 29) to `currentAppVersion`; shows on version change; 6 feature entries for current release
+- **Loading skeleton** (`lib/widgets/skeleton_loader.dart`) — `NoteCardSkeleton` with shimmer animation matching note card layout; `SkeletonNoteList` for multiple placeholders
+
+### Changed
+- **Auto-title generator** — improved edge case handling: added fallback for non-English text where filler stripping leaves short sentences; raw first sentence used as last resort if > 1 word
+
+---
+
 ## [Unreleased] - 2026-03-03 - Step 14 (Wave 4): Quality Foundation
 
 ### Added

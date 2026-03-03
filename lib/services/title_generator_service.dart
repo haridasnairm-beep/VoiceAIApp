@@ -56,6 +56,8 @@ class TitleGeneratorService {
     // Split into sentences
     final sentences = text.split(RegExp(r'[.!?]+'));
 
+    String? bestShort; // Fallback: best short sentence (1-2 words after cleaning)
+
     for (var sentence in sentences) {
       sentence = sentence.trim();
       if (sentence.isEmpty) continue;
@@ -70,12 +72,28 @@ class TitleGeneratorService {
 
       if (cleaned.isEmpty) continue;
 
-      // Check if remaining sentence has enough substance (> 3 words)
+      // Check if remaining sentence has enough substance (> 2 words)
       final words = cleaned.split(RegExp(r'\s+'));
-      if (words.length <= 2) continue;
+      if (words.length <= 2) {
+        // Keep as fallback if nothing better is found
+        bestShort ??= cleaned;
+        continue;
+      }
 
       // Good sentence found — clean and truncate
       return _truncate(_capitalize(cleaned));
+    }
+
+    // Fallback: if no 3+ word sentence found, try the raw first sentence
+    // (useful for non-English text where filler stripping doesn't apply)
+    if (bestShort == null) {
+      final firstSentence = sentences.firstWhere(
+        (s) => s.trim().isNotEmpty,
+        orElse: () => '',
+      ).trim();
+      if (firstSentence.isNotEmpty && firstSentence.split(RegExp(r'\s+')).length > 1) {
+        return _truncate(_capitalize(firstSentence));
+      }
     }
 
     return null;

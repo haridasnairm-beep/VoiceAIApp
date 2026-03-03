@@ -7,6 +7,7 @@ import '../providers/folders_provider.dart';
 import '../providers/tags_provider.dart';
 import '../widgets/speed_dial_fab.dart';
 import '../widgets/empty_state_illustrated.dart';
+import '../widgets/folder_color_picker.dart';
 
 class FoldersPage extends ConsumerWidget {
   const FoldersPage({super.key});
@@ -139,19 +140,22 @@ class FoldersPage extends ConsumerWidget {
                         ],
 
                         // Folders list
-                        ...folders.map((folder) => _FolderCard(
-                              title: folder.name,
-                              noteCount: folder.noteIds.length,
-                              projectCount: folder.projectDocumentIds.length,
-                              lastActive: _formatDate(folder.updatedAt),
-                              icon: Icons.folder_rounded,
-                              iconBg: const Color(0xFFE3F2FD),
-                              iconColor: const Color(0xFF1E88E5),
-                              onTap: () => context.push(
-                                AppRoutes.folderDetail,
-                                extra: {'folderId': folder.id},
-                              ),
-                            )),
+                        ...folders.map((folder) {
+                          final fc = folderColor(folder.colorValue);
+                          return _FolderCard(
+                            title: folder.name,
+                            noteCount: folder.noteIds.length,
+                            projectCount: folder.projectDocumentIds.length,
+                            lastActive: _formatDate(folder.updatedAt),
+                            icon: Icons.folder_rounded,
+                            iconBg: fc.withValues(alpha: 0.15),
+                            iconColor: fc,
+                            onTap: () => context.push(
+                              AppRoutes.folderDetail,
+                              extra: {'folderId': folder.id},
+                            ),
+                          );
+                        }),
 
                         const SizedBox(height: 80),
                       ],
@@ -187,33 +191,60 @@ class FoldersPage extends ConsumerWidget {
 
   void _showNewFolderDialog(BuildContext context, WidgetRef ref) {
     final controller = TextEditingController();
+    int? selectedColor;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New Folder'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Folder name',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('New Folder'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Folder name',
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Color',
+                  style: Theme.of(ctx).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(ctx).colorScheme.secondary)),
+              const SizedBox(height: 8),
+              FolderColorPicker(
+                selectedColorValue: selectedColor,
+                onColorSelected: (v) =>
+                    setDialogState(() => selectedColor = v),
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final name = controller.text.trim();
+                if (name.isNotEmpty) {
+                  final folder = await ref
+                      .read(foldersProvider.notifier)
+                      .addFolder(name: name);
+                  if (selectedColor != null) {
+                    folder.colorValue = selectedColor;
+                    await ref
+                        .read(foldersProvider.notifier)
+                        .updateFolder(folder);
+                  }
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                ref.read(foldersProvider.notifier).addFolder(name: name);
-                Navigator.of(ctx).pop();
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
       ),
     );
   }

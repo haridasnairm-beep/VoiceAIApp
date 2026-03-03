@@ -39,6 +39,8 @@ class SettingsState {
   final bool soundCuesEnabled; // Play subtle beep on recording start/stop
   final bool guidedRecordingCompleted; // First-recording coaching done
   final bool crashReportingEnabled; // Opt-in anonymous crash reporting
+  final List<String> dismissedTips; // Contextual tip IDs dismissed by user
+  final String? lastSeenAppVersion; // For What's New screen
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -70,6 +72,8 @@ class SettingsState {
     this.soundCuesEnabled = true,
     this.guidedRecordingCompleted = false,
     this.crashReportingEnabled = false,
+    this.dismissedTips = const [],
+    this.lastSeenAppVersion,
   });
 
   SettingsState copyWith({
@@ -102,6 +106,8 @@ class SettingsState {
     bool? soundCuesEnabled,
     bool? guidedRecordingCompleted,
     bool? crashReportingEnabled,
+    List<String>? dismissedTips,
+    String? Function()? lastSeenAppVersion,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -136,6 +142,8 @@ class SettingsState {
       soundCuesEnabled: soundCuesEnabled ?? this.soundCuesEnabled,
       guidedRecordingCompleted: guidedRecordingCompleted ?? this.guidedRecordingCompleted,
       crashReportingEnabled: crashReportingEnabled ?? this.crashReportingEnabled,
+      dismissedTips: dismissedTips ?? this.dismissedTips,
+      lastSeenAppVersion: lastSeenAppVersion != null ? lastSeenAppVersion() : this.lastSeenAppVersion,
     );
   }
 
@@ -215,6 +223,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
       soundCuesEnabled: settings.soundCuesEnabled,
       guidedRecordingCompleted: settings.guidedRecordingCompleted,
       crashReportingEnabled: settings.crashReportingEnabled,
+      dismissedTips: settings.dismissedTips,
+      lastSeenAppVersion: settings.lastSeenAppVersion,
     );
   }
 

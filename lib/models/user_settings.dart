@@ -88,6 +88,12 @@ class UserSettings extends HiveObject {
   @HiveField(27, defaultValue: false)
   bool crashReportingEnabled; // Opt-in anonymous crash reporting via Sentry
 
+  @HiveField(28)
+  List<String> dismissedTips; // IDs of contextual tips the user has dismissed
+
+  @HiveField(29)
+  String? lastSeenAppVersion; // For What's New screen detection
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -117,7 +123,9 @@ class UserSettings extends HiveObject {
     this.soundCuesEnabled = true,
     this.guidedRecordingCompleted = false,
     this.crashReportingEnabled = false,
-  });
+    List<String>? dismissedTips,
+    this.lastSeenAppVersion,
+  })  : dismissedTips = dismissedTips ?? [];
 
   Map<String, dynamic> toMap() => {
         'defaultLanguage': defaultLanguage,
@@ -148,6 +156,8 @@ class UserSettings extends HiveObject {
         'soundCuesEnabled': soundCuesEnabled,
         'guidedRecordingCompleted': guidedRecordingCompleted,
         'crashReportingEnabled': crashReportingEnabled,
+        'dismissedTips': dismissedTips,
+        'lastSeenAppVersion': lastSeenAppVersion,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -181,5 +191,7 @@ class UserSettings extends HiveObject {
         soundCuesEnabled: m['soundCuesEnabled'] as bool? ?? true,
         guidedRecordingCompleted: m['guidedRecordingCompleted'] as bool? ?? false,
         crashReportingEnabled: m['crashReportingEnabled'] as bool? ?? false,
+        dismissedTips: List<String>.from(m['dismissedTips'] as List? ?? []),
+        lastSeenAppVersion: m['lastSeenAppVersion'] as String?,
       );
 }

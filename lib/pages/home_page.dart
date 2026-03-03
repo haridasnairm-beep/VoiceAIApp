@@ -12,6 +12,7 @@ import '../widgets/tasks_tab.dart';
 import '../widgets/note_card.dart';
 import '../widgets/template_picker_sheet.dart';
 import '../widgets/empty_state_illustrated.dart';
+import '../widgets/backup_reminder_banner.dart';
 import '../providers/settings_provider.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -25,6 +26,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   int _selectedTab = 0; // 0 = Notes, 1 = Tasks
   bool _selectionMode = false;
   final Set<String> _selectedNoteIds = {};
+  bool _backupReminderDismissed = false;
 
   void _toggleSelection(String noteId) {
     setState(() {
@@ -65,6 +67,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Guided first-recording banner: show when not completed and no notes yet
     final showGuidedBanner =
         !settings.guidedRecordingCompleted && notes.isEmpty;
+
+    // Backup reminder: show when 10+ notes and never backed up, or backup > 30 days old
+    final showBackupReminder = !_backupReminderDismissed &&
+        notes.length >= 10 &&
+        (settings.lastBackupDate == null ||
+            DateTime.now().difference(settings.lastBackupDate!).inDays > 30);
 
     // Auto-dismiss guided banner once the user has recorded their first note
     if (settings.guidedRecordingCompleted == false && notes.isNotEmpty) {
@@ -317,6 +325,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                     // Guided first-recording banner
                     if (showGuidedBanner)
                       _buildGuidedBanner(context, ref),
+
+                    // Backup reminder banner
+                    if (showBackupReminder && !showGuidedBanner)
+                      BackupReminderBanner(
+                        neverBackedUp: settings.lastBackupDate == null,
+                        onDismiss: () => setState(() =>
+                            _backupReminderDismissed = true),
+                      ),
 
                     // Notes List or Empty State
                     if (notes.isEmpty && !showGuidedBanner)

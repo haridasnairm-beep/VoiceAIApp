@@ -383,7 +383,7 @@ Waves 5-7 ship as post-launch updates.
 
 ---
 
-## Wave 5: Discoverability & Polish (Weeks 8-10) — Step 15
+## Wave 5: Discoverability & Polish (Weeks 8-10) — Step 15 ✅ COMPLETE
 
 **Goal:** Help users discover features they'd otherwise miss. Layer on polish details.
 
