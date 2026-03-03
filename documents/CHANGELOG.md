@@ -59,6 +59,71 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-02 - Step 10.5: App Lock — PIN / Biometric Authentication
+
+### Added
+- **`AppLockService`** — singleton managing lock state, PIN hashing (salted SHA-256 via `crypto`, salt stored in `flutter_secure_storage`), timeout tracking, and progressive lockout (30 s / 1 min / 5 min after repeated failed attempts)
+- **`LockScreenPage`** — full-screen overlay with app logo, biometric auto-prompt on open, custom PIN keypad with obscured dot indicators, shake animation on wrong PIN, `PopScope` prevents back-button bypass
+- **`SecurityPage`** — App Lock toggle (triggers inline PIN-setup flow), Change PIN flow (current → new → confirm), Biometric Unlock toggle (tests biometric availability before enabling), Auto-Lock Timeout picker (Immediately / 1 min / 5 min / 15 min), informational warning about PIN recovery
+- **`/security` route** — new `GoRoute` in `AppRouter`; accessible from Home screen overflow menu (new "Security" entry)
+- `appLockEnabled`, `appLockPinHash`, `biometricEnabled`, `autoLockTimeoutSeconds` (HiveFields 19–22) on `UserSettings`
+- `setAppLockEnabled()`, `setPinHash()`, `setBiometricEnabled()`, `setAutoLockTimeout()` on `SettingsRepository` and `SettingsNotifier`
+
+### Changed
+- `main.dart` — converted to `ConsumerStatefulWidget` with `WidgetsBindingObserver`; auto-locks on app pause/resume via `AppLockService`; shows `LockScreenPage` on cold start when App Lock is enabled
+- `home_page.dart` — added "Security" `PopupMenuItem` to overflow menu
+- `AndroidManifest.xml` — added `USE_BIOMETRIC` permission
+- `pubspec.yaml` — added `local_auth: ^2.3.0`, `crypto: ^3.0.6`
+
+### New Dependencies
+- `local_auth: ^2.3.0` — biometric (fingerprint / face) authentication
+- `crypto: ^3.0.6` — SHA-256 PIN hashing
+
+---
+
+## [Unreleased] - 2026-03-02 - Step 10: Trash / Soft Delete (30-day Retention)
+
+### Added
+- **`TrashPage`** — displays trashed Notes, Folders, and Projects in three sections; per-item Restore and Permanent Delete actions; "Empty Trash" button to wipe all trashed items; "X days remaining" badge on each item
+- **`/trash` route** — new `GoRoute` in `AppRouter`; accessible from Home screen overflow menu (new "Trash" entry)
+- **`isDeleted`** / **`deletedAt`** fields on `Note` (HiveFields), `Folder`, and `ProjectDocument` models — enable soft-delete without removing from Hive
+- **`previousFolderId`** on `Note` — remembers the original folder so restore correctly reassigns the note
+- **Auto-purge on startup** — `main.dart` calls purge at launch; items in trash for > 30 days are permanently deleted (audio + image files removed from disk)
+- **Undo SnackBar** — delete actions show a 5-second undo snackbar before the soft-delete is committed
+
+### Changed
+- All repository `getAll*()` methods (`NotesRepository`, `FoldersRepository`, `ProjectDocumentsRepository`) — now filter out `isDeleted == true` items so trashed content is invisible in normal views
+- Permanent delete — removes the Hive record and cleans up associated audio / image files on disk
+- Search — excludes trashed items at repository level
+- Tasks provider — automatically excludes tasks belonging to trashed notes
+- Bulk delete — uses soft-delete pattern (moves to trash, not immediate permanent delete)
+- `home_page.dart` — added "Trash" `PopupMenuItem` to overflow menu
+
+---
+
+## [Unreleased] - 2026-03-02 - Step 8+9: Pinned Notes, AMOLED Theme, Auto-Title, Note Templates
+
+### Added (Step 8 — Pinned Notes, AMOLED Theme, Auto-Title Generation)
+- **Pinned Notes** — `isPinned` / `pinnedAt` fields on `Note` model; pinned notes appear in a dedicated "Pinned" section at the top of Home and Folder Detail; maximum 10 pinned notes enforced with user-facing warning; pin/unpin available from note card long-press selection bar and Note Detail overflow menu; pin icon overlay on note cards
+- **AMOLED Dark Theme** — pure-black (`#000000`) background and near-black card surfaces; fourth option ("AMOLED Dark") in the theme picker alongside System/Light/Dark; `isAmoled` flag exposed in `SettingsState`; `theme.dart` extended with `amoledDark` `ThemeData`
+- **Auto-Title Generation (`TitleGeneratorService`)** — strips common filler phrases, extracts the first meaningful sentence, applies task-based fallbacks (action items, todos), truncates to 60 characters; called automatically after Whisper transcription completes; `isUserEditedTitle` flag on `Note` prevents overwriting manually typed titles
+
+### Added (Step 9 — Note Templates)
+- **6 built-in templates** — Meeting Notes, Daily Journal, Idea Capture, Grocery List, Project Planning, Quick Checklist; stored as constants in `lib/constants/note_templates.dart`
+- **`TemplatePicker` bottom sheet (`template_picker_sheet.dart`)** — shown from SpeedDialFab "Text Note" action; displays template cards with name + preview; selecting a template pre-fills the Quill editor and auto-generates a title from the template name + current date
+- **Template content pre-fill** — `NoteDetailPage` accepts `templateContent` and `templateTitle` extras from the router so template data flows cleanly from picker to editor
+
+### Changed
+- `Note` model — added `isPinned` (HiveField), `pinnedAt` (HiveField), `isUserEditedTitle` (HiveField)
+- `NotesProvider` — added `pinNote()` / `unpinNote()` methods; notes sorted: pinned first (by `pinnedAt` desc), then remaining (by `createdAt` desc)
+- `SettingsState` / `SettingsNotifier` — added `isAmoled` field and `setThemeMode()` AMOLED support
+- `preferences_page.dart` — theme picker shows four options including AMOLED Dark
+- `home_page.dart` — Pinned section at top of Notes tab; SpeedDialFab "Text Note" now opens template picker before navigating to Note Detail
+- `note_detail_page.dart` — pin/unpin action in overflow menu; respects `isUserEditedTitle` to protect manual title edits
+- `note_card.dart` — pin icon overlay when `note.isPinned == true`
+
+---
+
 ## [Unreleased] - 2026-03-02 - Documentation: Release Status & Value Gaps Integration
 
 ### Documentation
