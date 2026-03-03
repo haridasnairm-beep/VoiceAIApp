@@ -14,7 +14,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 **Phase 1 = No AI.** All AI-related UI elements have been removed or replaced. See the AI exclusion table in CLAUDE.md.
 
-**Next phase:** 8 value proposition gap features (Steps 8–10.7) to match competitor expectations before Play Store release. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**All 8 value proposition gap features (Steps 8–10.7) are complete.** The app is ready for Play Store submission. Next: Phase 2 (AI-powered). See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 
 ---
 
@@ -33,10 +33,10 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - All providers backed by Hive repositories
 
 ### Step 3: Data Models & Hive Database ✅
-- 6 Hive models with generated type adapters
-- AES-256 encrypted boxes for notes, folders, settings
-- Repository layer (notes, folders, settings)
-- HiveService singleton with initialization and deleteAllData()
+- 10 Hive models with generated type adapters (Note, ActionItem, TodoItem, ReminderItem, Folder, UserSettings, ProjectDocument, ProjectBlock, TranscriptVersion, ImageAttachment)
+- AES-256 encrypted boxes: notes, folders, settings, project_documents, image_attachments
+- Repository layer (notes, folders, settings, project_documents, image_attachments)
+- HiveService singleton with initialization, migration helpers, and deleteAllData()
 
 ### Step 4: Wire UI to Data Layer ✅
 - All 8 active pages converted to ConsumerWidget/ConsumerStatefulWidget
@@ -160,6 +160,46 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 ---
 
+## Value Proposition Gap Features (Steps 8–10.7)
+
+### Step 8+9: Pinned Notes, AMOLED Theme, Auto-Title, Note Templates ✅
+- Pinned notes float to top of home list; pin/unpin from overflow menu
+- AMOLED dark theme (true black) as a third theme option
+- Auto-title generated from first non-empty line of transcription (unless user manually edited title)
+- Note templates: bottom sheet picker with pre-defined content/title structures; accessible from SpeedDialFab
+
+### Step 10: Trash / Soft Delete ✅
+- Soft delete for notes, folders, and project documents (30-day retention before permanent purge)
+- Trash page: browse, restore, or permanently delete soft-deleted items
+- Purge of expired items runs on app startup
+- Notes show "(Deleted)" badge when in trash; folder soft-delete moves notes to trash too
+
+### Step 10.5: App Lock — PIN / Biometric ✅
+- PIN setup and change flow in Security settings page
+- Biometric authentication via `local_auth` (fingerprint / face unlock)
+- Auto-lock timeout options: immediately, 1 min, 5 min, 15 min
+- Lock screen page with PIN entry + biometric trigger
+- SHA-256 PIN hashing (never store raw PIN) via `crypto` package
+- `AppLockService` for hash verification and biometric auth
+
+### Step 10.6: Home Screen Widget ✅
+- Quick Record widget (2×1): tap anywhere to open Recording screen directly
+- Dashboard widget (4×2): shows note count, open task count, latest note preview
+- Widget Privacy setting (Security page): Full / Record-Only (default) / Minimal — controls what data is shown when App Lock is enabled
+- `HomeWidgetService` pushes data to widgets on foreground resume
+- Android `VoiceNotesWidgetSmall.kt` + `VoiceNotesWidgetDashboard.kt` (AppWidgetProvider)
+
+### Step 10.7: Local Backup & Restore ✅
+- Creates AES-256-CBC encrypted `.vnbak` backup files (ZIP archive wrapped in encryption)
+- Key derived via 10,000 rounds of SHA-256 from user passphrase + random 16-byte salt
+- Archive includes: `manifest.json`, `data.json` (all Hive records), `images/`, `audio/` (optional)
+- Restore: decrypt → unzip → clear Hive → populate from JSON → copy files
+- `BackupRestorePage`: passphrase + confirm, include-audio toggle, progress bar, share sheet on backup; file picker, passphrase, manifest preview card, restore progress on restore
+- `lastBackupDate` persisted in `UserSettings` (HiveField 24)
+- `toMap()` / `fromMap()` added to all 10 Hive model classes
+
+---
+
 ## Post-Release Enhancements (GitHub Issues #7–#12)
 
 ### Issue #7: Home Dashboard Tiles ✅ COMPLETED
@@ -220,12 +260,12 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 |---|---|---|
 | Project Setup | ✅ Done | Flutter project, branding aligned |
 | Theme System | ✅ Done | Light/dark mode, Material 3, Google Fonts |
-| Navigation | ✅ Done | 23 routes via go_router with extras, onboarding redirect |
+| Navigation | ✅ Done | 26 routes via go_router with extras, onboarding redirect |
 | Audio Recording Service | ✅ Done | Record, pause, resume, stop, cancel |
 | Audio Player Service | ✅ Done | Play, pause, seek via just_audio |
 | Transcription Service | ✅ Done | On-device STT via speech_to_text |
 | Notification Service | ✅ Done | Schedule, cancel, deep-link notifications |
-| Hive Database | ✅ Done | AES-256 encrypted, 3 boxes |
+| Hive Database | ✅ Done | AES-256 encrypted, 5 boxes (notes, folders, settings, project_documents, image_attachments) |
 | Riverpod Providers | ✅ Done | 7 providers connected to repositories (notes, folders, settings, project_documents, tasks + 2 repo providers) |
 | App Logo/Icon | ✅ Done | `assets/icons/logo.png` — launcher + in-app |
 
@@ -346,6 +386,26 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 77. Version history preserves and displays rich text formatting (Quill Delta JSON stored per version)
 78. Restoring a rich text version restores formatting; restoring plain text version reverts to plain mode
 79. "New Folder" and "New Project" inline creation in all folder/project picker bottom sheets
+80. Pinned notes float to top of home list with pin icon badge; pin/unpin from overflow menu
+81. AMOLED dark theme (true-black) as a third theme option alongside light and system dark
+82. Auto-title generated from first non-empty transcription line (respects user-edited titles)
+83. Note templates: SpeedDialFab → "From Template" → pre-filled note with title and content
+84. Soft delete for notes, folders, and project documents — moved to Trash, 30-day retention
+85. Trash page: browse all deleted items, restore individually, permanently delete, purge all
+86. Expired trash items (>30 days) purged automatically on app startup
+87. App Lock: PIN setup, change, and removal via Security settings
+88. Biometric authentication (fingerprint / face) as alternative to PIN unlock
+89. Auto-lock timeout: immediately, 1 min, 5 min, 15 min — configurable in Security settings
+90. Lock screen page with PIN entry pad + biometric trigger button
+91. Quick Record home screen widget (2×1): tap to open Recording screen; always safe, no content shown
+92. Dashboard home screen widget (4×2): note count, open task count, latest note preview
+93. Widget Privacy setting controls what the Dashboard widget shows when App Lock is enabled
+94. Widget data refreshed on every app foreground resume
+95. AES-256 encrypted backup: passphrase + confirm, progress bar, shares as .vnbak file
+96. Backup includes all notes, folders, settings, project documents, images, and optionally audio
+97. Restore: select .vnbak file → enter passphrase → verify & preview manifest → confirm → restore
+98. Backup manifest preview shows creation date, app version, note/folder/image counts before restoring
+99. Last backup date displayed on Backup & Restore page header
 
 ---
 
@@ -368,13 +428,13 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 ## Next Steps
 
-### Phase 1 — Value Proposition Gaps (7/8 complete)
+### Phase 1 — Value Proposition Gaps ✅ ALL COMPLETE (8/8)
 - ~~Step 8: Pinned Notes + AMOLED + Auto-Title~~ ✅
 - ~~Step 9: Note Templates~~ ✅
 - ~~Step 10: Trash / Soft Delete~~ ✅
 - ~~Step 10.5: App Lock — PIN / Biometric~~ ✅
 - ~~Step 10.6: Home Screen Widget~~ ✅
-- **Step 10.7: Local Backup & Restore** ← next
+- ~~Step 10.7: Local Backup & Restore~~ ✅
 
 ### Phase 2 — AI-Powered
 1. **Step 11:** Whisper API Transcription (cloud-based, higher accuracy)

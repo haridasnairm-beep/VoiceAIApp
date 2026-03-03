@@ -11,7 +11,7 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 
 **VoiceNotes AI** is a privacy-first, voice-driven note-taking and task management mobile app built with Flutter. Users record voice notes, the app transcribes audio on-device, and organizes content into folders with manual categorization.
 
-**Current Phase:** Phase 1 (Release) — Core 100% complete (all 7 steps + Steps 4.5/4.6/4.7 + bonus features + post-release enhancements Issues #7–#12). Version 1.0.0. **Next:** Value Proposition Gaps (Steps 8–10.7).
+**Current Phase:** Phase 1 (Release) — 100% complete. All 7 core steps + Steps 4.5/4.6/4.7 + post-release enhancements (Issues #7–#12) + all 8 value proposition gap features (Steps 8–10.7). Version 1.0.0. **Next:** Phase 2 (AI-powered features).
 
 ---
 
@@ -19,7 +19,7 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 
 | Phase | Scope | AI Required |
 |---|---|---|
-| **Phase 1 (Current)** | On-device recording, transcription (speech_to_text + whisper_flutter_new), local storage, manual organization, playback, notifications, project documents, tasks, sharing/export, rich text, image blocks | **No AI** |
+| **Phase 1 (Complete)** | On-device recording, transcription (speech_to_text + whisper_flutter_new), local storage, manual organization, playback, notifications, project documents, tasks, sharing/export, rich text, image blocks, pinned notes, AMOLED theme, auto-title, note templates, trash/soft-delete, app lock (PIN/biometric), home screen widgets, local backup & restore | **No AI** |
 | Phase 2 (Future) | Whisper API transcription, AI categorization, auto-folders, n8n integration | Yes |
 
 ---
@@ -98,6 +98,12 @@ These fields in `lib/models/note.dart` should **remain in the model** (for Phase
 | Image picker/viewer | image_picker, image_cropper, photo_view, flutter_image_compress |
 | PDF generation | pdf (pure Dart, on-device) |
 | Screen wakelock | wakelock_plus |
+| Biometric / PIN auth | local_auth (Step 10.5 — App Lock) |
+| Cryptographic hashing | crypto (SHA-256 PIN hashing + backup key derivation) |
+| Home screen widgets | home_widget (Step 10.6 — Quick Record + Dashboard) |
+| Backup archive | archive (Step 10.7 — ZIP encode/decode) |
+| Backup encryption | encrypt (Step 10.7 — AES-256-CBC) |
+| Backup file picker | file_picker (Step 10.7 — restore file selection) |
 | Typography | Google Fonts (Plus Jakarta Sans, Inter) |
 | App icon | `assets/icons/logo.png` (used for launcher icon + in-app branding) |
 
@@ -107,37 +113,41 @@ These fields in `lib/models/note.dart` should **remain in the model** (for Phase
 
 ```
 lib/
-├── main.dart                         # App entry point (Hive init + ProviderScope)
-├── nav.dart                          # GoRouter routes (23 routes) and AppRoutes constants
-├── theme.dart                        # Material 3 theme (light + dark)
+├── main.dart                         # App entry point (Hive init + ProviderScope + widget/lock init)
+├── nav.dart                          # GoRouter routes (26 routes) and AppRoutes constants
+├── theme.dart                        # Material 3 theme (light + dark + AMOLED)
 ├── models/
-│   ├── note.dart                     # Hive model (typeId: 0)
-│   ├── action_item.dart              # Hive model (typeId: 1)
-│   ├── todo_item.dart                # Hive model (typeId: 2)
-│   ├── reminder_item.dart            # Hive model (typeId: 3)
-│   ├── folder.dart                   # Hive model (typeId: 4)
-│   ├── user_settings.dart            # Hive model (typeId: 5)
-│   ├── project_document.dart         # Hive model (typeId: 6)
-│   ├── project_block.dart            # Hive model (typeId: 7)
-│   ├── transcript_version.dart       # Hive model (typeId: 8)
-│   ├── image_attachment.dart         # Hive model (typeId: 9)
+│   ├── note.dart                     # Hive model (typeId: 0) — includes isPinned, isDeleted, toMap/fromMap
+│   ├── action_item.dart              # Hive model (typeId: 1) — toMap/fromMap
+│   ├── todo_item.dart                # Hive model (typeId: 2) — toMap/fromMap
+│   ├── reminder_item.dart            # Hive model (typeId: 3) — toMap/fromMap
+│   ├── folder.dart                   # Hive model (typeId: 4) — includes isDeleted, toMap/fromMap
+│   ├── user_settings.dart            # Hive model (typeId: 5) — HiveFields 0–24, toMap/fromMap
+│   ├── project_document.dart         # Hive model (typeId: 6) — toMap/fromMap
+│   ├── project_block.dart            # Hive model (typeId: 7) + BlockType enum (typeId: 9) — toMap/fromMap
+│   ├── transcript_version.dart       # Hive model (typeId: 8) — toMap/fromMap
+│   ├── image_attachment.dart         # Hive model (typeId: 10) — toMap/fromMap
 │   ├── task_item.dart                # View model for aggregated tasks (NOT Hive)
 │   └── *.g.dart                      # Generated Hive type adapters
 ├── services/
 │   ├── audio_recorder_service.dart   # Audio recording
 │   ├── audio_player_service.dart     # Audio playback via just_audio
-│   ├── hive_service.dart             # Encrypted Hive init + storage usage
-│   ├── notes_repository.dart         # CRUD for notes + tasks + versioning
-│   ├── folders_repository.dart       # CRUD for folders
+│   ├── hive_service.dart             # Encrypted Hive init + storage usage + migration helpers
+│   ├── notes_repository.dart         # CRUD for notes + tasks + versioning + trash
+│   ├── folders_repository.dart       # CRUD for folders + trash
 │   ├── settings_repository.dart      # Settings persistence
 │   ├── transcription_service.dart    # On-device STT via speech_to_text
 │   ├── whisper_service.dart          # On-device Whisper transcription
 │   ├── notification_service.dart     # Local notifications + scheduling
-│   ├── project_documents_repository.dart  # CRUD for project documents
+│   ├── project_documents_repository.dart  # CRUD for project documents + trash
 │   ├── image_attachment_repository.dart   # Image CRUD + file management
 │   ├── sharing_service.dart          # Assemble share text, export PDF/MD/TXT
 │   ├── voice_command_processor.dart  # Voice command lookup/auto-create
-│   └── os_reminder_service.dart      # OS calendar bridge via add_2_calendar
+│   ├── os_reminder_service.dart      # OS calendar bridge via add_2_calendar
+│   ├── app_lock_service.dart         # PIN hash verify + biometric auth (Step 10.5)
+│   ├── home_widget_service.dart      # Home screen widget data push + privacy (Step 10.6)
+│   ├── backup_service.dart           # AES-256 encrypted ZIP backup/restore (Step 10.7)
+│   └── title_generator_service.dart  # Auto-title generation from transcription (Step 8)
 ├── providers/
 │   ├── notes_provider.dart           # NotesNotifier + notesProvider
 │   ├── folders_provider.dart         # FoldersNotifier + foldersProvider
@@ -145,7 +155,7 @@ lib/
 │   ├── project_documents_provider.dart  # ProjectDocumentsNotifier
 │   └── tasks_provider.dart           # Derived provider: aggregated tasks view
 ├── pages/
-│   ├── splash_page.dart              # Animated splash → onboarding or home
+│   ├── splash_page.dart              # Animated splash → lock screen / onboarding / home
 │   ├── onboarding_page.dart          # 5-page Quick Guide (swipeable)
 │   ├── login_page.dart               # NOT IN USE (Phase 2)
 │   ├── home_page.dart                # Dashboard: Notes/Tasks tabs, stats, SpeedDialFab
@@ -164,6 +174,10 @@ lib/
 │   ├── storage_page.dart             # Storage breakdown display
 │   ├── support_page.dart             # Quick Guide + Send Feedback
 │   ├── danger_zone_page.dart         # Delete Whisper model / recordings / all data
+│   ├── security_page.dart            # App Lock: PIN setup, biometric, auto-lock, widget privacy (Step 10.5/10.6)
+│   ├── trash_page.dart               # Soft-deleted notes/folders/projects — 30-day retention (Step 10)
+│   ├── backup_restore_page.dart      # Encrypted backup creation & restore UI (Step 10.7)
+│   ├── lock_screen_page.dart         # PIN / biometric unlock screen (Step 10.5)
 │   ├── about_page.dart               # App info, credits, legal
 │   ├── feedback_page.dart            # User feedback form
 │   ├── support_us_page.dart          # Buy Me a Coffee
@@ -176,12 +190,12 @@ lib/
 │   ├── find_replace_bar.dart         # Find & Replace toolbar
 │   ├── settings_widgets.dart         # Reusable settings UI components
 │   ├── download_progress_sheet.dart  # Whisper model download progress
-│   ├── project_document_card.dart    # Project document card for list
 │   ├── image_block_widget.dart       # Image block for project documents
 │   ├── note_attachments_section.dart # Photo section on Note Detail
 │   ├── task_list_item.dart           # Task row in aggregated tasks view
 │   ├── tasks_tab.dart                # Tasks tab content for Home page
-│   └── reminder_destination_sheet.dart  # "Keep in-app / Also add to OS" choice
+│   ├── reminder_destination_sheet.dart  # "Keep in-app / Also add to OS" choice
+│   └── template_picker_sheet.dart    # Note template selection bottom sheet (Step 9)
 └── utils/
     ├── voice_command_parser.dart      # Voice command keyword parsing
     └── profanity_filter.dart          # Offline profanity filter (whole-word regex)
@@ -210,15 +224,21 @@ lib/
 6. **Waveform, Playback & Notifications** ✅ Done (amplitude waveform, just_audio playback, manual reminders)
 7. **Testing, Polish & Release** ✅ Done (splash screen, quick guide, settings overhaul, compact AppBar headers)
 - **Post-release enhancements:** Issues #7–#12 ✅ Done (multi-select, layout, search, rich text, share preview, word count, find & replace, profanity filter, voice commands for tasks)
+- **Step 8: Pinned Notes + AMOLED + Auto-Title** ✅ Done (pin notes to top, AMOLED dark theme, auto-title from transcription)
+- **Step 9: Note Templates** ✅ Done (template picker bottom sheet, pre-filled note content/title)
+- **Step 10: Trash / Soft Delete** ✅ Done (30-day retention, restore, purge on startup)
+- **Step 10.5: App Lock — PIN / Biometric** ✅ Done (PIN setup/change, biometric via local_auth, auto-lock timeout, lock screen)
+- **Step 10.6: Home Screen Widget** ✅ Done (Quick Record 2×1 + Dashboard 4×2 Android widgets, Widget Privacy setting)
+- **Step 10.7: Local Backup & Restore** ✅ Done (AES-256-CBC encrypted .vnbak archives, passphrase key derivation, full restore)
 
 **Phase 2 Steps (future, not in scope):**
-8. Whisper API Transcription (cloud-based, higher accuracy)
-9. AI Categorization & Structuring (auto-extract actions/todos/reminders)
-10. n8n Integration & Advanced Features (includes Project Documents Phase 2: AI summary)
+- Whisper API Transcription (cloud-based, higher accuracy)
+- AI Categorization & Structuring (auto-extract actions/todos/reminders)
+- n8n Integration & Advanced Features (includes Project Documents Phase 2: AI summary)
 
 ---
 
-## Routes (go_router) — 23 routes
+## Routes (go_router) — 26 routes
 
 | Path | Screen | Status |
 |---|---|---|
@@ -235,7 +255,10 @@ lib/
 | `/audio_settings` | Audio & Recording | Active (accepts `highlightWhisper` extra) |
 | `/storage` | Storage | Active |
 | `/support` | Help & Support | Active |
+| `/security` | Security | Active (App Lock PIN/biometric setup, auto-lock, widget privacy) |
+| `/trash` | Trash | Active (soft-deleted notes/folders/projects, 30-day retention) |
 | `/danger_zone` | Danger Zone | Active |
+| `/backup_restore` | Backup & Restore | Active (create encrypted .vnbak, restore from file) |
 | `/about` | About | Active |
 | `/feedback` | Feedback | Active |
 | `/support_us` | Support Us | Active |
@@ -299,4 +322,5 @@ flutter analyze
     - `documents/CHANGELOG.md` — log all changes
     - `documents/PROJECT_STATUS.md` — update after major updates
     - `documents/IMPLEMENTATION_PLAN.md` — update when major changes are implemented
+    - `CLAUDE.md` — update when new files, routes, dependencies, or features are added
     - This is mandatory for all agents without exception.
