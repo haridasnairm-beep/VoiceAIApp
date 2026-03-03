@@ -862,4 +862,102 @@ class SharingService {
   String _formatDateShort(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
+
+  // ---------------------------------------------------------------------------
+  // 17.2 — Export ecosystem: Markdown note, CSV tasks, JSON full-data
+  // ---------------------------------------------------------------------------
+
+  /// Export a single note as Markdown with metadata header.
+  Future<File> exportNoteAsMarkdown(Note note) async {
+    final buf = StringBuffer();
+    buf.writeln('# ${note.title}');
+    buf.writeln();
+    buf.writeln('- **Created:** ${_formatDateTime(note.createdAt)}');
+    if (note.folderId != null) buf.writeln('- **Folder ID:** ${note.folderId}');
+    if (note.tags.isNotEmpty) {
+      buf.writeln('- **Tags:** ${note.tags.map((t) => '#$t').join(', ')}');
+    }
+    if (note.audioDurationSeconds > 0) {
+      buf.writeln('- **Duration:** ${note.audioDurationSeconds}s');
+    }
+    buf.writeln();
+    buf.writeln('## Transcription');
+    buf.writeln();
+    buf.writeln(_renderContent(
+        note.rawTranscription, note.contentFormat, false));
+    if (note.actions.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('## Action Items');
+      for (final a in note.actions) {
+        buf.writeln('- [${a.isCompleted ? 'x' : ' '}] ${a.text}');
+      }
+    }
+    if (note.todos.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('## Todos');
+      for (final t in note.todos) {
+        buf.writeln('- [${t.isCompleted ? 'x' : ' '}] ${t.text}');
+      }
+    }
+    if (note.reminders.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('## Reminders');
+      for (final r in note.reminders) {
+        buf.writeln('- [${r.isCompleted ? 'x' : ' '}] ${r.text}');
+      }
+    }
+
+    final dir = await getTemporaryDirectory();
+    final safe = note.title.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
+    final file = File('${dir.path}/${safe.isEmpty ? 'note' : safe}.md');
+    await file.writeAsString(buf.toString());
+    return file;
+  }
+
+  /// Export all open tasks as CSV.
+  Future<File> exportTasksCsv(List<Note> notes) async {
+    final buf = StringBuffer();
+    buf.writeln('Type,Text,Status,Due Date,Source Note,Created At');
+    for (final note in notes) {
+      for (final a in note.actions) {
+        buf.writeln(
+            'Action,"${_csvEscape(a.text)}",${a.isCompleted ? "Done" : "Open"},,${_csvEscape(note.title)},${_formatDateShort(note.createdAt)}');
+      }
+      for (final t in note.todos) {
+        buf.writeln(
+            'Todo,"${_csvEscape(t.text)}",${t.isCompleted ? "Done" : "Open"},${t.dueDate != null ? _formatDateShort(t.dueDate!) : ''},${_csvEscape(note.title)},${_formatDateShort(note.createdAt)}');
+      }
+      for (final r in note.reminders) {
+        buf.writeln(
+            'Reminder,"${_csvEscape(r.text)}",${r.isCompleted ? "Done" : "Open"},${r.reminderTime != null ? _formatDateShort(r.reminderTime!) : ''},${_csvEscape(note.title)},${_formatDateShort(note.createdAt)}');
+      }
+    }
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/voicenotes_tasks.csv');
+    await file.writeAsString(buf.toString());
+    return file;
+  }
+
+  /// Export entire app database as JSON (data portability).
+  /// Excludes audio files and images (too large).
+  Future<File> exportFullDataJson(
+    List<Note> notes,
+    List<dynamic> folders,
+    List<dynamic> projects,
+  ) async {
+    final data = {
+      'exportedAt': DateTime.now().toIso8601String(),
+      'version': '1.0',
+      'notes': notes.map((n) => n.toMap()).toList(),
+      'folders': folders.map((f) => f.toMap()).toList(),
+      'projects': projects.map((p) => p.toMap()).toList(),
+    };
+    final json = const JsonEncoder.withIndent('  ').convert(data);
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/voicenotes_export.json');
+    await file.writeAsString(json);
+    return file;
+  }
+
+  String _csvEscape(String s) => s.replaceAll('"', '""');
 }

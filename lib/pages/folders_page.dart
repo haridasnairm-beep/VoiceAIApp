@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../providers/folders_provider.dart';
+import '../providers/notes_provider.dart';
 import '../providers/tags_provider.dart';
 import '../widgets/speed_dial_fab.dart';
 import '../widgets/empty_state_illustrated.dart';
@@ -35,6 +36,17 @@ class FoldersPage extends ConsumerWidget {
     final folders = allFolders.where((f) => !f.isArchived).toList();
     final archivedFolders = allFolders.where((f) => f.isArchived).toList();
     final tags = ref.watch(tagsProvider);
+    final notes = ref.watch(notesProvider);
+
+    // Smart filters
+    final now = DateTime.now();
+    final thisWeekCount = notes.where((n) =>
+        now.difference(n.createdAt).inDays < 7).length;
+    final openTaskCount = notes.where((n) =>
+        n.todos.any((t) => !t.isCompleted) ||
+        n.actions.any((a) => !a.isCompleted)).length;
+    final unorganizedCount = notes.where((n) =>
+        n.folderId == null && n.tags.isEmpty).length;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -88,6 +100,54 @@ class FoldersPage extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // Smart Filters
+                        if (notes.length >= 3) ...[
+                          Text('Smart Filters',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary,
+                                    fontWeight: FontWeight.bold,
+                                  )),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              if (thisWeekCount > 0)
+                                _SmartFilterChip(
+                                  icon: Icons.date_range_rounded,
+                                  label: 'This Week',
+                                  count: thisWeekCount,
+                                  onTap: () => context.push(
+                                      AppRoutes.search),
+                                ),
+                              if (openTaskCount > 0)
+                                _SmartFilterChip(
+                                  icon: Icons.task_alt_rounded,
+                                  label: 'Open Tasks',
+                                  count: openTaskCount,
+                                  color: Colors.orange,
+                                  onTap: () => context.push(
+                                      AppRoutes.search),
+                                ),
+                              if (unorganizedCount > 0)
+                                _SmartFilterChip(
+                                  icon: Icons.folder_off_outlined,
+                                  label: 'Unorganized',
+                                  count: unorganizedCount,
+                                  color: Theme.of(context).hintColor,
+                                  onTap: () => context.push(
+                                      AppRoutes.search),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+
                         // Tags quick-access row
                         if (tags.isNotEmpty) ...[
                           GestureDetector(
@@ -324,6 +384,55 @@ class FoldersPage extends ConsumerWidget {
                   ),
                 )),
             const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SmartFilterChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final Color? color;
+  final VoidCallback? onTap;
+
+  const _SmartFilterChip({
+    required this.icon,
+    required this.label,
+    required this.count,
+    this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? Theme.of(context).colorScheme.primary;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: c.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: c.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: c),
+            const SizedBox(width: 6),
+            Text(label,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: c,
+                      fontWeight: FontWeight.w600,
+                    )),
+            const SizedBox(width: 4),
+            Text('$count',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: c,
+                    )),
           ],
         ),
       ),

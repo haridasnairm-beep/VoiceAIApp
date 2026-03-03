@@ -26,6 +26,7 @@ import 'pages/feedback_page.dart';
 import 'pages/support_us_page.dart';
 import 'pages/backup_restore_page.dart';
 import 'pages/tags_page.dart';
+import 'pages/calendar_page.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -317,6 +318,13 @@ class AppRouter {
           child: TagsPage(),
         ),
       ),
+      GoRoute(
+        path: AppRoutes.calendar,
+        name: 'calendar',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: CalendarPage(),
+        ),
+      ),
     ],
   );
 }
@@ -349,4 +357,5 @@ class AppRoutes {
   static const String supportUs = '/support_us';
   static const String backupRestore = '/backup_restore';
   static const String tags = '/tags';
+  static const String calendar = '/calendar';
 }

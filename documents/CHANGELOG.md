@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-03 - Step 17 (Wave 7): Differentiation
+
+### Added
+- **Calendar/Timeline view** (`lib/pages/calendar_page.dart`) — monthly grid with color-coded dots (blue=notes, orange=open tasks, red=overdue); tap day to see notes; upcoming reminders section (next 7 days); month navigation; `/calendar` route; calendar icon in Home AppBar
+- **Markdown export for notes** — `SharingService.exportNoteAsMarkdown()`: metadata header (created date, folder, tags, duration) + transcription + action items/todos/reminders as Markdown checklists
+- **CSV export for tasks** — `SharingService.exportTasksCsv()`: all tasks across all notes as CSV with Type, Text, Status, Due Date, Source Note, Created At columns
+- **JSON full-data export** — `SharingService.exportFullDataJson()`: entire database (notes, folders, projects) as pretty-printed JSON for data portability
+- **Voice command feedback** — `voiceCommandFeedbackProvider` notifies UI of parsed commands (folder assigned, tags, task created); message built from command results
+- **Smart Filters** in Library — "This Week", "Open Tasks", "Unorganized" filter chips above folders; count-based, auto-computed from notes; shown when 3+ notes exist; `_SmartFilterChip` widget
+
+---
+
 ## [Unreleased] - 2026-03-03 - Step 16 (Wave 6): Power User Features
 
 ### Added

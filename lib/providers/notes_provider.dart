@@ -20,6 +20,19 @@ final notesRepositoryProvider = Provider<NotesRepository>((ref) {
   return NotesRepository();
 });
 
+/// Holds the latest voice command feedback message for UI display.
+/// Null means no pending message. UI clears it after showing.
+class VoiceCommandFeedbackNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String message) => state = message;
+  void clear() => state = null;
+}
+
+final voiceCommandFeedbackProvider =
+    NotifierProvider<VoiceCommandFeedbackNotifier, String?>(
+        VoiceCommandFeedbackNotifier.new);
+
 /// Notifier that manages the list of all notes, backed by Hive.
 class NotesNotifier extends Notifier<List<Note>> {
   @override
@@ -188,6 +201,11 @@ class NotesNotifier extends Notifier<List<Note>> {
           debugPrint('VoiceCmd: assigned tags ${result.tags}');
         }
 
+        // Build feedback message for UI
+        final parts = <String>[];
+        if (result.folderId != null) parts.add('Folder assigned');
+        if (result.tags.isNotEmpty) parts.add('Tags: ${result.tags.map((t) => '#$t').join(', ')}');
+
         // Auto-create task item if voice command detected a task keyword
         if (result.taskType != null && result.taskDescription != null) {
           debugPrint('VoiceCmd: creating ${result.taskType} task: "${result.taskDescription}"');
@@ -209,6 +227,14 @@ class NotesNotifier extends Notifier<List<Note>> {
               );
               break;
           }
+          if (result.taskType != null) {
+            parts.add('${result.taskType}: ${result.taskDescription}');
+          }
+        }
+
+        // Notify UI with feedback
+        if (parts.isNotEmpty) {
+          ref.read(voiceCommandFeedbackProvider.notifier).set(parts.join(' · '));
         }
       } else {
         note.rawTranscription =

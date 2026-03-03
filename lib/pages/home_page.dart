@@ -136,6 +136,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ],
               ),
               actions: [
+                IconButton(
+                  icon: Icon(Icons.calendar_month_rounded,
+                      color: Theme.of(context).colorScheme.onSurface),
+                  onPressed: () => context.push(AppRoutes.calendar),
+                ),
                 PopupMenuButton<String>(
                   icon: Icon(
                     Icons.more_vert_rounded,
