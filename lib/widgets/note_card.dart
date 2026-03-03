@@ -202,6 +202,12 @@ class NoteCard extends StatelessWidget {
                         textColor: const Color(0xFF7B1FA2),
                       ),
                     )),
+                ...note.tags.map((tag) => _LabelChip(
+                      icon: Icons.label_rounded,
+                      label: '#$tag',
+                      bgColor: theme.colorScheme.secondaryContainer,
+                      textColor: theme.colorScheme.onSecondaryContainer,
+                    )),
               ],
             ),
 

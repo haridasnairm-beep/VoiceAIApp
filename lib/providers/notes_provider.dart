@@ -13,7 +13,6 @@ import '../services/whisper_service.dart';
 import '../services/title_generator_service.dart';
 import '../utils/profanity_filter.dart';
 import 'folders_provider.dart';
-import 'project_documents_provider.dart';
 import 'settings_provider.dart';
 
 /// Provider for the NotesRepository singleton.
@@ -138,7 +137,6 @@ class NotesNotifier extends Notifier<List<Note>> {
     String wavPath, {
     String language = 'en',
     bool hasManualFolder = false,
-    bool hasManualProject = false,
   }) async {
     try {
       // Determine if we need translation to English
@@ -182,12 +180,12 @@ class NotesNotifier extends Notifier<List<Note>> {
           debugPrint('VoiceCmd: assigned folder ${result.folderId}');
         }
 
-        // Auto-link to project if detected and user didn't manually select one
-        if (result.projectId != null && !hasManualProject) {
-          ref
-              .read(projectDocumentsProvider.notifier)
-              .addNoteBlock(result.projectId!, noteId);
-          debugPrint('VoiceCmd: linked to project ${result.projectId}');
+        // Auto-assign tags if detected by voice command
+        if (result.tags.isNotEmpty) {
+          for (final tag in result.tags) {
+            await ref.read(notesRepositoryProvider).addTag(noteId, tag);
+          }
+          debugPrint('VoiceCmd: assigned tags ${result.tags}');
         }
 
         // Auto-create task item if voice command detected a task keyword
@@ -689,6 +687,33 @@ class NotesNotifier extends Notifier<List<Note>> {
     required String attachmentId,
   }) async {
     await ref.read(notesRepositoryProvider).removeImageAttachment(noteId, attachmentId);
+    refresh();
+  }
+
+  // --- Tag Management ---
+
+  Future<void> addTag({required String noteId, required String tag}) async {
+    await ref.read(notesRepositoryProvider).addTag(noteId, tag);
+    refresh();
+  }
+
+  Future<void> removeTag({required String noteId, required String tag}) async {
+    await ref.read(notesRepositoryProvider).removeTag(noteId, tag);
+    refresh();
+  }
+
+  Future<void> setTags({required String noteId, required List<String> tags}) async {
+    await ref.read(notesRepositoryProvider).setTags(noteId, tags);
+    refresh();
+  }
+
+  Future<void> renameTag(String oldTag, String newTag) async {
+    await ref.read(notesRepositoryProvider).renameTag(oldTag, newTag);
+    refresh();
+  }
+
+  Future<void> deleteTag(String tag) async {
+    await ref.read(notesRepositoryProvider).deleteTag(tag);
     refresh();
   }
 }

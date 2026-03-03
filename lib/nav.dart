@@ -25,6 +25,7 @@ import 'pages/about_page.dart';
 import 'pages/feedback_page.dart';
 import 'pages/support_us_page.dart';
 import 'pages/backup_restore_page.dart';
+import 'pages/tags_page.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -310,6 +311,13 @@ class AppRouter {
           child: BackupRestorePage(),
         ),
       ),
+      GoRoute(
+        path: AppRoutes.tags,
+        name: 'tags',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: TagsPage(),
+        ),
+      ),
     ],
   );
 }
@@ -341,4 +349,5 @@ class AppRoutes {
   static const String feedback = '/feedback';
   static const String supportUs = '/support_us';
   static const String backupRestore = '/backup_restore';
+  static const String tags = '/tags';
 }

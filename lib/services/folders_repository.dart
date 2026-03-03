@@ -108,6 +108,36 @@ class FoldersRepository {
     }
   }
 
+  /// Add a project document ID to a folder.
+  Future<void> addProjectToFolder(String folderId, String projectId) async {
+    final folder = getFolderById(folderId);
+    if (folder != null && !folder.projectDocumentIds.contains(projectId)) {
+      folder.projectDocumentIds.add(projectId);
+      folder.updatedAt = DateTime.now();
+      await HiveService.foldersBox.put(folder.id, folder);
+    }
+  }
+
+  /// Remove a project document ID from a folder.
+  Future<void> removeProjectFromFolder(String folderId, String projectId) async {
+    final folder = getFolderById(folderId);
+    if (folder != null) {
+      folder.projectDocumentIds.remove(projectId);
+      folder.updatedAt = DateTime.now();
+      await HiveService.foldersBox.put(folder.id, folder);
+    }
+  }
+
+  /// Get the folder that owns a given project document ID.
+  Folder? getFolderByProjectId(String projectId) {
+    try {
+      return HiveService.foldersBox.values
+          .firstWhere((f) => !f.isDeleted && f.projectDocumentIds.contains(projectId));
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Get total count of folders.
   int get count => HiveService.foldersBox.length;
 }

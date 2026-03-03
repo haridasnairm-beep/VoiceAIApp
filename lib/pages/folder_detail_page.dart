@@ -7,8 +7,10 @@ import '../nav.dart';
 import '../theme.dart';
 import '../providers/folders_provider.dart';
 import '../providers/notes_provider.dart';
+import '../providers/project_documents_provider.dart';
 import '../models/folder.dart';
 import '../models/note.dart';
+import '../models/project_document.dart';
 import '../widgets/settings_widgets.dart' show friendlyLanguageName;
 
 enum _SortOption { newest, oldest, titleAZ, titleZA }
@@ -130,6 +132,13 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
     final folderNotes = _sortNotes(
         allNotes.where((n) => n.folderId == widget.folderId).toList());
 
+    // Get project documents that belong to this folder
+    final allProjects = ref.watch(projectDocumentsProvider);
+    final folderProjects = allProjects
+        .where((p) => p.folderId == widget.folderId)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
     // Calculate total audio duration
     int totalSeconds = 0;
     for (final note in folderNotes) {
@@ -155,7 +164,7 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                   ),
             ),
             Text(
-              '${folder.noteIds.length} voice notes',
+              '${folderNotes.length} notes${folderProjects.isNotEmpty ? ' · ${folderProjects.length} projects' : ''}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.secondary,
                   ),
@@ -173,13 +182,19 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
               icon: Icon(Icons.more_vert_rounded,
                   color: Theme.of(context).colorScheme.onSurface),
               onSelected: (value) {
-                if (value == 'rename') {
+                if (value == 'new_project') {
+                  _showNewProjectDialog(context, ref);
+                } else if (value == 'rename') {
                   _showRenameDialog(context, folder!);
                 } else if (value == 'delete') {
                   _showDeleteDialog(context);
                 }
               },
               itemBuilder: (ctx) => [
+                const PopupMenuItem(
+                  value: 'new_project',
+                  child: Text('New Project'),
+                ),
                 const PopupMenuItem(
                   value: 'rename',
                   child: Text('Rename'),
@@ -342,10 +357,53 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                                   extra: {'noteId': note.id},
                                 ),
                               )),
-                          const SizedBox(height: 80),
                         ],
                       ),
               ),
+
+              // === Projects Section ===
+              if (folderProjects.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.only(left: 24, right: 24, top: 24),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Projects',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _showNewProjectDialog(context, ref),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('New'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: folderProjects
+                        .map((project) => _FolderProjectCard(
+                              project: project,
+                              onTap: () => context.push(
+                                AppRoutes.projectDocumentDetail,
+                                extra: {'documentId': project.id},
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 80),
             ],
           ),
         ),
@@ -382,6 +440,40 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
               }
             },
             child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNewProjectDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Project'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Project title'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final title = controller.text.trim();
+              if (title.isNotEmpty) {
+                await ref.read(projectDocumentsProvider.notifier).create(
+                      title: title,
+                      folderId: widget.folderId,
+                    );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              }
+            },
+            child: const Text('Create'),
           ),
         ],
       ),
@@ -628,6 +720,78 @@ class _FolderNoteCard extends StatelessWidget {
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FolderProjectCard extends StatelessWidget {
+  final ProjectDocument project;
+  final VoidCallback? onTap;
+
+  const _FolderProjectCard({required this.project, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final blockCount = project.blocks.length;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: Theme.of(context).dividerColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E5F5),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: const Icon(Icons.article_rounded,
+                  color: Color(0xFF7B1FA2), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    project.title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$blockCount ${blockCount == 1 ? 'block' : 'blocks'}${project.description != null && project.description!.isNotEmpty ? ' · ${project.description}' : ''}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: Theme.of(context).hintColor, size: 20),
           ],
         ),
       ),

@@ -34,15 +34,25 @@ class ProjectDocumentsRepository {
     }
   }
 
+  /// Get all active project documents in a specific folder.
+  List<ProjectDocument> getProjectsByFolder(String folderId) {
+    return HiveService.projectDocumentsBox.values
+        .where((d) => !d.isDeleted && d.folderId == folderId)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
   /// Create a new empty project document.
   Future<ProjectDocument> createProjectDocument({
     required String title,
     String? description,
+    String? folderId,
   }) async {
     final doc = ProjectDocument(
       id: _uuid.v4(),
       title: title,
       description: description,
+      folderId: folderId,
     );
     await HiveService.projectDocumentsBox.put(doc.id, doc);
     return doc;

@@ -4,6 +4,59 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-03 - Step 13 (Wave 3): Structural Redesign
+
+### Added — Tags System (13.2)
+- **`tags` field** (HiveField 28, `List<String>`) on `Note` model — stores normalized lowercase tags
+- **Tag CRUD** in `NotesRepository`: `addTag`, `removeTag`, `setTags`, `renameTag`, `deleteTag`, `getAllTagsWithCounts`, `getNotesByTag`
+- **Tag provider methods** in `NotesNotifier`: `addTag`, `removeTag`, `setTags`, `renameTag`, `deleteTag`
+- **`tagsProvider`** (`lib/providers/tags_provider.dart`) — derived provider returning all unique tags with counts, sorted alphabetically; also `tagNamesProvider` for autocomplete
+- **`TagPills` widget** (`lib/widgets/tag_pills.dart`) — reusable horizontal wrap of `#tag` pills with optional remove (✕), tap, and "+ Add tag" chip
+- **Tags section on Note Detail** — tag pills between metadata and transcription; "Add tag" opens dialog with autocomplete from existing tags
+- **Tag chips on NoteCard** — `#tag` labels displayed inline alongside folder/project chips
+- **`TagsPage`** (`lib/pages/tags_page.dart`) — management screen listing all tags with note counts, rename, delete; accessible via `/tags` route
+- **`/tags` route** added to `nav.dart` (27 total routes)
+- **Tags in Library** — tags quick-access row on folders page links to Tags management
+- **Voice command support** — "Tag \<name\>" keyword added to `VoiceCommandParser`; multiple tags supported (e.g. "Folder Kitchen Tag Budget Tag Urgent Start...")
+- **Tag auto-assignment** in `VoiceCommandProcessor` / `NotesNotifier.transcribeInBackground` — tags from voice commands auto-added to note
+- **Search tag filter** — tag chips in search filter bar; tag content included in search results matching
+
+### Changed — Projects Inside Folders (13.1)
+- **`Folder` model** — added `projectDocumentIds: List<String>` (HiveField 9); `toMap`/`fromMap` updated
+- **`ProjectDocument` model** — added `folderId: String?` (HiveField 8); `toMap`/`fromMap` updated
+- **`FoldersRepository`** — added `addProjectToFolder`, `removeProjectFromFolder`, `getFolderByProjectId`
+- **`FoldersNotifier`** — added `addProjectToFolder`, `removeProjectFromFolder`
+- **`ProjectDocumentsRepository.createProjectDocument`** — accepts optional `folderId` parameter
+- **`ProjectDocumentsNotifier.create`** — accepts `folderId`, auto-registers in folder's `projectDocumentIds`
+- **Migration** — `HiveService.migrateProjectsIntoFolders()` runs on startup; assigns existing unlinked projects to folders based on linked note folders, defaulting to "General"
+- **`FolderDetailPage`** — now shows folder's projects below notes with `_FolderProjectCard` widget; "New Project" in overflow menu; subtitle shows project count
+- **`FoldersPage` (Library)** — completely simplified: removed separate Projects section, collapsible headers, `_ProjectCard` widget, project dialogs; now shows folders only with note+project counts; tags quick-access row added; SpeedDialFab reduced to New Folder + Record Note
+- **`HomePage`** — reduced from 3 to 2 stat cards (Notes + Folders, removed Projects); removed all project-related code: project capsule chips, "Add to Project" bulk action, "New Project" SpeedDial item, project change pickers, project creation dialog
+- **`RecordingPage`** — removed project dropdown from "Save To" section; removed `_selectedProjectId` state, `_showNewProjectDialog`, project import
+- **`SearchPage`** — replaced project filter chips with tag filter chips; removed `initialProjectId` parameter; search now matches tags
+- **`NotesNotifier.transcribeInBackground`** — removed `hasManualProject` parameter; replaced project auto-link with tag auto-assignment
+- **`NotesRepository.searchNotes`** — now also matches against `note.tags`
+
+### Progressive Disclosure Audit (13.3)
+- **Tier 1** (everyone sees): Recording, notes feed, basic search, folders
+- **Tier 2** (first week): Tasks tab, reminders, pinning, tags, templates
+- **Tier 3** (power users): Project documents (inside folders), rich text, voice commands, PDF export, backup/restore, app lock, find & replace
+- Stats cards hidden until ≥5 notes + ≥2 folders (implemented in Wave 2)
+- Guided recording banner for zero-note users (implemented in Wave 2)
+- Projects moved inside folders, simplifying home screen and Library
+
+### Removed
+- Separate "Projects" section in Library page
+- "Projects" stat card on Home page
+- "Add to Project" multi-select action on Home page
+- "New Project" SpeedDialItem on Home page and Library page
+- Project dropdown on Recording page
+- `_showProjectChangePicker`, `_showBulkProjectPicker`, `_showNewProjectDialog` methods from Home page
+- `_CollapsibleHeader`, `_TopicChip`, `_ProjectCard` widgets from Library page
+- `hasManualProject` parameter from `transcribeInBackground`
+
+---
+
 ## [Unreleased] - 2026-03-03 - Step 12 (Wave 2): Core Feel
 
 ### Added

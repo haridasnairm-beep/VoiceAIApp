@@ -8,6 +8,7 @@ import '../utils/voice_command_parser.dart';
 class VoiceCommandProcessResult {
   final String? folderId;
   final String? projectId;
+  final List<String> tags;
   final String noteContent;
   final bool folderCreated;
   final bool projectCreated;
@@ -17,6 +18,7 @@ class VoiceCommandProcessResult {
   const VoiceCommandProcessResult({
     this.folderId,
     this.projectId,
+    this.tags = const [],
     required this.noteContent,
     this.folderCreated = false,
     this.projectCreated = false,
@@ -80,6 +82,7 @@ class VoiceCommandProcessor {
     return VoiceCommandProcessResult(
       folderId: folderId,
       projectId: projectId,
+      tags: parsed.tagNames,
       noteContent: parsed.noteContent,
       folderCreated: folderCreated,
       projectCreated: projectCreated,

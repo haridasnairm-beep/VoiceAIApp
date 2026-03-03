@@ -14,7 +14,6 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:voicenotes_ai/theme.dart';
 import 'package:voicenotes_ai/providers/notes_provider.dart';
 import 'package:voicenotes_ai/providers/folders_provider.dart';
-import 'package:voicenotes_ai/providers/project_documents_provider.dart';
 import 'package:voicenotes_ai/utils/profanity_filter.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
@@ -50,9 +49,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
   String _detectedLanguage = '';
   bool _speechAvailable = false;
 
-  // Folder & project selection (whisper mode)
+  // Folder selection (whisper mode)
   String? _selectedFolderId;
-  String? _selectedProjectId;
 
   // UI feedback state
   bool _isSaving = false;
@@ -412,13 +410,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         ref.read(foldersProvider.notifier).addNoteToFolder(folderId, note.id);
       }
 
-      // Add note to selected project if chosen
-      if (_selectedProjectId != null) {
-        ref
-            .read(projectDocumentsProvider.notifier)
-            .addNoteBlock(_selectedProjectId!, note.id);
-      }
-
       // Fire-and-forget background transcription
       // Pass manual selection flags so voice commands don't override user choices
       ref.read(notesProvider.notifier).transcribeInBackground(
@@ -426,7 +417,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
             path,
             language: lang ?? 'en',
             hasManualFolder: folderId != null,
-            hasManualProject: _selectedProjectId != null,
           );
 
       if (!mounted) return;
@@ -667,7 +657,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
                       _buildScreenAwakeToggle(context),
                       const SizedBox(height: 12),
                       // Folder & Project selection
-                      _buildFolderProjectSelection(context),
+                      _buildFolderSelection(context),
                     ] else ...[
                       Container(
                         height: 240,
@@ -847,7 +837,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
   }
 
   static const _newFolderSentinel = '__new_folder__';
-  static const _newProjectSentinel = '__new_project__';
 
   Future<void> _showNewFolderDialog() async {
     final controller = TextEditingController();
@@ -878,38 +867,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
       final folder =
           await ref.read(foldersProvider.notifier).addFolder(name: name);
       setState(() => _selectedFolderId = folder.id);
-    }
-  }
-
-  Future<void> _showNewProjectDialog() async {
-    final controller = TextEditingController();
-    final title = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New Project'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Project title'),
-          textCapitalization: TextCapitalization.words,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (title != null && title.isNotEmpty && mounted) {
-      final project =
-          await ref.read(projectDocumentsProvider.notifier).create(title: title);
-      setState(() => _selectedProjectId = project.id);
     }
   }
 
@@ -976,9 +933,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
     );
   }
 
-  Widget _buildFolderProjectSelection(BuildContext context) {
+  Widget _buildFolderSelection(BuildContext context) {
     final folders = ref.watch(foldersProvider);
-    final projects = ref.watch(projectDocumentsProvider);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1056,73 +1012,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
                         return;
                       }
                       setState(() => _selectedFolderId = value);
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Divider(
-              height: 1,
-              color: Theme.of(context).dividerColor),
-          const SizedBox(height: 4),
-          // Project selector
-          Row(
-            children: [
-              Icon(Icons.article_outlined,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.secondary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String?>(
-                    value: _selectedProjectId,
-                    isExpanded: true,
-                    hint: Text(
-                      'None',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                    ),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                    dropdownColor: Theme.of(context).colorScheme.surface,
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('None',
-                            style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .secondary)),
-                      ),
-                      ...projects.map((p) => DropdownMenuItem<String?>(
-                            value: p.id,
-                            child: Text(p.title),
-                          )),
-                      DropdownMenuItem<String?>(
-                        value: _newProjectSentinel,
-                        child: Row(
-                          children: [
-                            Icon(Icons.add,
-                                size: 18,
-                                color: Theme.of(context).colorScheme.primary),
-                            const SizedBox(width: 6),
-                            Text('New Project',
-                                style: TextStyle(
-                                    color:
-                                        Theme.of(context).colorScheme.primary)),
-                          ],
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == _newProjectSentinel) {
-                        _showNewProjectDialog();
-                        return;
-                      }
-                      setState(() => _selectedProjectId = value);
                     },
                   ),
                 ),

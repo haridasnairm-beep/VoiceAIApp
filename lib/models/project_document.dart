@@ -29,10 +29,14 @@ class ProjectDocument extends HiveObject {
   @HiveField(7)
   DateTime? deletedAt;
 
+  @HiveField(8)
+  String? folderId;
+
   ProjectDocument({
     required this.id,
     required this.title,
     this.description,
+    this.folderId,
     List<ProjectBlock>? blocks,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -46,6 +50,7 @@ class ProjectDocument extends HiveObject {
         'id': id,
         'title': title,
         'description': description,
+        'folderId': folderId,
         'blocks': blocks.map((b) => b.toMap()).toList(),
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
@@ -57,6 +62,7 @@ class ProjectDocument extends HiveObject {
         id: m['id'] as String,
         title: m['title'] as String,
         description: m['description'] as String?,
+        folderId: m['folderId'] as String?,
         blocks: (m['blocks'] as List? ?? [])
             .map((b) => ProjectBlock.fromMap(b as Map<String, dynamic>))
             .toList(),

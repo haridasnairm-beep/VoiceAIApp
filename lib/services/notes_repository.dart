@@ -123,7 +123,8 @@ class NotesRepository {
     return getAllNotes().where((n) {
       return n.title.toLowerCase().contains(lower) ||
           n.rawTranscription.toLowerCase().contains(lower) ||
-          n.topics.any((t) => t.toLowerCase().contains(lower));
+          n.topics.any((t) => t.toLowerCase().contains(lower)) ||
+          n.tags.any((t) => t.toLowerCase().contains(lower));
     }).toList();
   }
 
@@ -419,5 +420,78 @@ class NotesRepository {
     note.imageAttachmentIds.remove(attachmentId);
     note.updatedAt = DateTime.now();
     await HiveService.notesBox.put(note.id, note);
+  }
+
+  // --- Tag Management ---
+
+  /// Add a tag to a note (no-op if already present).
+  Future<void> addTag(String noteId, String tag) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    final normalized = tag.trim().toLowerCase();
+    if (normalized.isEmpty || note.tags.contains(normalized)) return;
+    note.tags = [...note.tags, normalized];
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Remove a tag from a note.
+  Future<void> removeTag(String noteId, String tag) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    note.tags = note.tags.where((t) => t != tag).toList();
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Set all tags on a note at once (replaces existing tags).
+  Future<void> setTags(String noteId, List<String> tags) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    note.tags = tags.map((t) => t.trim().toLowerCase()).where((t) => t.isNotEmpty).toList();
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Rename a tag across all notes.
+  Future<void> renameTag(String oldTag, String newTag) async {
+    final normalized = newTag.trim().toLowerCase();
+    if (normalized.isEmpty) return;
+    final affected = HiveService.notesBox.values
+        .where((n) => !n.isDeleted && n.tags.contains(oldTag))
+        .toList();
+    for (final note in affected) {
+      note.tags = note.tags.map((t) => t == oldTag ? normalized : t).toList();
+      note.updatedAt = DateTime.now();
+      await HiveService.notesBox.put(note.id, note);
+    }
+  }
+
+  /// Delete a tag from all notes.
+  Future<void> deleteTag(String tag) async {
+    final affected = HiveService.notesBox.values
+        .where((n) => !n.isDeleted && n.tags.contains(tag))
+        .toList();
+    for (final note in affected) {
+      note.tags = note.tags.where((t) => t != tag).toList();
+      note.updatedAt = DateTime.now();
+      await HiveService.notesBox.put(note.id, note);
+    }
+  }
+
+  /// Get all unique tags across all active notes with note counts.
+  Map<String, int> getAllTagsWithCounts() {
+    final counts = <String, int>{};
+    for (final note in getAllNotes()) {
+      for (final tag in note.tags) {
+        counts[tag] = (counts[tag] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }
+
+  /// Get all notes that have a specific tag.
+  List<Note> getNotesByTag(String tag) {
+    return getAllNotes().where((n) => n.tags.contains(tag)).toList();
   }
 }

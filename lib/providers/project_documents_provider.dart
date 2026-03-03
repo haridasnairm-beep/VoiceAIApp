@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/project_document.dart';
 import '../services/project_documents_repository.dart';
 import 'notes_provider.dart';
+import 'folders_provider.dart';
 
 /// Provider for the ProjectDocumentsRepository singleton.
 final projectDocumentsRepositoryProvider =
@@ -24,12 +25,20 @@ class ProjectDocumentsNotifier extends Notifier<List<ProjectDocument>> {
   Future<ProjectDocument> create({
     required String title,
     String? description,
+    String? folderId,
   }) async {
     final repo = ref.read(projectDocumentsRepositoryProvider);
     final doc = await repo.createProjectDocument(
       title: title,
       description: description,
+      folderId: folderId,
     );
+    // Also register in the folder's projectDocumentIds list
+    if (folderId != null) {
+      final foldersRepo = ref.read(foldersRepositoryProvider);
+      await foldersRepo.addProjectToFolder(folderId, doc.id);
+      ref.read(foldersProvider.notifier).refresh();
+    }
     state = [doc, ...state];
     return doc;
   }

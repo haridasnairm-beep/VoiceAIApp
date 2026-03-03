@@ -6,6 +6,9 @@ class VoiceCommandResult {
   /// Project name extracted from command, or null if not specified.
   final String? projectName;
 
+  /// Tag names extracted from command (multiple "Tag <name>" supported).
+  final List<String> tagNames;
+
   /// The actual note content (after "Start", or full text if no command).
   final String noteContent;
 
@@ -21,6 +24,7 @@ class VoiceCommandResult {
   const VoiceCommandResult({
     this.folderName,
     this.projectName,
+    this.tagNames = const [],
     required this.noteContent,
     required this.hasCommand,
     this.taskType,
@@ -41,6 +45,7 @@ class VoiceCommandResult {
 class VoiceCommandParser {
   static const _folderKeyword = 'folder';
   static const _projectKeyword = 'project';
+  static const _tagKeyword = 'tag';
   static const _startKeyword = 'start';
   static const _todoKeyword = 'todo';
   static const _actionKeyword = 'action';
@@ -126,6 +131,7 @@ class VoiceCommandParser {
 
     String? folderName;
     String? projectName;
+    final tagNames = <String>[];
 
     // If task keyword is in the prefix (before "Start"), detect it there
     if (hasStart && hasTask && taskIndex < startIndex) {
@@ -136,13 +142,15 @@ class VoiceCommandParser {
     }
     // If !hasStart && hasTask: task keyword IS the delimiter, already handled
 
-    // Collect keyword positions in the prefix (folder/project only)
+    // Collect keyword positions in the prefix (folder/project/tag)
     final keywordPositions = <int, String>{}; // index -> keyword type
     for (var i = 0; i < prefixLower.length; i++) {
       if (prefixLower[i] == _folderKeyword) {
         keywordPositions[i] = _folderKeyword;
       } else if (prefixLower[i] == _projectKeyword) {
         keywordPositions[i] = _projectKeyword;
+      } else if (prefixLower[i] == _tagKeyword) {
+        keywordPositions[i] = _tagKeyword;
       }
     }
 
@@ -190,6 +198,8 @@ class VoiceCommandParser {
         folderName = name;
       } else if (keyword == _projectKeyword) {
         projectName = name;
+      } else if (keyword == _tagKeyword) {
+        tagNames.add(name.toLowerCase());
       }
     }
 
@@ -204,6 +214,7 @@ class VoiceCommandParser {
     return VoiceCommandResult(
       folderName: folderName,
       projectName: projectName,
+      tagNames: tagNames,
       noteContent: noteContent,
       hasCommand: true,
       taskType: taskType,

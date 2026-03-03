@@ -20,6 +20,7 @@ class ProjectDocumentAdapter extends TypeAdapter<ProjectDocument> {
       id: fields[0] as String,
       title: fields[1] as String,
       description: fields[2] as String?,
+      folderId: fields[8] as String?,
       blocks: (fields[3] as List?)?.cast<ProjectBlock>(),
       createdAt: fields[4] as DateTime?,
       updatedAt: fields[5] as DateTime?,
@@ -31,7 +32,7 @@ class ProjectDocumentAdapter extends TypeAdapter<ProjectDocument> {
   @override
   void write(BinaryWriter writer, ProjectDocument obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class ProjectDocumentAdapter extends TypeAdapter<ProjectDocument> {
       ..writeByte(6)
       ..write(obj.isDeleted)
       ..writeByte(7)
-      ..write(obj.deletedAt);
+      ..write(obj.deletedAt)
+      ..writeByte(8)
+      ..write(obj.folderId);
   }
 
   @override

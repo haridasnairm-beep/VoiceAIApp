@@ -45,13 +45,14 @@ class NoteAdapter extends TypeAdapter<Note> {
       isDeleted: fields[25] == null ? false : fields[25] as bool,
       deletedAt: fields[26] as DateTime?,
       previousFolderId: fields[27] as String?,
+      tags: (fields[28] as List?)?.cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Note obj) {
     writer
-      ..writeByte(28)
+      ..writeByte(29)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -107,7 +108,9 @@ class NoteAdapter extends TypeAdapter<Note> {
       ..writeByte(26)
       ..write(obj.deletedAt)
       ..writeByte(27)
-      ..write(obj.previousFolderId);
+      ..write(obj.previousFolderId)
+      ..writeByte(28)
+      ..write(obj.tags);
   }
 
   @override

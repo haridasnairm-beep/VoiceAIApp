@@ -7,7 +7,7 @@ import '../nav.dart';
 import '../theme.dart';
 import '../providers/notes_provider.dart';
 import '../providers/folders_provider.dart';
-import '../providers/project_documents_provider.dart';
+import '../providers/tags_provider.dart';
 import '../models/note.dart';
 import '../widgets/settings_widgets.dart' show friendlyLanguageName;
 import '../widgets/empty_state_illustrated.dart';
@@ -16,13 +16,9 @@ class SearchPage extends ConsumerStatefulWidget {
   /// Optional pre-selected folder ID for contextual search.
   final String? initialFolderId;
 
-  /// Optional pre-selected project ID for contextual search.
-  final String? initialProjectId;
-
   const SearchPage({
     super.key,
     this.initialFolderId,
-    this.initialProjectId,
   });
 
   @override
@@ -33,13 +29,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   String? _selectedFolderId;
-  String? _selectedProjectId;
+  String? _selectedTag;
 
   @override
   void initState() {
     super.initState();
     _selectedFolderId = widget.initialFolderId;
-    _selectedProjectId = widget.initialProjectId;
   }
 
   @override
@@ -82,10 +77,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       }
     }
 
-    // Filter by project
-    if (_selectedProjectId != null) {
+    // Filter by tag
+    if (_selectedTag != null) {
       results = results
-          .where((n) => n.projectDocumentIds.contains(_selectedProjectId))
+          .where((n) => n.tags.contains(_selectedTag))
           .toList();
     }
 
@@ -96,7 +91,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   Widget build(BuildContext context) {
     final allNotes = ref.watch(notesProvider);
     final folders = ref.watch(foldersProvider);
-    final projects = ref.watch(projectDocumentsProvider);
+    final tags = ref.watch(tagNamesProvider);
     final results = _getFilteredResults();
 
     return Scaffold(
@@ -179,10 +174,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                   _buildFilterChip(
                     label: 'All',
                     selected: _selectedFolderId == null &&
-                        _selectedProjectId == null,
+                        _selectedTag == null,
                     onTap: () => setState(() {
                       _selectedFolderId = null;
-                      _selectedProjectId = null;
+                      _selectedTag = null;
                     }),
                   ),
                   const SizedBox(width: 8),
@@ -198,22 +193,20 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                                 _selectedFolderId == folder.id
                                     ? null
                                     : folder.id;
-                            _selectedProjectId = null;
+                            _selectedTag = null;
                           }),
                         ),
                       )),
-                  // Project chips
-                  ...projects.map((project) => Padding(
+                  // Tag chips
+                  ...tags.map((tag) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: _buildFilterChip(
-                          label: project.title,
-                          icon: Icons.article_rounded,
-                          selected: _selectedProjectId == project.id,
+                          label: '#$tag',
+                          icon: Icons.label_rounded,
+                          selected: _selectedTag == tag,
                           onTap: () => setState(() {
-                            _selectedProjectId =
-                                _selectedProjectId == project.id
-                                    ? null
-                                    : project.id;
+                            _selectedTag =
+                                _selectedTag == tag ? null : tag;
                             _selectedFolderId = null;
                           }),
                         ),

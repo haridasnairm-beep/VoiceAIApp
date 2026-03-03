@@ -6,7 +6,6 @@ import '../theme.dart';
 import '../models/note.dart';
 import '../providers/notes_provider.dart';
 import '../providers/folders_provider.dart';
-import '../providers/project_documents_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../widgets/speed_dial_fab.dart';
 import '../widgets/tasks_tab.dart';
@@ -56,7 +55,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     final notes = ref.watch(notesProvider);
     final folders = ref.watch(foldersProvider);
-    final projects = ref.watch(projectDocumentsProvider);
     final allTasks = ref.watch(tasksProvider);
     final settings = ref.watch(settingsProvider);
     final openTaskCount = allTasks.where((t) => !t.isCompleted).length;
@@ -273,22 +271,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                           onTap: () => context.push(AppRoutes.folders),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _CategoryCard(
-                          icon: Icons.article_rounded,
-                          title: "Projects",
-                          subtitle: "${projects.length}",
-                          backgroundColor:
-                              Theme.of(context).colorScheme.surface,
-                          textColor:
-                              Theme.of(context).colorScheme.onSurface,
-                          iconColor: const Color(0xFF8E24AA),
-                          hasBorder: true,
-                          onTap: () =>
-                              context.push(AppRoutes.projectDocuments),
-                        ),
-                      ),
                     ],
                   ),
                   if (showStats) const SizedBox(height: 16),
@@ -342,7 +324,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     else if (notes.isNotEmpty) ...[
                       // Split into pinned and unpinned
                       ..._buildPinnedSection(
-                        context, ref, notes, folders, projects),
+                        context, ref, notes, folders),
                     ],
                   ] else ...[
                     // Tasks tab
@@ -461,14 +443,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 },
                               ),
                               _ActionBarButton(
-                                icon: Icons.article_rounded,
-                                label: 'Add to Project',
-                                onTap: () {
-                                  _showBulkProjectPicker(
-                                      context, ref, notes);
-                                },
-                              ),
-                              _ActionBarButton(
                                 icon: Icons.delete_rounded,
                                 label: 'Delete',
                                 color: Colors.red,
@@ -495,14 +469,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                       onTap: () {
                         setState(() => _selectedTab = 0);
                         context.push(AppRoutes.search);
-                      },
-                    ),
-                    SpeedDialItem(
-                      icon: Icons.article_rounded,
-                      label: 'New Project',
-                      onTap: () {
-                        setState(() => _selectedTab = 0);
-                        _showNewProjectDialog(context, ref);
                       },
                     ),
                     SpeedDialItem(
@@ -636,7 +602,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     WidgetRef ref,
     List<Note> notes,
     List<dynamic> folders,
-    List<dynamic> projects,
   ) {
     final pinned = notes.where((n) => n.isPinned).toList()
       ..sort((a, b) =>
@@ -667,7 +632,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ));
       for (final note in pinned) {
-        widgets.add(_buildNoteItem(context, ref, note, folders, projects));
+        widgets.add(_buildNoteItem(context, ref, note, folders));
       }
       // Recent section header
       if (unpinned.isNotEmpty) {
@@ -686,7 +651,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     // Unpinned notes
     for (final note in unpinned) {
-      widgets.add(_buildNoteItem(context, ref, note, folders, projects));
+      widgets.add(_buildNoteItem(context, ref, note, folders));
     }
 
     return widgets;
@@ -697,29 +662,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     WidgetRef ref,
     Note note,
     List<dynamic> folders,
-    List<dynamic> projects,
   ) {
     final noteFolderNames = folders
         .where((f) => f.noteIds.contains(note.id))
         .map((f) => f.name as String)
         .toList();
 
-    final noteProjectNames = note.projectDocumentIds
-        .map((id) {
-          try {
-            return projects.firstWhere((d) => d.id == id).title as String;
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<String>()
-        .toList();
-
     final card = NoteCard(
       note: note,
       timestamp: _formatDate(note.createdAt),
       folderNames: noteFolderNames,
-      projectNames: noteProjectNames,
+      projectNames: const [],
       isSelected: _selectedNoteIds.contains(note.id),
       selectionMode: _selectionMode,
       onTap: _selectionMode
@@ -735,9 +688,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       onFolderTap: _selectionMode
           ? null
           : (_) => _showFolderChangePicker(context, ref, note),
-      onProjectTap: _selectionMode
-          ? null
-          : (_) => _showProjectChangePicker(context, ref, note),
     );
 
     if (_selectionMode) return card;
@@ -1004,120 +954,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  void _showProjectChangePicker(
-      BuildContext context, WidgetRef ref, Note note) {
-    var projects = ref.read(projectDocumentsProvider);
-    final currentProjectIds = note.projectDocumentIds.toSet();
-    final selected = Set<String>.from(currentProjectIds);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.8,
-          builder: (_, scrollController) => Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8, bottom: 4),
-                width: 32,
-                height: 4,
-                decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).hintColor.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Row(
-                  children: [
-                    Text('Change Project',
-                        style:
-                            Theme.of(context).textTheme.titleMedium),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 4),
-                    FilledButton(
-                      onPressed: () {
-                        // Add to new projects
-                        for (final pid in selected) {
-                          if (!currentProjectIds.contains(pid)) {
-                            ref
-                                .read(projectDocumentsProvider.notifier)
-                                .addNoteBlock(pid, note.id);
-                          }
-                        }
-                        Navigator.of(ctx).pop();
-                      },
-                      child: const Text('Save'),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.note_add_rounded,
-                    color: Color(0xFF7B1FA2)),
-                title: const Text('New Project'),
-                onTap: () async {
-                  final name = await _showNewNameDialog(
-                      context, 'New Project', 'Project title');
-                  if (name != null && name.trim().isNotEmpty) {
-                    final project = await ref
-                        .read(projectDocumentsProvider.notifier)
-                        .create(title: name.trim());
-                    setSheetState(() {
-                      projects = ref.read(projectDocumentsProvider);
-                      selected.add(project.id);
-                    });
-                  }
-                },
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: projects.length,
-                  itemBuilder: (_, index) {
-                    final project = projects[index];
-                    final isChecked = selected.contains(project.id);
-                    return CheckboxListTile(
-                      value: isChecked,
-                      onChanged: (val) {
-                        setSheetState(() {
-                          if (val == true) {
-                            selected.add(project.id);
-                          } else {
-                            selected.remove(project.id);
-                          }
-                        });
-                      },
-                      secondary: Icon(
-                        Icons.article_rounded,
-                        color: isChecked
-                            ? const Color(0xFF7B1FA2)
-                            : null,
-                      ),
-                      title: Text(project.title),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // --- Bulk folder/project pickers (multi-select) ---
+  // --- Bulk folder picker (multi-select) ---
 
   void _showBulkFolderPicker(
       BuildContext context, WidgetRef ref, List<Note> allNotes) {
@@ -1237,125 +1074,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  void _showBulkProjectPicker(
-      BuildContext context, WidgetRef ref, List<Note> allNotes) {
-    var projects = ref.read(projectDocumentsProvider);
-    final selected = <String>{};
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.8,
-          builder: (_, scrollController) => Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8, bottom: 4),
-                width: 32,
-                height: 4,
-                decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).hintColor.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Row(
-                  children: [
-                    Text(
-                        'Add ${_selectedNoteIds.length} note${_selectedNoteIds.length > 1 ? 's' : ''} to project',
-                        style:
-                            Theme.of(context).textTheme.titleMedium),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 4),
-                    FilledButton(
-                      onPressed: () {
-                        for (final pid in selected) {
-                          for (final nid in _selectedNoteIds) {
-                            ref
-                                .read(
-                                    projectDocumentsProvider.notifier)
-                                .addNoteBlock(pid, nid);
-                          }
-                        }
-                        Navigator.of(ctx).pop();
-                        _exitSelectionMode();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text(
-                                  'Added to ${selected.length} project${selected.length > 1 ? 's' : ''}')),
-                        );
-                      },
-                      child: const Text('Save'),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.note_add_rounded,
-                    color: Color(0xFF7B1FA2)),
-                title: const Text('New Project'),
-                onTap: () async {
-                  final name = await _showNewNameDialog(
-                      context, 'New Project', 'Project title');
-                  if (name != null && name.trim().isNotEmpty) {
-                    final project = await ref
-                        .read(projectDocumentsProvider.notifier)
-                        .create(title: name.trim());
-                    setSheetState(() {
-                      projects = ref.read(projectDocumentsProvider);
-                      selected.add(project.id);
-                    });
-                  }
-                },
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: projects.length,
-                  itemBuilder: (_, index) {
-                    final project = projects[index];
-                    final isChecked = selected.contains(project.id);
-                    return CheckboxListTile(
-                      value: isChecked,
-                      onChanged: (val) {
-                        setSheetState(() {
-                          if (val == true) {
-                            selected.add(project.id);
-                          } else {
-                            selected.remove(project.id);
-                          }
-                        });
-                      },
-                      secondary: Icon(
-                        Icons.article_rounded,
-                        color: isChecked
-                            ? const Color(0xFF7B1FA2)
-                            : null,
-                      ),
-                      title: Text(project.title),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showEditTitleDialog(
       BuildContext context, WidgetRef ref, Note note) {
     final controller = TextEditingController(text: note.title);
@@ -1414,53 +1132,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               final name = controller.text.trim();
               if (name.isNotEmpty) {
                 ref.read(foldersProvider.notifier).addFolder(name: name);
-                Navigator.of(ctx).pop();
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showNewProjectDialog(BuildContext context, WidgetRef ref) {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New Project'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              autofocus: true,
-              decoration: const InputDecoration(hintText: 'Project title'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descController,
-              decoration:
-                  const InputDecoration(hintText: 'Description (optional)'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              final title = titleController.text.trim();
-              if (title.isNotEmpty) {
-                final desc = descController.text.trim();
-                ref.read(projectDocumentsProvider.notifier).create(
-                      title: title,
-                      description: desc.isEmpty ? null : desc,
-                    );
                 Navigator.of(ctx).pop();
               }
             },

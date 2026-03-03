@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-03-03
 **Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Wave 1 (Step 11) + Wave 2 (Step 12) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). Phase 1.5 Waves 1–3 (Steps 11–13) complete. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -14,7 +14,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 **Phase 1 = No AI.** All AI-related UI elements have been removed or replaced. See the AI exclusion table in CLAUDE.md.
 
-**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Wave 1 (Step 11) and Wave 2 (Step 12 — Core Feel) are complete. Next: Phase 1.5 Wave 3 (Step 13 — Structural Redesign). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+**All 8 value proposition gap features (Steps 8–10.7) are complete.** Phase 1.5 Waves 1–3 (Steps 11–13) are complete. Next: Phase 1.5 Wave 4 (Step 14 — Quality Foundation). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 ---
 
@@ -188,6 +188,18 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Widget Privacy setting (Security page): Full / Record-Only (default) / Minimal — controls what data is shown when App Lock is enabled
 - `HomeWidgetService` pushes data to widgets on foreground resume
 - Android `VoiceNotesWidgetSmall.kt` + `VoiceNotesWidgetDashboard.kt` (AppWidgetProvider)
+
+### Step 13 (Wave 3): Structural Redesign ✅
+- **Projects inside folders** — `ProjectDocument` gets `folderId` (HiveField 8), `Folder` gets `projectDocumentIds` (HiveField 9); migration assigns unlinked projects to folders on startup
+- **Folder Detail** shows projects alongside notes with `_FolderProjectCard`; "New Project" in overflow menu
+- **Library simplified** — removed separate Projects section, collapsible headers; folders-only view with note+project counts; tags quick-access row
+- **Home simplified** — 2 stat cards (Notes + Folders); all project-related code removed (stat card, bulk picker, capsule chips, SpeedDial item)
+- **Recording simplified** — project dropdown removed; folder-only assignment
+- **Tags system** — `tags: List<String>` (HiveField 28) on Note; full CRUD in repository/provider; `tagsProvider` derived provider
+- **Tags UI** — `TagPills` widget; tags section on Note Detail with add dialog + autocomplete; tag chips on NoteCard; `TagsPage` management (rename, delete); `/tags` route
+- **Voice command tags** — "Tag \<name\>" keyword in parser; multiple tags per command; auto-assigned on transcription
+- **Search tags** — tag filter chips replace project chips; search matches tag content
+- **Progressive disclosure audit** — documented 3 tiers (immediate/first week/power user); verified stats+banner implementations
 
 ### Step 12 (Wave 2): Core Feel ✅
 - `HapticService` — static utility wrapping `HapticFeedback` (light/medium/heavy/selection); wired to recording start/stop/pause/discard and all task checkbox toggles

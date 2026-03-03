@@ -30,6 +30,7 @@ void main() async {
   await HiveService.migrateTranscriptVersions();
   await HiveService.migrateDefaultTranscriptionMode();
   await HiveService.ensureDefaultFolder();
+  await HiveService.migrateProjectsIntoFolders();
   await NotificationService.instance.initialize();
   await HomeWidgetService.initialize();
   SharingService.cleanupTempExports(); // fire-and-forget

@@ -74,6 +74,16 @@ class FoldersNotifier extends Notifier<List<Folder>> {
         .removeNoteFromFolder(folderId, noteId);
     refresh();
   }
+
+  Future<void> addProjectToFolder(String folderId, String projectId) async {
+    await ref.read(foldersRepositoryProvider).addProjectToFolder(folderId, projectId);
+    refresh();
+  }
+
+  Future<void> removeProjectFromFolder(String folderId, String projectId) async {
+    await ref.read(foldersRepositoryProvider).removeProjectFromFolder(folderId, projectId);
+    refresh();
+  }
 }
 
 /// Provider for the folders list.

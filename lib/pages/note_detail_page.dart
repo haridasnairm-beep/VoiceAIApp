@@ -29,6 +29,7 @@ import '../services/image_attachment_repository.dart';
 import 'image_viewer_page.dart';
 import '../widgets/share_preview_sheet.dart';
 import '../services/haptic_service.dart';
+import '../widgets/tag_pills.dart';
 
 class NoteDetailPage extends ConsumerStatefulWidget {
   final String? recordingPath;
@@ -1354,6 +1355,20 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
               ),
             ),
 
+            const SizedBox(height: 12),
+
+            // === TAGS SECTION ===
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TagPills(
+                tags: note.tags,
+                onRemove: (tag) => ref
+                    .read(notesProvider.notifier)
+                    .removeTag(noteId: note.id, tag: tag),
+                onAdd: () => _showAddTagDialog(note),
+              ),
+            ),
+
             const SizedBox(height: 16),
 
             // === FIND & REPLACE BAR ===
@@ -2178,6 +2193,64 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
       }
     }
     textController.dispose();
+  }
+
+  Future<void> _showAddTagDialog(Note note) async {
+    final controller = TextEditingController();
+    final tagNames = ref.read(notesProvider).expand((n) => n.tags).toSet().toList()
+      ..sort();
+    final newTag = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Tag'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Tag name (e.g. work, idea)',
+                prefixText: '#',
+              ),
+              onSubmitted: (v) => Navigator.pop(ctx, v.trim().toLowerCase()),
+            ),
+            if (tagNames.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('Existing tags',
+                  style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.secondary)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: tagNames
+                    .where((t) => !note.tags.contains(t))
+                    .map((t) => GestureDetector(
+                          onTap: () => Navigator.pop(ctx, t),
+                          child: Chip(label: Text('#$t')),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(ctx, controller.text.trim().toLowerCase()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (newTag != null && newTag.isNotEmpty && !note.tags.contains(newTag)) {
+      await ref.read(notesProvider.notifier).addTag(noteId: note.id, tag: newTag);
+    }
   }
 
   Future<void> _showAddActionDialog(Note note) async {

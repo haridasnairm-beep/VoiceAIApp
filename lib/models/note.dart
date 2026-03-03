@@ -92,6 +92,9 @@ class Note extends HiveObject {
   @HiveField(27)
   String? previousFolderId;
 
+  @HiveField(28)
+  List<String> tags;
+
   Note({
     required this.id,
     required this.title,
@@ -121,6 +124,7 @@ class Note extends HiveObject {
     this.isDeleted = false,
     this.deletedAt,
     this.previousFolderId,
+    List<String>? tags,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         topics = topics ?? [],
@@ -130,7 +134,8 @@ class Note extends HiveObject {
         generalNotes = generalNotes ?? [],
         transcriptVersions = transcriptVersions ?? [],
         projectDocumentIds = projectDocumentIds ?? [],
-        imageAttachmentIds = imageAttachmentIds ?? [];
+        imageAttachmentIds = imageAttachmentIds ?? [],
+        tags = tags ?? [];
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -161,6 +166,7 @@ class Note extends HiveObject {
         'isDeleted': isDeleted,
         'deletedAt': deletedAt?.toIso8601String(),
         'previousFolderId': previousFolderId,
+        'tags': tags,
       };
 
   factory Note.fromMap(Map<String, dynamic> m) => Note(
@@ -202,5 +208,6 @@ class Note extends HiveObject {
         isDeleted: m['isDeleted'] as bool? ?? false,
         deletedAt: m['deletedAt'] != null ? DateTime.parse(m['deletedAt'] as String) : null,
         previousFolderId: m['previousFolderId'] as String?,
+        tags: List<String>.from(m['tags'] as List? ?? []),
       );
 }
