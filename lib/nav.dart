@@ -27,6 +27,7 @@ import 'pages/support_us_page.dart';
 import 'pages/backup_restore_page.dart';
 import 'pages/tags_page.dart';
 import 'pages/calendar_page.dart';
+import 'pages/permission_page.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -307,9 +308,17 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.backupRestore,
         name: 'backup_restore',
-        pageBuilder: (context, state) => const NoTransitionPage(
-          child: BackupRestorePage(),
-        ),
+        pageBuilder: (context, state) {
+          String? restoreFilePath;
+          final extra = state.extra;
+          if (extra is Map) {
+            final p = extra['restoreFilePath'];
+            if (p is String && p.isNotEmpty) restoreFilePath = p;
+          }
+          return NoTransitionPage(
+            child: BackupRestorePage(restoreFilePath: restoreFilePath),
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.tags,
@@ -323,6 +332,13 @@ class AppRouter {
         name: 'calendar',
         pageBuilder: (context, state) => const NoTransitionPage(
           child: CalendarPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.permissions,
+        name: 'permissions',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: PermissionPage(),
         ),
       ),
     ],
@@ -358,4 +374,5 @@ class AppRoutes {
   static const String backupRestore = '/backup_restore';
   static const String tags = '/tags';
   static const String calendar = '/calendar';
+  static const String permissions = '/permissions';
 }

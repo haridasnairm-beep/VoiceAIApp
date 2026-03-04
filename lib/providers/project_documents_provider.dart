@@ -75,6 +75,15 @@ class ProjectDocumentsNotifier extends Notifier<List<ProjectDocument>> {
     ];
   }
 
+  /// Move a project to a different folder (atomic).
+  Future<void> moveProjectToFolder(String projectId, String newFolderId) async {
+    await ref
+        .read(projectDocumentsRepositoryProvider)
+        .moveProjectToFolder(projectId, newFolderId);
+    refresh();
+    ref.read(foldersProvider.notifier).refresh();
+  }
+
   Future<void> addNoteBlock(String documentId, String noteId) async {
     await ref
         .read(projectDocumentsRepositoryProvider)

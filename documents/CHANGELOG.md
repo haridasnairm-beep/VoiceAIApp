@@ -4,6 +4,59 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-04 - Auto-Naming Preference
+
+### Added
+- **Auto Naming preference** — new "Auto Naming" setting in Preferences page with 3 styles:
+  - **Prefix + Auto** (default): `V001 — Meeting notes about budget` — keeps sequential prefix and appends auto-generated title from transcription
+  - **Prefix Only**: `V001` — keeps prefix, no auto-rename after transcription
+  - **Auto Only**: `Meeting notes about budget` — replaces prefix entirely with auto-generated title
+- **`noteNamingStyle`** field in `UserSettings` (HiveField 34, default `'prefix_auto'`)
+- **`_applyAutoTitle()`** method in `NotesNotifier` — applies naming style logic when auto-title is generated after transcription
+- **`_NamingStyleDialog`** widget in `preferences_page.dart` — radio dialog with 3 options and example previews
+
+### Changed
+- Default voice note prefix changed from `VOICE` to `V` (e.g., `V001`, `V002`)
+- Default text note prefix changed from `TXT` to `T` (e.g., `T001`, `T002`)
+- One-time migration for existing users: `VOICE` → `V` and `TXT` → `T` (only if prefix was unchanged from old default)
+- Auto-title logic now respects `noteNamingStyle` setting instead of always replacing the full title
+
+---
+
+## [Unreleased] - 2026-03-04 - Gesture FAB (Issue #14)
+
+### Added
+- **Gesture FAB** (`lib/widgets/gesture_fab.dart`) — swipe-up on FAB to navigate directly to recording screen (single-gesture record); tap to expand SpeedDial with all actions (Search, New Folder, Text Note, Record Note)
+- **Swipe gesture detection** — 40px vertical threshold, 20px max horizontal drift, icon crossfade (+ → mic), FAB pulse animation on threshold, haptic feedback (medium on threshold, light on navigation)
+- **Subtitle hint label** — "↑ swipe to record" shown above FAB for first 10 sessions, auto-hidden when SpeedDial is open
+- **Session count tracking** — `sessionCount` (HiveField 33) incremented on each app launch; `fabSwipeHintShownCount` (HiveField 32) for idle hint limit
+- Replaced `SpeedDialFab` with `GestureFab` on Home page
+
+### Fixed
+- Removed debug `print()` statements from template picker flow in home_page.dart
+
+---
+
+## [Unreleased] - 2026-03-04 - Permission Management (Issue #13)
+
+### Added
+- **Permission request page** (`lib/pages/permission_page.dart`) — one-time post-onboarding screen requesting Microphone (required) and Notifications (optional) permissions; "Grant Access" and "Later" options; permanently-denied dialog with link to Android app settings
+- **Permissions section in Audio & Recording settings** — live status display for Microphone and Notifications; green/red indicators; tap to open Android app settings; auto-refreshes on return from settings via `WidgetsBindingObserver`
+- **`permission_handler`** dependency (^11.3.1) for runtime permission checking and app settings navigation
+- **`permissionScreenShown`** field in `UserSettings` (HiveField 31) — tracks whether permission page has been shown
+- **`/permissions` route** in GoRouter
+
+### Changed
+- **Onboarding flow** — first-run users now go to permission page after completing Quick Guide (instead of directly to Home)
+- **Splash navigation** — checks `permissionScreenShown` flag; existing users upgrading see permission page once
+
+### Fixed
+- **Template picker dismiss** — fixed `DraggableScrollableSheet` + `ListView` gesture interaction so pulling down anywhere on the sheet dismisses it (returns null, no note created)
+- **PIN setup dialog** — now using `showModalBottomSheet` with larger fonts, bigger keypad, prominent red warning about PIN loss
+- **Biometric authentication** — fixed `FlutterFragmentActivity` requirement, fixed infinite re-lock loop on resume, fixed lock screen never appearing
+
+---
+
 ## [Unreleased] - 2026-03-03 - Step 17 (Wave 7): Differentiation
 
 ### Added

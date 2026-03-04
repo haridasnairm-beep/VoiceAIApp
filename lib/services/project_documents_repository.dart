@@ -3,6 +3,7 @@ import '../models/project_document.dart';
 import '../models/project_block.dart';
 import '../models/note.dart';
 import 'hive_service.dart';
+import 'folders_repository.dart';
 
 /// Repository for ProjectDocument CRUD operations against Hive.
 class ProjectDocumentsRepository {
@@ -105,6 +106,24 @@ class ProjectDocumentsRepository {
       await permanentlyDeleteProjectDocument(doc.id);
     }
     return expired.length;
+  }
+
+  /// Move a project to a different folder (atomic: updates project + both folders).
+  Future<void> moveProjectToFolder(String projectId, String newFolderId) async {
+    final doc = getProjectDocument(projectId);
+    if (doc == null) return;
+
+    final foldersRepo = FoldersRepository();
+    // Remove from old folder
+    if (doc.folderId != null && doc.folderId!.isNotEmpty) {
+      await foldersRepo.removeProjectFromFolder(doc.folderId!, projectId);
+    }
+    // Set new folder
+    doc.folderId = newFolderId;
+    doc.updatedAt = DateTime.now();
+    await updateProjectDocument(doc);
+    // Add to new folder
+    await foldersRepo.addProjectToFolder(newFolderId, projectId);
   }
 
   /// Add a note_reference block to a document.

@@ -24,6 +24,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   void _finish() {
     if (!_isFromSettings) {
       ref.read(settingsProvider.notifier).setOnboardingCompleted(true);
+      // Show permission request screen on first run
+      context.go(AppRoutes.permissions);
+      return;
     }
     if (context.canPop()) {
       context.pop();

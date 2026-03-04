@@ -30,6 +30,7 @@ class AppLockService {
     _isLocked = false;
     _failedAttempts = 0;
     _lockoutUntil = null;
+    _lastBackgroundedAt = null; // Prevent re-lock from stale timestamp
   }
 
   /// Called when app goes to background.
@@ -38,8 +39,10 @@ class AppLockService {
   }
 
   /// Called when app returns to foreground. Returns true if lock should trigger.
+  /// Returns false if app was never backgrounded (cold start lock is handled
+  /// by the splash page directly).
   bool shouldLockOnResume(int timeoutSeconds) {
-    if (_lastBackgroundedAt == null) return true;
+    if (_lastBackgroundedAt == null) return false;
     final elapsed = DateTime.now().difference(_lastBackgroundedAt!).inSeconds;
     return elapsed >= timeoutSeconds;
   }

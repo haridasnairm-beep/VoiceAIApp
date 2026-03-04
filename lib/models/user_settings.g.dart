@@ -49,13 +49,18 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       dismissedTips: (fields[28] as List?)?.cast<String>(),
       lastSeenAppVersion: fields[29] as String?,
       noteSortOrder: fields[30] == null ? 'newest' : fields[30] as String,
+      permissionScreenShown: fields[31] == null ? false : fields[31] as bool,
+      fabSwipeHintShownCount: fields[32] == null ? 0 : fields[32] as int,
+      sessionCount: fields[33] == null ? 0 : fields[33] as int,
+      noteNamingStyle:
+          fields[34] == null ? 'prefix_auto' : fields[34] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(31)
+      ..writeByte(35)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -117,7 +122,15 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(29)
       ..write(obj.lastSeenAppVersion)
       ..writeByte(30)
-      ..write(obj.noteSortOrder);
+      ..write(obj.noteSortOrder)
+      ..writeByte(31)
+      ..write(obj.permissionScreenShown)
+      ..writeByte(32)
+      ..write(obj.fabSwipeHintShownCount)
+      ..writeByte(33)
+      ..write(obj.sessionCount)
+      ..writeByte(34)
+      ..write(obj.noteNamingStyle);
   }
 
   @override

@@ -104,11 +104,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
       await _recorder.cancelAndDelete();
     }
     if (!mounted) return;
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go(AppRoutes.home);
-    }
+    context.go(AppRoutes.home);
   }
 
   void _startTimer() {
@@ -227,11 +223,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
           const SnackBar(
               content: Text('Microphone permission is required to record.')),
         );
-        if (context.canPop()) {
-          context.pop();
-        } else {
-          context.go(AppRoutes.home);
-        }
+        context.go(AppRoutes.home);
         return;
       }
 
@@ -635,28 +627,30 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
                                 child: child,
                               ),
                               child: Container(
-                                width: 8,
-                                height: 8,
+                                width: 12,
+                                height: 12,
                                 decoration: BoxDecoration(
                                   color: _isPaused
                                       ? Theme.of(context).colorScheme.secondary
-                                      : AppColors.lightSuccess,
+                                      : Colors.red,
                                   shape: BoxShape.circle,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 10),
-                            Text(
-                              'Recording audio for Whisper transcription',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .secondary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                            Expanded(
+                              child: Text(
+                                'Recording audio for Whisper transcription',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                              ),
                             ),
                           ],
                         ),

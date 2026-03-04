@@ -11,7 +11,7 @@ import 'services/notes_repository.dart';
 import 'services/project_documents_repository.dart';
 import 'services/sharing_service.dart';
 import 'services/crash_reporting_service.dart';
-import 'pages/lock_screen_page.dart';
+import 'services/settings_repository.dart';
 import 'theme.dart';
 import 'nav.dart';
 import 'providers/settings_provider.dart';
@@ -33,6 +33,7 @@ void main() async {
   await HiveService.migrateDefaultTranscriptionMode();
   await HiveService.ensureDefaultFolder();
   await HiveService.migrateProjectsIntoFolders();
+  await HiveService.migrateNotePrefixes();
   await HiveService.validateIntegrity();
   await NotificationService.instance.initialize();
   await HomeWidgetService.initialize();
@@ -43,6 +44,8 @@ void main() async {
     await CrashReportingService.instance.initialize();
     CrashReportingService.setupFlutterErrorHandler();
   }
+  // Increment session count for Gesture FAB hint logic
+  SettingsRepository().incrementSessionCount();
   // Auto-purge trash items older than 30 days
   NotesRepository().purgeExpiredTrash();
   FoldersRepository().purgeExpiredTrash();
@@ -59,16 +62,13 @@ class VoiceNotesApp extends ConsumerStatefulWidget {
 
 class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
     with WidgetsBindingObserver {
-  bool _lockScreenShown = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Show lock on cold start after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkColdStartLock();
       _checkWidgetLaunch();
+      _checkFileIntent();
       _refreshWidget();
       // Recover any transcriptions that were interrupted by app kill
       ref.read(notesProvider.notifier).recoverStuckTranscriptions();
@@ -89,25 +89,22 @@ class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
     if (!settings.appLockEnabled) return;
 
     if (state == AppLifecycleState.paused) {
-      AppLockService.instance.onAppPaused();
-    } else if (state == AppLifecycleState.resumed) {
-      final shouldLock = AppLockService.instance
-          .shouldLockOnResume(settings.autoLockTimeoutSeconds);
-      if (shouldLock) {
-        AppLockService.instance.lock();
-        _showLockScreen();
+      // Only record background time if app is unlocked.
+      // If locked (biometric dialog open), skip to avoid re-lock loop.
+      if (!AppLockService.instance.isLocked) {
+        AppLockService.instance.onAppPaused();
       }
-      // Keep widget data fresh whenever the app comes back to foreground
+    } else if (state == AppLifecycleState.resumed) {
+      if (!AppLockService.instance.isLocked) {
+        final shouldLock = AppLockService.instance
+            .shouldLockOnResume(settings.autoLockTimeoutSeconds);
+        if (shouldLock) {
+          AppLockService.instance.lock();
+          // Navigate to splash which handles the lock screen
+          AppRouter.router.go(AppRoutes.splash);
+        }
+      }
       _refreshWidget();
-    }
-  }
-
-  void _checkColdStartLock() {
-    final settings = ref.read(settingsProvider);
-    if (settings.appLockEnabled &&
-        settings.appLockPinHash != null &&
-        AppLockService.instance.isLocked) {
-      _showLockScreen();
     }
   }
 
@@ -128,36 +125,26 @@ class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
     }
   }
 
+  /// Check if the app was launched by opening a .vnbak file.
+  Future<void> _checkFileIntent() async {
+    const channel = MethodChannel('com.hariappbuilders.voicenotesai/file_intent');
+    try {
+      final String? filePath = await channel.invokeMethod('getOpenFilePath');
+      if (filePath != null && filePath.isNotEmpty) {
+        // Navigate to backup restore page with the file path
+        AppRouter.router.go(AppRoutes.backupRestore, extra: {'restoreFilePath': filePath});
+      }
+    } catch (_) {
+      // Channel not available or no file — ignore
+    }
+  }
+
   /// Push fresh data to the home screen widget (fire-and-forget).
   void _refreshWidget() {
     final settings = ref.read(settingsProvider);
     HomeWidgetService.updateWidgetData(
       appLockEnabled: settings.appLockEnabled,
       widgetPrivacyLevel: settings.widgetPrivacyLevel,
-    );
-  }
-
-  void _showLockScreen() {
-    if (_lockScreenShown) return;
-    final settings = ref.read(settingsProvider);
-    if (settings.appLockPinHash == null) return;
-
-    _lockScreenShown = true;
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: true,
-        pageBuilder: (_, __, ___) => LockScreenPage(
-          pinHash: settings.appLockPinHash!,
-          biometricEnabled: settings.biometricEnabled,
-          onUnlocked: () {
-            Navigator.of(context).pop();
-            _lockScreenShown = false;
-          },
-        ),
-        transitionsBuilder: (_, animation, __, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-      ),
     );
   }
 

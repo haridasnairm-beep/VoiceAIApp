@@ -177,4 +177,28 @@ class SettingsRepository {
     settings.crashReportingEnabled = enabled;
     await saveSettings(settings);
   }
+
+  Future<void> setPermissionScreenShown(bool shown) async {
+    final settings = getSettings();
+    settings.permissionScreenShown = shown;
+    await saveSettings(settings);
+  }
+
+  Future<void> setFabSwipeHintShownCount(int count) async {
+    final settings = getSettings();
+    settings.fabSwipeHintShownCount = count;
+    await saveSettings(settings);
+  }
+
+  Future<void> setNoteNamingStyle(String style) async {
+    final settings = getSettings();
+    settings.noteNamingStyle = style;
+    await saveSettings(settings);
+  }
+
+  Future<void> incrementSessionCount() async {
+    final settings = getSettings();
+    settings.sessionCount += 1;
+    await saveSettings(settings);
+  }
 }

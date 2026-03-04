@@ -22,7 +22,9 @@ String _fmtDate(DateTime dt) {
 }
 
 class BackupRestorePage extends ConsumerStatefulWidget {
-  const BackupRestorePage({super.key});
+  final String? restoreFilePath;
+
+  const BackupRestorePage({super.key, this.restoreFilePath});
 
   @override
   ConsumerState<BackupRestorePage> createState() => _BackupRestorePageState();
@@ -48,6 +50,18 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
   BackupManifest? _previewManifest;
   String _restoreStatus = '';
   double _restoreProgress = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.restoreFilePath != null) {
+      _restoreFilePath = widget.restoreFilePath;
+      // Auto-preview the file after build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _previewBackup();
+      });
+    }
+  }
 
   @override
   void dispose() {

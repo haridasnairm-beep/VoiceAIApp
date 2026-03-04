@@ -97,6 +97,18 @@ class UserSettings extends HiveObject {
   @HiveField(30, defaultValue: 'newest')
   String noteSortOrder; // newest, oldest, titleAZ, titleZA, longest
 
+  @HiveField(31, defaultValue: false)
+  bool permissionScreenShown; // True once the post-onboarding permission screen has been displayed
+
+  @HiveField(32, defaultValue: 0)
+  int fabSwipeHintShownCount; // Idle hint shown count (max 2)
+
+  @HiveField(33, defaultValue: 0)
+  int sessionCount; // Incremented on each app launch
+
+  @HiveField(34, defaultValue: 'prefix_auto')
+  String noteNamingStyle; // 'prefix_only', 'prefix_auto', 'auto_only'
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -107,10 +119,10 @@ class UserSettings extends HiveObject {
     this.onboardingCompleted = false,
     this.transcriptionMode = 'whisper',
     this.speakerName = 'Speaker 1',
-    this.notePrefix = 'VOICE',
+    this.notePrefix = 'V',
     this.defaultFolderId,
     this.voiceCommandsEnabled = true,
-    this.textNotePrefix = 'TXT',
+    this.textNotePrefix = 'T',
     this.actionItemsEnabled = true,
     this.todosEnabled = true,
     this.whisperModel = 'base',
@@ -129,6 +141,10 @@ class UserSettings extends HiveObject {
     List<String>? dismissedTips,
     this.lastSeenAppVersion,
     this.noteSortOrder = 'newest',
+    this.permissionScreenShown = false,
+    this.fabSwipeHintShownCount = 0,
+    this.sessionCount = 0,
+    this.noteNamingStyle = 'prefix_auto',
   })  : dismissedTips = dismissedTips ?? [];
 
   Map<String, dynamic> toMap() => {
@@ -163,6 +179,10 @@ class UserSettings extends HiveObject {
         'dismissedTips': dismissedTips,
         'lastSeenAppVersion': lastSeenAppVersion,
         'noteSortOrder': noteSortOrder,
+        'permissionScreenShown': permissionScreenShown,
+        'fabSwipeHintShownCount': fabSwipeHintShownCount,
+        'sessionCount': sessionCount,
+        'noteNamingStyle': noteNamingStyle,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -175,10 +195,10 @@ class UserSettings extends HiveObject {
         onboardingCompleted: m['onboardingCompleted'] as bool? ?? false,
         transcriptionMode: m['transcriptionMode'] as String? ?? 'whisper',
         speakerName: m['speakerName'] as String? ?? 'Speaker 1',
-        notePrefix: m['notePrefix'] as String? ?? 'VOICE',
+        notePrefix: m['notePrefix'] as String? ?? 'V',
         defaultFolderId: m['defaultFolderId'] as String?,
         voiceCommandsEnabled: m['voiceCommandsEnabled'] as bool? ?? true,
-        textNotePrefix: m['textNotePrefix'] as String? ?? 'TXT',
+        textNotePrefix: m['textNotePrefix'] as String? ?? 'T',
         actionItemsEnabled: m['actionItemsEnabled'] as bool? ?? true,
         todosEnabled: m['todosEnabled'] as bool? ?? true,
         whisperModel: m['whisperModel'] as String? ?? 'base',
@@ -199,5 +219,9 @@ class UserSettings extends HiveObject {
         dismissedTips: List<String>.from(m['dismissedTips'] as List? ?? []),
         lastSeenAppVersion: m['lastSeenAppVersion'] as String?,
         noteSortOrder: m['noteSortOrder'] as String? ?? 'newest',
+        permissionScreenShown: m['permissionScreenShown'] as bool? ?? false,
+        fabSwipeHintShownCount: m['fabSwipeHintShownCount'] as int? ?? 0,
+        sessionCount: m['sessionCount'] as int? ?? 0,
+        noteNamingStyle: m['noteNamingStyle'] as String? ?? 'prefix_auto',
       );
 }

@@ -104,6 +104,7 @@ These fields in `lib/models/note.dart` should **remain in the model** (for Phase
 | Backup archive | archive (Step 10.7 — ZIP encode/decode) |
 | Backup encryption | encrypt (Step 10.7 — AES-256-CBC) |
 | Backup file picker | file_picker (Step 10.7 — restore file selection) |
+| Permission management | permission_handler (runtime permission checks + app settings) |
 | Typography | Google Fonts (Plus Jakarta Sans, Inter) |
 | App icon | `assets/icons/logo.png` (used for launcher icon + in-app branding) |
 
@@ -114,7 +115,7 @@ These fields in `lib/models/note.dart` should **remain in the model** (for Phase
 ```
 lib/
 ├── main.dart                         # App entry point (Hive init + ProviderScope + widget/lock init)
-├── nav.dart                          # GoRouter routes (26 routes) and AppRoutes constants
+├── nav.dart                          # GoRouter routes (29 routes) and AppRoutes constants
 ├── theme.dart                        # Material 3 theme (light + dark + AMOLED)
 ├── models/
 │   ├── note.dart                     # Hive model (typeId: 0) — includes isPinned, isDeleted, toMap/fromMap
@@ -122,7 +123,7 @@ lib/
 │   ├── todo_item.dart                # Hive model (typeId: 2) — toMap/fromMap
 │   ├── reminder_item.dart            # Hive model (typeId: 3) — toMap/fromMap
 │   ├── folder.dart                   # Hive model (typeId: 4) — includes isDeleted, toMap/fromMap
-│   ├── user_settings.dart            # Hive model (typeId: 5) — HiveFields 0–24, toMap/fromMap
+│   ├── user_settings.dart            # Hive model (typeId: 5) — HiveFields 0–33, toMap/fromMap
 │   ├── project_document.dart         # Hive model (typeId: 6) — toMap/fromMap
 │   ├── project_block.dart            # Hive model (typeId: 7) + BlockType enum (typeId: 9) — toMap/fromMap
 │   ├── transcript_version.dart       # Hive model (typeId: 8) — toMap/fromMap
@@ -178,6 +179,7 @@ lib/
 │   ├── trash_page.dart               # Soft-deleted notes/folders/projects — 30-day retention (Step 10)
 │   ├── backup_restore_page.dart      # Encrypted backup creation & restore UI (Step 10.7)
 │   ├── lock_screen_page.dart         # PIN / biometric unlock screen (Step 10.5)
+│   ├── permission_page.dart         # Post-onboarding permission request (mic + notifications)
 │   ├── about_page.dart               # App info, credits, legal
 │   ├── feedback_page.dart            # User feedback form
 │   ├── support_us_page.dart          # Buy Me a Coffee
@@ -185,7 +187,8 @@ lib/
 │   └── terms_conditions_page.dart    # Terms & conditions
 ├── widgets/
 │   ├── note_card.dart                # Note card for lists
-│   ├── speed_dial_fab.dart           # Multi-action floating button
+│   ├── speed_dial_fab.dart           # Multi-action floating button (SpeedDialItem model)
+│   ├── gesture_fab.dart              # Gesture FAB: swipe-up to record, tap to expand SpeedDial
 │   ├── share_preview_sheet.dart      # Share preview with toggles + PDF export
 │   ├── find_replace_bar.dart         # Find & Replace toolbar
 │   ├── settings_widgets.dart         # Reusable settings UI components
@@ -230,6 +233,8 @@ lib/
 - **Step 10.5: App Lock — PIN / Biometric** ✅ Done (PIN setup/change, biometric via local_auth, auto-lock timeout, lock screen)
 - **Step 10.6: Home Screen Widget** ✅ Done (Quick Record 2×1 + Dashboard 4×2 Android widgets, Widget Privacy setting)
 - **Step 10.7: Local Backup & Restore** ✅ Done (AES-256-CBC encrypted .vnbak archives, passphrase key derivation, full restore)
+- **Permission Management (Issue #13)** ✅ Done (post-onboarding permission page, permissions section in audio settings, permission_handler)
+- **Gesture FAB (Issue #14)** ✅ Done (swipe-up to record, icon crossfade, pulse animation, haptic feedback, subtitle hint label, session count tracking)
 
 **Phase 2 Steps (future, not in scope):**
 - Whisper API Transcription (cloud-based, higher accuracy)
@@ -268,6 +273,7 @@ lib/
 | `/project_document_detail` | Project Document Detail | Active |
 | `/note_picker` | Note Picker | Active |
 | `/version_history` | Version History | Active |
+| `/permissions` | Permission Request | Active (post-onboarding, one-time mic + notifications) |
 
 ---
 

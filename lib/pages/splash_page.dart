@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:local_auth/local_auth.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../providers/settings_provider.dart';
+import '../services/app_lock_service.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -14,10 +16,25 @@ class SplashPage extends ConsumerStatefulWidget {
   ConsumerState<SplashPage> createState() => _SplashPageState();
 }
 
-class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProviderStateMixin {
+class _SplashPageState extends ConsumerState<SplashPage>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeIn;
   late Animation<double> _logoScale;
+
+  // Lock screen state
+  bool _isLocked = false;
+  final _localAuth = LocalAuthentication();
+  String _enteredPin = '';
+  bool _showPinPad = false;
+  String? _errorText;
+  bool _isAuthenticating = false;
+  bool _biometricAvailable = false;
+  Timer? _lockoutTimer;
+  Duration? _lockoutRemaining;
+
+  String? _pinHash;
+  bool _biometricEnabled = false;
 
   @override
   void initState() {
@@ -32,147 +49,484 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
     );
     _controller.forward();
 
-    Timer(const Duration(seconds: 5), () {
-      if (mounted) {
-        final completed = ref.read(settingsProvider).onboardingCompleted;
-        context.go(completed ? AppRoutes.home : AppRoutes.onboarding);
-      }
-    });
+    final settings = ref.read(settingsProvider);
+    _pinHash = settings.appLockPinHash;
+    _biometricEnabled = settings.biometricEnabled;
+
+    if (settings.appLockEnabled &&
+        _pinHash != null &&
+        AppLockService.instance.isLocked) {
+      // App lock is on — show lock UI instead of auto-navigating
+      _isLocked = true;
+      _checkBiometricAvailability();
+    } else {
+      // No lock — auto-navigate after splash
+      Timer(const Duration(seconds: 5), () {
+        if (mounted) _navigateForward();
+      });
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _lockoutTimer?.cancel();
     super.dispose();
+  }
+
+  void _navigateForward() {
+    final settings = ref.read(settingsProvider);
+    if (!settings.onboardingCompleted) {
+      context.go(AppRoutes.onboarding);
+    } else if (!settings.permissionScreenShown) {
+      context.go(AppRoutes.permissions);
+    } else {
+      context.go(AppRoutes.home);
+    }
+  }
+
+  // --- Biometric ---
+
+  Future<void> _checkBiometricAvailability() async {
+    try {
+      final canCheck = await _localAuth.canCheckBiometrics;
+      final isSupported = await _localAuth.isDeviceSupported();
+      print('Splash biometric: canCheck=$canCheck isSupported=$isSupported');
+      if (mounted) {
+        setState(() => _biometricAvailable = canCheck || isSupported);
+        if (_biometricEnabled && _biometricAvailable) {
+          // Auto-trigger biometric on cold start
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _tryBiometric());
+        }
+      }
+    } catch (e) {
+      print('Splash biometric check failed: $e');
+    }
+  }
+
+  Future<void> _tryBiometric() async {
+    if (_isAuthenticating) return;
+    setState(() => _isAuthenticating = true);
+    try {
+      final didAuth = await _localAuth.authenticate(
+        localizedReason: 'Unlock VoiceNotes AI',
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
+        ),
+      );
+      print('Splash biometric: didAuth=$didAuth');
+      if (didAuth && mounted) {
+        AppLockService.instance.unlock();
+        _navigateForward();
+      }
+    } catch (e) {
+      print('Splash biometric error: $e');
+    } finally {
+      if (mounted) setState(() => _isAuthenticating = false);
+    }
+  }
+
+  // --- PIN ---
+
+  void _onDigit(String digit) {
+    if (_enteredPin.length >= 6) return;
+    final lockout = AppLockService.instance.lockoutRemaining;
+    if (lockout != null) return;
+
+    setState(() {
+      _enteredPin += digit;
+      _errorText = null;
+    });
+
+    if (_enteredPin.length >= 4) {
+      _verifyPin();
+    }
+  }
+
+  void _onBackspace() {
+    if (_enteredPin.isEmpty) return;
+    setState(() {
+      _enteredPin = _enteredPin.substring(0, _enteredPin.length - 1);
+      _errorText = null;
+    });
+  }
+
+  Future<void> _verifyPin() async {
+    if (_pinHash == null) return;
+    final isValid = await AppLockService.verifyPin(_enteredPin, _pinHash!);
+    if (!mounted) return;
+
+    if (isValid) {
+      AppLockService.instance.unlock();
+      _navigateForward();
+    } else {
+      final lockoutDuration = AppLockService.instance.recordFailedAttempt();
+      setState(() {
+        _enteredPin = '';
+        if (lockoutDuration != null) {
+          _errorText =
+              'Too many attempts. Try again in ${lockoutDuration.inSeconds}s';
+          _startLockoutTimer(lockoutDuration);
+        } else {
+          _errorText = 'Incorrect PIN';
+        }
+      });
+    }
+  }
+
+  void _startLockoutTimer(Duration duration) {
+    _lockoutRemaining = duration;
+    _lockoutTimer?.cancel();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final remaining = AppLockService.instance.lockoutRemaining;
+      if (remaining == null || !mounted) {
+        timer.cancel();
+        setState(() {
+          _lockoutRemaining = null;
+          _errorText = null;
+        });
+      } else {
+        setState(() {
+          _lockoutRemaining = remaining;
+          _errorText = 'Try again in ${remaining.inSeconds}s';
+        });
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final theme = Theme.of(context);
 
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark
-                ? [
-                    AppColors.darkBackground,
-                    const Color(0xFF1A2332),
-                    AppColors.darkBackground,
-                  ]
-                : [
-                    AppColors.lightBackground,
-                    const Color(0xFFE8F0FE),
-                    AppColors.lightBackground,
-                  ],
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDark
+                  ? [
+                      AppColors.darkBackground,
+                      const Color(0xFF1A2332),
+                      AppColors.darkBackground,
+                    ]
+                  : [
+                      AppColors.lightBackground,
+                      const Color(0xFFE8F0FE),
+                      AppColors.lightBackground,
+                    ],
+            ),
+          ),
+          child: SafeArea(
+            child: FadeTransition(
+              opacity: _fadeIn,
+              child: _isLocked ? _buildLockUI(theme, primaryColor) : _buildSplashUI(theme, primaryColor),
+            ),
           ),
         ),
-        child: FadeTransition(
-          opacity: _fadeIn,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      ),
+    );
+  }
+
+  // --- Normal splash (no lock) ---
+  Widget _buildSplashUI(ThemeData theme, Color primaryColor) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(flex: 3),
+        _buildLogo(primaryColor, size: 140),
+        const SizedBox(height: 32),
+        Text(
+          'VoiceNotes AI',
+          style: theme.textTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 48),
+          child: Text(
+            'Your voice, perfectly organized.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.secondary,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ),
+        const Spacer(flex: 2),
+        Text.rich(
+          TextSpan(
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: primaryColor.withValues(alpha: 0.7),
+              fontSize: 11,
+            ),
             children: [
-              const Spacer(flex: 3),
-              // Logo
-              ScaleTransition(
-                scale: _logoScale,
-                child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(40),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withValues(alpha: 0.3),
-                        blurRadius: 50,
-                        spreadRadius: 8,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(40),
-                    child: Image.asset(
-                      'assets/icons/logo.png',
-                      width: 140,
-                      height: 140,
-                      fit: BoxFit.cover,
+              const TextSpan(text: 'By using this app you agree to the\n'),
+              WidgetSpan(
+                child: GestureDetector(
+                  onTap: () => context.push(AppRoutes.termsConditions),
+                  child: Text(
+                    'Terms & Conditions',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: primaryColor.withValues(alpha: 0.9),
+                      decoration: TextDecoration.underline,
+                      decorationColor: primaryColor.withValues(alpha: 0.5),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
-              // App name
-              Text(
-                'VoiceNotes AI',
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              // Tagline
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 48),
-                child: Text(
-                  'Your voice, perfectly organized.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.secondary,
-                        fontWeight: FontWeight.w400,
-                      ),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'by HDMPixels',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 72),
+      ],
+    );
+  }
+
+  // --- Lock screen UI ---
+  Widget _buildLockUI(ThemeData theme, Color primaryColor) {
+    final hasBiometric = _biometricEnabled && _biometricAvailable;
+    // Show tip if biometric is available but not enabled by the user
+    final showBiometricTip = _biometricAvailable && !_biometricEnabled;
+
+    return Column(
+      children: [
+        // Logo positioned in upper third so biometric popup doesn't cover it
+        const Spacer(flex: 1),
+        _buildLogo(primaryColor, size: 120),
+        const SizedBox(height: 24),
+        Text(
+          'VoiceNotes AI',
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _showPinPad ? 'Enter your PIN' : 'Your voice, perfectly organized.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: _showPinPad ? theme.hintColor : theme.colorScheme.secondary,
+          ),
+        ),
+        const Spacer(),
+
+        if (!_showPinPad) ...[
+          // Biometric + Use PIN buttons
+          if (hasBiometric)
+            FilledButton.icon(
+              onPressed: _isAuthenticating ? null : _tryBiometric,
+              icon: const Icon(Icons.fingerprint_rounded),
+              label: Text(_isAuthenticating
+                  ? 'Authenticating...'
+                  : 'Unlock with Biometric'),
+            ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => setState(() => _showPinPad = true),
+            icon: const Icon(Icons.dialpad_rounded),
+            label: const Text('Use PIN'),
+          ),
+          // Biometric tip for users who haven't enabled it
+          if (showBiometricTip) ...[
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: primaryColor.withValues(alpha: 0.15),
+                  ),
                 ),
-              ),
-              const Spacer(flex: 2),
-              // Terms & Conditions link
-              Text.rich(
-                TextSpan(
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: primaryColor.withValues(alpha: 0.7),
-                        fontSize: 11,
-                      ),
+                child: Row(
                   children: [
-                    const TextSpan(text: 'By using this app you agree to the\n'),
-                    WidgetSpan(
-                      child: GestureDetector(
-                        onTap: () => context.push(AppRoutes.termsConditions),
-                        child: Text(
-                          'Terms & Conditions',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: primaryColor.withValues(alpha: 0.9),
-                                decoration: TextDecoration.underline,
-                                decorationColor: primaryColor.withValues(alpha: 0.5),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
+                    Icon(Icons.fingerprint_rounded,
+                        size: 20, color: primaryColor.withValues(alpha: 0.7)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Tip: Enable biometric unlock in Settings > Security for faster access.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                          fontSize: 11,
                         ),
                       ),
                     ),
                   ],
                 ),
-                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
-              // Bottom branding
-              Text(
-                'by HDMPixels',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.4),
-                      letterSpacing: 1.0,
+            ),
+          ],
+        ] else ...[
+          // PIN dots
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(6, (i) {
+              final filled = i < _enteredPin.length;
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: filled ? primaryColor : Colors.transparent,
+                  border: Border.all(
+                    color: filled ? primaryColor : theme.hintColor,
+                    width: 2,
+                  ),
+                ),
+              );
+            }),
+          ),
+          if (_errorText != null) ...[
+            const SizedBox(height: 12),
+            Text(_errorText!,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.error)),
+          ],
+          const SizedBox(height: 24),
+          _buildKeypad(theme),
+          const SizedBox(height: 12),
+          if (hasBiometric)
+            TextButton.icon(
+              onPressed: _tryBiometric,
+              icon: const Icon(Icons.fingerprint_rounded, size: 18),
+              label: const Text('Use Biometric'),
+            ),
+        ],
+        const Spacer(),
+
+        // Bottom section — same as splash
+        Text.rich(
+          TextSpan(
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: primaryColor.withValues(alpha: 0.7),
+              fontSize: 11,
+            ),
+            children: [
+              const TextSpan(text: 'By using this app you agree to the\n'),
+              WidgetSpan(
+                child: GestureDetector(
+                  onTap: () => context.push(AppRoutes.termsConditions),
+                  child: Text(
+                    'Terms & Conditions',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: primaryColor.withValues(alpha: 0.9),
+                      decoration: TextDecoration.underline,
+                      decorationColor: primaryColor.withValues(alpha: 0.5),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 72),
             ],
           ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'by HDMPixels',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildLogo(Color primaryColor, {required double size}) {
+    return ScaleTransition(
+      scale: _logoScale,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(size * 0.28),
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withValues(alpha: 0.2),
+              blurRadius: 30,
+              spreadRadius: 4,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(size * 0.28),
+          child: Image.asset('assets/icons/logo.png', fit: BoxFit.cover),
         ),
       ),
+    );
+  }
+
+  Widget _buildKeypad(ThemeData theme) {
+    final isLockedOut = _lockoutRemaining != null;
+    final digits = [
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+      ['', '0', '\u232B'],
+    ];
+
+    return Column(
+      children: digits.map((row) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: row.map((key) {
+            if (key.isEmpty) {
+              return const SizedBox(width: 80, height: 64);
+            }
+            final isBackspace = key == '\u232B';
+            return SizedBox(
+              width: 80,
+              height: 64,
+              child: TextButton(
+                onPressed: isLockedOut
+                    ? null
+                    : isBackspace
+                        ? _onBackspace
+                        : () => _onDigit(key),
+                style: TextButton.styleFrom(
+                  shape: const CircleBorder(),
+                ),
+                child: isBackspace
+                    ? Icon(Icons.backspace_outlined,
+                        size: 22, color: theme.colorScheme.onSurface)
+                    : Text(key,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        )),
+              ),
+            );
+          }).toList(),
+        );
+      }).toList(),
     );
   }
 }

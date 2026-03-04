@@ -26,12 +26,17 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
   Future<void> _checkBiometrics() async {
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
+      final isSupported = await _localAuth.isDeviceSupported();
       final available = await _localAuth.getAvailableBiometrics();
+      final hasBio = (canCheck || isSupported) && available.isNotEmpty;
+      print('Biometric: canCheck=$canCheck isSupported=$isSupported available=$available hasBio=$hasBio');
       if (mounted) {
-        setState(() => _hasBiometrics = canCheck && available.isNotEmpty);
+        // Use isDeviceSupported as fallback — some Samsung devices report
+        // canCheckBiometrics=false but isDeviceSupported=true with PIN/pattern
+        setState(() => _hasBiometrics = hasBio);
       }
-    } catch (_) {
-      // No biometric hardware
+    } catch (e) {
+      print('Biometric check failed: $e');
     }
   }
 
@@ -94,18 +99,20 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
                       final didAuth = await _localAuth.authenticate(
                         localizedReason: 'Verify biometric to enable',
                         options: const AuthenticationOptions(
-                          biometricOnly: true,
+                          biometricOnly: false,
+                          stickyAuth: true,
                         ),
                       );
                       if (didAuth) {
                         ref.read(settingsProvider.notifier)
                             .setBiometricEnabled(true);
                       }
-                    } catch (_) {
+                    } catch (e) {
+                      print('Biometric auth failed: $e');
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Biometric not available')),
+                          SnackBar(
+                              content: Text('Biometric not available: $e')),
                         );
                       }
                     }
@@ -400,7 +407,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
                 final didAuth = await _localAuth.authenticate(
                   localizedReason: 'Verify biometric to enable',
                   options:
-                      const AuthenticationOptions(biometricOnly: true),
+                      const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
                 );
                 if (didAuth) {
                   ref.read(settingsProvider.notifier)
@@ -420,85 +427,140 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
     );
   }
 
-  /// Show a PIN entry dialog. Calls onComplete with the entered PIN.
+  /// Show a PIN entry bottom sheet. Calls onComplete with the entered PIN.
   void _showPinEntry({
     required String title,
     required String subtitle,
     required void Function(String pin) onComplete,
   }) {
     String pin = '';
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
+      isDismissible: false,
+      enableDrag: false,
+      isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(title),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(subtitle,
-                  style: Theme.of(ctx).textTheme.bodySmall
-                      ?.copyWith(color: Theme.of(ctx).hintColor)),
-              const SizedBox(height: 16),
-              // PIN dots
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(6, (i) {
-                  final filled = i < pin.length;
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                    width: 14,
-                    height: 14,
+        builder: (ctx, setSheetState) {
+          final theme = Theme.of(ctx);
+          final primary = theme.colorScheme.primary;
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Drag handle
+                  Container(
+                    width: 32,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: filled
-                          ? Theme.of(ctx).colorScheme.primary
-                          : Colors.transparent,
+                      color: theme.hintColor.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  // Title
+                  Text(title,
+                      style: theme.textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Text(subtitle,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: theme.hintColor)),
+                  const SizedBox(height: 20),
+                  // PIN dots
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(6, (i) {
+                      final filled = i < pin.length;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: filled ? primary : Colors.transparent,
+                          border: Border.all(
+                            color: filled ? primary : theme.hintColor,
+                            width: 2,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 20),
+                  // Keypad
+                  _buildSheetKeypad(ctx, pin, (newPin) {
+                    setSheetState(() => pin = newPin);
+                  }),
+                  const SizedBox(height: 16),
+                  // Warning
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: filled
-                            ? Theme.of(ctx).colorScheme.primary
-                            : Theme.of(ctx).hintColor,
-                        width: 2,
+                        color:
+                            theme.colorScheme.error.withValues(alpha: 0.25),
                       ),
                     ),
-                  );
-                }),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            size: 20,
+                            color: theme.colorScheme.error
+                                .withValues(alpha: 0.8)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'If you forget your PIN, you\'ll need to reinstall the app. All data will be lost.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.error
+                                  .withValues(alpha: 0.9),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: pin.length >= 4
+                              ? () {
+                                  Navigator.pop(ctx);
+                                  onComplete(pin);
+                                }
+                              : null,
+                          child: const Text('Continue'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              // Simple keypad
-              ..._buildDialogKeypad(ctx, pin, (newPin) {
-                setDialogState(() => pin = newPin);
-              }),
-              const SizedBox(height: 8),
-              Text(
-                'If you forget your PIN, you\'ll need to reinstall the app.',
-                style: Theme.of(ctx).textTheme.labelSmall
-                    ?.copyWith(color: Theme.of(ctx).hintColor),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
             ),
-            FilledButton(
-              onPressed: pin.length >= 4
-                  ? () {
-                      Navigator.pop(ctx);
-                      onComplete(pin);
-                    }
-                  : null,
-              child: const Text('Continue'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  List<Widget> _buildDialogKeypad(
+  Widget _buildSheetKeypad(
     BuildContext ctx,
     String currentPin,
     void Function(String) onUpdate,
@@ -507,46 +569,48 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
       ['1', '2', '3'],
       ['4', '5', '6'],
       ['7', '8', '9'],
-      ['', '0', '⌫'],
+      ['', '0', '\u232B'],
     ];
 
-    return rows.map((row) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: row.map((key) {
-          if (key.isEmpty) return const SizedBox(width: 56, height: 48);
-          final isBack = key == '⌫';
-          return SizedBox(
-            width: 56,
-            height: 48,
-            child: TextButton(
-              onPressed: () {
-                if (isBack) {
-                  if (currentPin.isNotEmpty) {
-                    onUpdate(
-                        currentPin.substring(0, currentPin.length - 1));
+    return Column(
+      children: rows.map((row) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: row.map((key) {
+            if (key.isEmpty) return const SizedBox(width: 72, height: 56);
+            final isBack = key == '\u232B';
+            return SizedBox(
+              width: 72,
+              height: 56,
+              child: TextButton(
+                onPressed: () {
+                  if (isBack) {
+                    if (currentPin.isNotEmpty) {
+                      onUpdate(
+                          currentPin.substring(0, currentPin.length - 1));
+                    }
+                  } else if (currentPin.length < 6) {
+                    onUpdate(currentPin + key);
                   }
-                } else if (currentPin.length < 6) {
-                  onUpdate(currentPin + key);
-                }
-              },
-              style: TextButton.styleFrom(
-                shape: const CircleBorder(),
-                padding: EdgeInsets.zero,
+                },
+                style: TextButton.styleFrom(
+                  shape: const CircleBorder(),
+                  padding: EdgeInsets.zero,
+                ),
+                child: isBack
+                    ? Icon(Icons.backspace_outlined,
+                        size: 22,
+                        color: Theme.of(ctx).colorScheme.onSurface)
+                    : Text(key,
+                        style: Theme.of(ctx)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w500)),
               ),
-              child: isBack
-                  ? Icon(Icons.backspace_outlined,
-                      size: 18,
-                      color: Theme.of(ctx).colorScheme.onSurface)
-                  : Text(key,
-                      style: Theme.of(ctx)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w500)),
-            ),
-          );
-        }).toList(),
-      );
-    }).toList();
+            );
+          }).toList(),
+        );
+      }).toList(),
+    );
   }
 }

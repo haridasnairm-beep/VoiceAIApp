@@ -56,23 +56,27 @@ class _LockScreenPageState extends State<LockScreenPage>
     setState(() => _isAuthenticating = true);
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
-      if (!canCheck || !mounted) {
+      final isSupported = await _localAuth.isDeviceSupported();
+      print('LockScreen biometric: canCheck=$canCheck isSupported=$isSupported');
+      if ((!canCheck && !isSupported) || !mounted) {
+        print('LockScreen biometric: not available, skipping');
         setState(() => _isAuthenticating = false);
         return;
       }
       final didAuth = await _localAuth.authenticate(
         localizedReason: 'Unlock VoiceNotes AI',
         options: const AuthenticationOptions(
-          biometricOnly: true,
+          biometricOnly: false,
           stickyAuth: true,
         ),
       );
+      print('LockScreen biometric: didAuth=$didAuth');
       if (didAuth && mounted) {
         AppLockService.instance.unlock();
         widget.onUnlocked();
       }
-    } catch (_) {
-      // Biometric failed or cancelled
+    } catch (e) {
+      print('LockScreen biometric error: $e');
     } finally {
       if (mounted) setState(() => _isAuthenticating = false);
     }

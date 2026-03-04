@@ -28,6 +28,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/image_attachment_repository.dart';
 import 'image_viewer_page.dart';
 import '../widgets/share_preview_sheet.dart';
+import '../widgets/folder_picker_sheet.dart';
 import '../services/haptic_service.dart';
 import '../widgets/tag_pills.dart';
 
@@ -502,6 +503,22 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Max 10 pinned notes. Unpin one first.')),
       );
+    }
+  }
+
+  Future<void> _showMoveToFolder(Note note) async {
+    final folderId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FolderPickerSheet(excludeFolderId: note.folderId),
+    );
+    if (folderId != null && mounted) {
+      await ref.read(notesProvider.notifier).moveNoteToFolder(note.id, folderId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Note moved to folder')),
+        );
+      }
     }
   }
 
@@ -1248,6 +1265,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                     onSelected: (value) {
                       if (value == 'retranscribe') _retranscribeNote(note);
                       if (value == 'pin') _togglePin(note);
+                      if (value == 'move_folder') _showMoveToFolder(note);
                     },
                     itemBuilder: (context) => [
                       PopupMenuItem(
@@ -1262,6 +1280,16 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                             ),
                             const SizedBox(width: 8),
                             Text(note.isPinned ? 'Unpin' : 'Pin to Top'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'move_folder',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.drive_file_move_rounded, size: 20),
+                            const SizedBox(width: 8),
+                            const Text('Move to Folder'),
                           ],
                         ),
                       ),
@@ -2068,6 +2096,11 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           ],
         ),
       ),
+      floatingActionButton: _isEditingTitle || _versionSelectionMode
+          ? null
+          : _SwipeUpRecordFab(
+              onRecord: () => context.push(AppRoutes.recording),
+            ),
     );
   }
 
@@ -2979,4 +3012,142 @@ class _DetailTabInfo {
     required this.icon,
     required this.badgeCount,
   });
+}
+
+/// A simple FAB with mic icon that supports swipe-up gesture to start recording.
+/// No tap action — swipe up only, same gesture logic as GestureFab on home page.
+class _SwipeUpRecordFab extends StatefulWidget {
+  final VoidCallback onRecord;
+  const _SwipeUpRecordFab({required this.onRecord});
+
+  @override
+  State<_SwipeUpRecordFab> createState() => _SwipeUpRecordFabState();
+}
+
+class _SwipeUpRecordFabState extends State<_SwipeUpRecordFab>
+    with SingleTickerProviderStateMixin {
+  static const double _swipeThreshold = 40.0;
+  static const double _maxHorizontalDrift = 20.0;
+
+  double _dragDistance = 0.0;
+  double _totalHorizontalDrift = 0.0;
+  bool _thresholdReached = false;
+  bool _isDragging = false;
+
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _pulseAnimation = Tween(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  void _handleDragStart(DragStartDetails details) {
+    _isDragging = true;
+    _dragDistance = 0.0;
+    _totalHorizontalDrift = 0.0;
+    _thresholdReached = false;
+  }
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    if (!_isDragging) return;
+    if (details.delta.dy >= 0) return;
+
+    _totalHorizontalDrift += details.delta.dx.abs();
+    if (_totalHorizontalDrift > _maxHorizontalDrift) {
+      _resetDragState();
+      return;
+    }
+
+    _dragDistance += details.delta.dy.abs();
+
+    if (!_thresholdReached && _dragDistance >= _swipeThreshold) {
+      _thresholdReached = true;
+      HapticService.medium();
+      _pulseController.forward().then((_) {
+        if (mounted) _pulseController.reverse();
+      });
+    }
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    if (!_isDragging) return;
+    if (_thresholdReached) {
+      HapticService.light();
+      widget.onRecord();
+    }
+    _resetDragState();
+  }
+
+  void _resetDragState() {
+    setState(() {
+      _dragDistance = 0.0;
+      _totalHorizontalDrift = 0.0;
+      _thresholdReached = false;
+      _isDragging = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                const TextSpan(text: 'swipe '),
+                TextSpan(
+                  text: '\u2191',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white70,
+                  ),
+                ),
+                const TextSpan(text: ' to record'),
+              ],
+            ),
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.white54,
+            ),
+            semanticsLabel: '',
+          ),
+        ),
+        GestureDetector(
+          onVerticalDragStart: _handleDragStart,
+          onVerticalDragUpdate: _handleDragUpdate,
+          onVerticalDragEnd: _handleDragEnd,
+          onVerticalDragCancel: _resetDragState,
+          child: ScaleTransition(
+            scale: _pulseAnimation,
+            child: FloatingActionButton(
+              heroTag: 'note_detail_record_fab',
+              elevation: 6,
+              backgroundColor: colorScheme.primary,
+              onPressed: null,
+              child: Icon(Icons.mic_rounded, color: colorScheme.onPrimary, size: 28),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

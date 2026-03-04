@@ -7,6 +7,7 @@ import '../providers/settings_provider.dart';
 import '../services/whisper_service.dart';
 import '../widgets/settings_widgets.dart';
 import '../widgets/download_progress_sheet.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AudioSettingsPage extends ConsumerStatefulWidget {
   final bool highlightWhisper;
@@ -1039,10 +1040,94 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+              const _PermissionsSection(),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Permissions section showing mic & notification status with link to app settings.
+class _PermissionsSection extends StatefulWidget {
+  const _PermissionsSection();
+
+  @override
+  State<_PermissionsSection> createState() => _PermissionsSectionState();
+}
+
+class _PermissionsSectionState extends State<_PermissionsSection>
+    with WidgetsBindingObserver {
+  PermissionStatus _micStatus = PermissionStatus.denied;
+  PermissionStatus _notifStatus = PermissionStatus.denied;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshStatuses();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshStatuses();
+    }
+  }
+
+  Future<void> _refreshStatuses() async {
+    final mic = await Permission.microphone.status;
+    final notif = await Permission.notification.status;
+    if (mounted) {
+      setState(() {
+        _micStatus = mic;
+        _notifStatus = notif;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final micGranted = _micStatus.isGranted;
+    final notifGranted = _notifStatus.isGranted;
+
+    return SettingsGroup(
+      title: 'PERMISSIONS',
+      children: [
+        SettingsItem(
+          icon: Icons.mic_rounded,
+          iconBg: micGranted ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+          iconColor: micGranted ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+          label: 'Microphone',
+          sublabel: micGranted
+              ? 'Granted — recording is available'
+              : 'Required for recording — tap to open settings',
+          type: SettingsType.chevron,
+          hasSublabel: true,
+          onTap: () => openAppSettings(),
+        ),
+        const Divider(height: 1, indent: 56),
+        SettingsItem(
+          icon: Icons.notifications_rounded,
+          iconBg: notifGranted ? const Color(0xFFE3F2FD) : const Color(0xFFFFF3E0),
+          iconColor: notifGranted ? const Color(0xFF1565C0) : const Color(0xFFE65100),
+          label: 'Notifications',
+          sublabel: notifGranted
+              ? 'Granted — reminders will appear'
+              : 'Denied — tap to enable for reminders',
+          type: SettingsType.chevron,
+          hasSublabel: true,
+          onTap: () => openAppSettings(),
+        ),
+      ],
     );
   }
 }

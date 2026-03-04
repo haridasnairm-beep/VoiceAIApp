@@ -88,13 +88,20 @@ class FoldersRepository {
     return expired.length;
   }
 
-  /// Add a note ID to a folder.
+  /// Add a note ID to a folder and set the note's folderId.
   Future<void> addNoteToFolder(String folderId, String noteId) async {
     final folder = getFolderById(folderId);
     if (folder != null && !folder.noteIds.contains(noteId)) {
       folder.noteIds.add(noteId);
       folder.updatedAt = DateTime.now();
       await HiveService.foldersBox.put(folder.id, folder);
+    }
+    // Also set note.folderId to keep both sides in sync
+    final note = HiveService.notesBox.get(noteId);
+    if (note != null && note.folderId != folderId) {
+      note.folderId = folderId;
+      note.updatedAt = DateTime.now();
+      await HiveService.notesBox.put(noteId, note);
     }
   }
 

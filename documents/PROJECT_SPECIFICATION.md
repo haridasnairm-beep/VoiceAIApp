@@ -5,7 +5,7 @@
 **Platform:** Cross-platform (iOS + Android) via Flutter
 **Dart SDK:** ^3.6.0
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [VoiceNotes AI Concept Document](voicenotes-ai-concept.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Phase 1 Value Gaps](FEATURE_PHASE1_VALUE_GAPS.md) | [UX Audit](UX_PRODUCT_AUDIT.md)
+**Reference:** [VoiceNotes AI Concept Document](voicenotes-ai-concept.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Phase 1 Value Gaps](FEATURE_PHASE1_VALUE_GAPS.md) | [UX Audit](UX_PRODUCT_AUDIT.md) | [Gesture FAB](FEATURE_GESTURE_FAB.md)
 
 ---
 
@@ -60,7 +60,15 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - Skip button on first run, dot page indicators
 - Accessible again from Settings
 - "Prepare Your App" page checks Whisper model status and offers a "Let's Set It Up" button that navigates to Settings with auto-scroll + highlight on the download section
-- Navigation directly to Home (no login gate)
+- After first-run onboarding completes, navigates to Permission Request page (not directly to Home)
+
+### 4.1.1 Permission Request Page (Post-Onboarding)
+- Shown once after first-run onboarding completes
+- Requests Microphone (required) and Notifications (optional) permissions
+- "Grant Access" button requests both permissions; "Later" skip option
+- If mic permanently denied, prompts user to open Android app settings
+- Marks `permissionScreenShown` in settings; existing users see it once on upgrade
+- Status indicators show granted/denied for each permission
 
 ### 4.2 Guided First Recording
 - On first launch after onboarding, instead of an empty home screen, a coached overlay prompts the user to make their first recording
@@ -81,7 +89,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Sort selector** (Notes tab) — dropdown or icon to change note sort order; persists in settings
 - **Pinned section** (Notes tab, when pinned notes exist) — collapsible section header "Pinned (N)" with pin icon; pinned notes sorted by `pinnedAt` desc; max 10 pinned notes; pin icon shown on card top-right
 - **Notes feed** (Notes tab) — "Recent" section header followed by cards showing:
-  - Auto-generated title (smart extraction after filler removal, or task-based fallback)
+  - Auto-generated title (smart extraction after filler removal, or task-based fallback) — naming style controlled by `noteNamingStyle` setting: Prefix + Auto (e.g., "V001 — Meeting notes"), Prefix Only, or Auto Only
   - Date/time of recording
   - Detected language tag (small pill/badge)
   - Category icons (action, todo, reminder, note)
@@ -99,7 +107,12 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
   - **Multi-select bottom bar:** Add to Folder, Add Tags, Delete
   - Delete confirmation dialog with warning icon and white-on-red button
   - All folder picker sheets include "+ New Folder" inline creation at the top of the list; newly created items are auto-selected
-- **SpeedDialFab** — prominent floating button with actions: Record Note, New Folder, New Text Note. "New Text Note" opens template picker sheet (Blank Note + 6 built-in templates). Actions auto-switch to Notes tab if currently on Tasks tab.
+- **Gesture FAB** — prominent floating button with dual-gesture interaction (see [Gesture FAB spec](FEATURE_GESTURE_FAB.md)):
+  - **Swipe up** → navigate directly to Recording screen (fastest path, 1-gesture record)
+  - **Tap** → expand SpeedDial with actions: New Folder, New Text Note, Record Note
+  - Visual feedback: icon transitions from `+` to mic during swipe, pulse animation on threshold, haptic feedback
+  - Discoverability: subtitle label ("↑ swipe to record") shown for first 10 sessions, idle hint after 5 sessions
+  - "New Text Note" opens template picker sheet (Blank Note + 6 built-in templates). Actions auto-switch to Notes tab if currently on Tasks tab.
 - **Search bar** — top of screen, searches by keyword, language, category, tag, date
 - **Task count badge** — shown on Tasks tab label when not selected (e.g., "3" open tasks)
 
@@ -190,8 +203,9 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 
 **Preferences page** (`/preferences`):
 - Your Name — speaker label for transcription timestamps
-- Note Prefix — prefix for auto-generated note names (e.g., "VOICE" → VOICE001)
-- Text Prefix — prefix for text note names (e.g., "TXT" → TXT001)
+- Note Prefix — prefix for auto-generated note names (e.g., "V" → V001)
+- Text Prefix — prefix for text note names (e.g., "T" → T001)
+- Auto Naming — controls how notes are named after transcription: Prefix + Auto (default, e.g., "V001 — Meeting notes"), Prefix Only (e.g., "V001"), or Auto Only (e.g., "Meeting notes")
 - Language Detection — 13 languages + Automatic (auto-detect)
 - Reminders — enable/disable notifications
 - Action Items — enable/disable action items section in note detail
@@ -205,6 +219,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - Default Folder — picker to choose default folder for new recordings
 - Voice Commands — toggle for "Folder/Tag \<name\> Start" voice command parsing (Whisper mode only)
 - Block Offensive Words — filters profanity from transcription output
+- Permissions section — shows live status of Microphone and Notifications permissions; tap to open Android app settings; auto-refreshes on return from settings
 
 **Security page** (`/security`):
 - App Lock — PIN setup, change, and removal
@@ -505,8 +520,9 @@ UserSettings
 ├── guidedRecordingCompleted: bool
 ├── transcriptionMode: String (live / whisper)
 ├── speakerName: String (default: "Speaker 1")
-├── notePrefix: String (default: "VOICE")
-├── textNotePrefix: String (default: "TXT")
+├── notePrefix: String (default: "V")
+├── textNotePrefix: String (default: "T")
+├── noteNamingStyle: String (prefix_only / prefix_auto / auto_only; default: "prefix_auto")
 ├── defaultFolderId: String?
 ├── voiceCommandsEnabled: bool
 ├── actionItemsEnabled: bool
@@ -521,7 +537,10 @@ UserSettings
 ├── biometricEnabled: bool
 ├── autoLockTimeoutSeconds: int (0 = immediately)
 ├── widgetPrivacyMode: String (full / record_only / minimal)
-└── lastSeenAppVersion: String (for What's New screen)
+├── lastSeenAppVersion: String (for What's New screen)
+├── permissionScreenShown: bool (true after post-onboarding permission screen)
+├── fabSwipeHintShownCount: int (max 2, for idle hint animation)
+└── sessionCount: int (app launch counter for discoverability features)
 
 ProjectDocument
 ├── id: String (UUID)
@@ -669,6 +688,7 @@ Folders organize. Tags cross-reference. Projects compose.
 | Biometric auth | local_auth |
 | Home screen widget | home_widget |
 | Backup archive | archive + encrypt |
+| Permission management | permission_handler |
 | Crash reporting | sentry_flutter or firebase_crashlytics (opt-in) |
 | Typography | Google Fonts (Plus Jakarta Sans, Inter) |
 | App icon | assets/icons/logo.png (launcher + in-app branding) |
@@ -706,5 +726,6 @@ Folders organize. Tags cross-reference. Projects compose.
 | home_widget | Cross-platform home screen widget | Active |
 | archive | ZIP archive for backup | Active |
 | encrypt | AES-256 for backup encryption | Active |
+| permission_handler | Runtime permission management | Active |
 | sentry_flutter | Opt-in crash reporting | Planned |
 | hive_generator + build_runner | Hive model code generation (dev) | Active |

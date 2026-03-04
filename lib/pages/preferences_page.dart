@@ -196,6 +196,32 @@ class PreferencesPage extends ConsumerWidget {
                   ),
                   const Divider(height: 1, indent: 56),
                   SettingsItem(
+                    icon: Icons.auto_fix_high_rounded,
+                    iconBg: const Color(0xFFE8EAF6),
+                    iconColor: const Color(0xFF3949AB),
+                    label: "Auto Naming",
+                    sublabel: _namingStyleDescription(settings.noteNamingStyle),
+                    type: SettingsType.value,
+                    valueText: _namingStyleLabel(settings.noteNamingStyle),
+                    hasSublabel: true,
+                    onTap: () async {
+                      final result = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) => _NamingStyleDialog(
+                          current: settings.noteNamingStyle,
+                          voicePrefix: settings.notePrefix,
+                          textPrefix: settings.textNotePrefix,
+                        ),
+                      );
+                      if (result != null) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setNoteNamingStyle(result);
+                      }
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  SettingsItem(
                     icon: Icons.notifications_active_rounded,
                     iconBg: const Color(0xFFF1F8E9),
                     iconColor: const Color(0xFF388E3C),
@@ -363,6 +389,105 @@ class PreferencesPage extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  String _namingStyleLabel(String style) {
+    switch (style) {
+      case 'prefix_only':
+        return 'Prefix Only';
+      case 'auto_only':
+        return 'Auto Only';
+      case 'prefix_auto':
+      default:
+        return 'Prefix + Auto';
+    }
+  }
+
+  String _namingStyleDescription(String style) {
+    switch (style) {
+      case 'prefix_only':
+        return 'Keep prefix title (e.g. V001)';
+      case 'auto_only':
+        return 'Auto-rename from transcription';
+      case 'prefix_auto':
+      default:
+        return 'Prefix + auto title (e.g. V001 — Meeting notes)';
+    }
+  }
+}
+
+class _NamingStyleDialog extends StatefulWidget {
+  final String current;
+  final String voicePrefix;
+  final String textPrefix;
+
+  const _NamingStyleDialog({
+    required this.current,
+    required this.voicePrefix,
+    required this.textPrefix,
+  });
+
+  @override
+  State<_NamingStyleDialog> createState() => _NamingStyleDialogState();
+}
+
+class _NamingStyleDialogState extends State<_NamingStyleDialog> {
+  late String _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.current;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vp = widget.voicePrefix;
+    return AlertDialog(
+      title: const Text('Auto Naming Style'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildOption(
+            'prefix_auto',
+            'Prefix + Auto (Recommended)',
+            '${vp}001 — Meeting notes about...',
+          ),
+          _buildOption(
+            'prefix_only',
+            'Prefix Only',
+            '${vp}001, ${vp}002, ${vp}003...',
+          ),
+          _buildOption(
+            'auto_only',
+            'Auto Only',
+            'Meeting notes about budget...',
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _selected),
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOption(String value, String title, String example) {
+    return RadioListTile<String>(
+      value: value,
+      groupValue: _selected,
+      onChanged: (v) => setState(() => _selected = v!),
+      title: Text(title, style: const TextStyle(fontSize: 14)),
+      subtitle: Text(example, style: const TextStyle(fontSize: 12)),
+      contentPadding: EdgeInsets.zero,
+      dense: true,
     );
   }
 }

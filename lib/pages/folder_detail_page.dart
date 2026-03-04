@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../nav.dart';
@@ -11,9 +9,11 @@ import '../providers/project_documents_provider.dart';
 import '../models/folder.dart';
 import '../models/note.dart';
 import '../models/project_document.dart';
-import '../widgets/settings_widgets.dart' show friendlyLanguageName;
+import '../widgets/folder_picker_sheet.dart';
+import '../widgets/note_card.dart';
 
 enum _SortOption { newest, oldest, titleAZ, titleZA }
+enum _FilterOption { all, notes, projects }
 
 class FolderDetailPage extends ConsumerStatefulWidget {
   final String? folderId;
@@ -26,34 +26,27 @@ class FolderDetailPage extends ConsumerStatefulWidget {
 
 class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
   _SortOption _sortOption = _SortOption.newest;
+  _FilterOption _filterOption = _FilterOption.all;
 
   String get folderId => widget.folderId ?? '';
 
-  String _plainTextPreview(Note note) {
-    if (note.contentFormat == 'quill_delta' && note.rawTranscription.isNotEmpty) {
-      try {
-        final json = jsonDecode(note.rawTranscription) as List;
-        return Document.fromJson(json).toPlainText().trim();
-      } catch (_) {
-        return note.rawTranscription;
-      }
-    }
-    return note.rawTranscription;
-  }
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final dateOnly = DateTime(date.year, date.month, date.day);
-    if (dateOnly == today) return 'Today';
-    if (dateOnly == today.subtract(const Duration(days: 1))) return 'Yesterday';
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    final time = '$hour:$minute';
+    if (dateOnly == today) return 'Today, $time';
+    if (dateOnly == today.subtract(const Duration(days: 1))) return 'Yesterday, $time';
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     final month = months[date.month - 1];
     final day = date.day.toString().padLeft(2, '0');
-    return '$month $day';
+    return '$month $day, $time';
   }
 
   String _sortLabel(_SortOption option) {
@@ -127,10 +120,13 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
       );
     }
 
-    // Get notes that belong to this folder
+    // Get notes that belong to this folder (check both note.folderId and folder.noteIds)
     final allNotes = ref.watch(notesProvider);
-    final folderNotes = _sortNotes(
-        allNotes.where((n) => n.folderId == widget.folderId).toList());
+    final folderNotes = _sortNotes(allNotes
+        .where((n) =>
+            n.folderId == widget.folderId ||
+            folder!.noteIds.contains(n.id))
+        .toList());
 
     // Get project documents that belong to this folder
     final allProjects = ref.watch(projectDocumentsProvider);
@@ -144,7 +140,9 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
     for (final note in folderNotes) {
       totalSeconds += note.audioDurationSeconds;
     }
-    final totalAudio = '${totalSeconds ~/ 60}m';
+    final totalAudio = totalSeconds >= 60
+        ? '${totalSeconds ~/ 60}m'
+        : '${totalSeconds}s';
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -254,7 +252,33 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
               ),
             ),
 
-            // Recent Notes Header
+            // Toggle/filter: All | Notes | Projects — only show if folder has projects
+            if (folderProjects.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: SegmentedButton<_FilterOption>(
+                  segments: const [
+                    ButtonSegment(value: _FilterOption.all, label: Text('All')),
+                    ButtonSegment(value: _FilterOption.notes, label: Text('Notes')),
+                    ButtonSegment(value: _FilterOption.projects, label: Text('Projects')),
+                  ],
+                  selected: {_filterOption},
+                  onSelectionChanged: (selected) =>
+                      setState(() => _filterOption = selected.first),
+                  style: SegmentedButton.styleFrom(
+                    selectedBackgroundColor: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.12),
+                    selectedForegroundColor:
+                        Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+
+            // Notes section (show when filter is All or Notes)
+            if (_filterOption != _FilterOption.projects) ...[
+              // Notes Header
               Padding(
                 padding:
                     const EdgeInsets.only(left: 24, right: 24, top: 24),
@@ -262,7 +286,7 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Recent Notes',
+                      'Notes',
                       style: Theme.of(context)
                           .textTheme
                           .titleMedium
@@ -350,66 +374,97 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                       )
                     : Column(
                         children: [
-                          ...folderNotes.map((note) => _FolderNoteCard(
-                                title: note.title,
-                                lang: friendlyLanguageName(note.detectedLanguage),
-                                preview: _plainTextPreview(note),
-                                hasTasks: note.todos.isNotEmpty,
-                                taskCount: '${note.todos.length}',
-                                hasReminders: note.reminders.isNotEmpty,
-                                reminderCount:
-                                    '${note.reminders.length}',
-                                date: _formatDate(note.createdAt),
-                                onTap: () => context.push(
-                                  AppRoutes.noteDetail,
-                                  extra: {'noteId': note.id},
-                                ),
-                              )),
+                          ...folderNotes.map((note) {
+                            final noteFolderNames = folders
+                                .where((f) => f.noteIds.contains(note.id))
+                                .map((f) => f.name)
+                                .toList();
+                            return NoteCard(
+                              note: note,
+                              timestamp: _formatDate(note.createdAt),
+                              folderNames: noteFolderNames,
+                              projectNames: const [],
+                              onTap: () => context.push(
+                                AppRoutes.noteDetail,
+                                extra: {'noteId': note.id},
+                              ),
+                              onDelete: () {},
+                              onLongPress: () {},
+                            );
+                          }),
                         ],
                       ),
               ),
+            ],
 
-              // === Projects Section ===
-              if (folderProjects.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.only(left: 24, right: 24, top: 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Projects',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => _showNewProjectDialog(context, ref),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('New'),
-                      ),
-                    ],
-                  ),
+            // === Projects Section (show when filter is All or Projects) ===
+            if (_filterOption != _FilterOption.notes) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 24, right: 24, top: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Projects',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => _showNewProjectDialog(context, ref),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('New'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: folderProjects
-                        .map((project) => _FolderProjectCard(
-                              project: project,
-                              onTap: () => context.push(
-                                AppRoutes.projectDocumentDetail,
-                                extra: {'documentId': project.id},
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: folderProjects.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 48),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.article_rounded,
+                                  size: 48,
+                                  color: Theme.of(context).hintColor),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No projects in this folder',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary,
+                                    ),
                               ),
-                            ))
-                        .toList(),
-                  ),
-                ),
-              ],
+                            ],
+                          ),
+                        ),
+                      )
+                    : Column(
+                        children: folderProjects
+                            .map((project) => _FolderProjectCard(
+                                  project: project,
+                                  onTap: () => context.push(
+                                    AppRoutes.projectDocumentDetail,
+                                    extra: {'documentId': project.id},
+                                  ),
+                                  onLongPress: () => _showProjectMoveMenu(context, project),
+                                ))
+                            .toList(),
+                      ),
+              ),
+            ],
 
               const SizedBox(height: 80),
             ],
@@ -486,6 +541,24 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
         ],
       ),
     );
+  }
+
+  void _showProjectMoveMenu(BuildContext context, ProjectDocument project) async {
+    final folderId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FolderPickerSheet(excludeFolderId: widget.folderId),
+    );
+    if (folderId != null && mounted) {
+      await ref
+          .read(projectDocumentsProvider.notifier)
+          .moveProjectToFolder(project.id, folderId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Project moved to folder')),
+        );
+      }
+    }
   }
 
   void _showDeleteDialog(BuildContext context) {
@@ -571,181 +644,19 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-class _FolderNoteCard extends StatelessWidget {
-  final String title;
-  final String lang;
-  final String preview;
-  final bool hasTasks;
-  final String taskCount;
-  final bool hasReminders;
-  final String reminderCount;
-  final String date;
-  final VoidCallback? onTap;
-
-  const _FolderNoteCard({
-    required this.title,
-    required this.lang,
-    required this.preview,
-    required this.hasTasks,
-    required this.taskCount,
-    required this.hasReminders,
-    required this.reminderCount,
-    required this.date,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style:
-                        Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color:
-                                  Theme.of(context).colorScheme.onSurface,
-                            ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    border:
-                        Border.all(color: Theme.of(context).dividerColor),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.language,
-                          size: 12,
-                          color:
-                              Theme.of(context).colorScheme.secondary),
-                      const SizedBox(width: 4),
-                      Text(
-                        lang,
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(
-                              color:
-                                  Theme.of(context).colorScheme.secondary,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              preview,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    if (hasTasks)
-                      Row(
-                        children: [
-                          const Icon(Icons.task_alt_rounded,
-                              size: 16, color: AppColors.lightSuccess),
-                          const SizedBox(width: 4),
-                          Text(
-                            taskCount,
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary,
-                                ),
-                          ),
-                          const SizedBox(width: 16),
-                        ],
-                      ),
-                    if (hasReminders)
-                      Row(
-                        children: [
-                          const Icon(Icons.notifications_active_rounded,
-                              size: 16, color: AppColors.lightAccent),
-                          const SizedBox(width: 4),
-                          Text(
-                            reminderCount,
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary,
-                                ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-                Text(
-                  date,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).hintColor,
-                      ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _FolderProjectCard extends StatelessWidget {
   final ProjectDocument project;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
-  const _FolderProjectCard({required this.project, this.onTap});
+  const _FolderProjectCard({required this.project, this.onTap, this.onLongPress});
 
   @override
   Widget build(BuildContext context) {
     final blockCount = project.blocks.length;
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),

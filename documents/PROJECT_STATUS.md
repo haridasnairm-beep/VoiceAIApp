@@ -1,8 +1,8 @@
 # VoiceNotes AI - Project Status
 
-**Last Updated:** 2026-03-03
+**Last Updated:** 2026-03-04
 **Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). **All 7 Phase 1.5 waves complete** (Steps 11–17). See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). **All 7 Phase 1.5 waves complete** (Steps 11–17). Post-wave: Permission Management (Issue #13) + Gesture FAB (Issue #14) + Auto-Naming Preference done. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
 
@@ -502,6 +502,11 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Step 15 (Wave 5): Discoverability ⬜ *(post-launch)*
 - Step 16 (Wave 6): Power User Features ⬜ *(post-launch)*
 - Step 17 (Wave 7): Differentiation ⬜ *(post-launch)*
+
+### Post-Wave Enhancements
+- ~~Permission Management (Issue #13)~~ ✅
+- ~~Gesture FAB (Issue #14)~~ ✅
+- ~~Auto-Naming Preference~~ ✅ — `noteNamingStyle` setting (Prefix + Auto / Prefix Only / Auto Only), default prefixes V/T
 
 ### Phase 2 — AI-Powered
 1. **Step 11:** Whisper API Transcription (cloud-based, higher accuracy)

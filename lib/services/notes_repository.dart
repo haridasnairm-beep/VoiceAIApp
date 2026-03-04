@@ -5,6 +5,7 @@ import '../models/note.dart';
 import '../models/todo_item.dart';
 import '../models/transcript_version.dart';
 import 'hive_service.dart';
+import 'folders_repository.dart';
 
 /// Repository for Note CRUD operations against Hive.
 class NotesRepository {
@@ -67,6 +68,24 @@ class NotesRepository {
   Future<void> updateNote(Note note) async {
     note.updatedAt = DateTime.now();
     await HiveService.notesBox.put(note.id, note);
+  }
+
+  /// Move a note to a different folder (atomic: updates note + both folders).
+  Future<void> moveNoteToFolder(String noteId, String newFolderId) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+
+    final foldersRepo = FoldersRepository();
+    // Remove from old folder
+    if (note.folderId != null && note.folderId!.isNotEmpty) {
+      await foldersRepo.removeNoteFromFolder(note.folderId!, noteId);
+    }
+    // Set new folder
+    note.folderId = newFolderId;
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(noteId, note);
+    // Add to new folder
+    await foldersRepo.addNoteToFolder(newFolderId, noteId);
   }
 
   /// Soft-delete a note (move to trash).

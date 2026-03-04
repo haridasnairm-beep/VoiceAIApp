@@ -714,6 +714,24 @@ PHASE 1.5 — UX & Launch Readiness
     ├── 17.4 Transcript-Audio Sync
     ├── 17.5 Smart Filters
     └── 17.6 Play Store Launch Optimization
+│
+├── Post-Wave Enhancements ──────────── [Medium]  Step 18P
+│   ├── 18P.1 Permission Management (Issue #13) ── ✅
+│   │   ├── Post-onboarding permission request page
+│   │   ├── Permissions section in Audio & Recording settings
+│   │   └── permission_handler integration
+│   ├── 18P.2 Gesture FAB (Issue #14) ──────────── ✅
+│   │   ├── Swipe-up on FAB to record instantly
+│   │   ├── Icon transition + pulse animation + haptic feedback
+│   │   ├── Discoverability (subtitle label for first 10 sessions)
+│   │   ├── Session count tracking (HiveField 32, 33)
+│   │   └── See FEATURE_GESTURE_FAB.md
+│   └── 18P.3 Auto-Naming Preference ─────────── ✅
+│       ├── noteNamingStyle setting (HiveField 34)
+│       ├── 3 styles: Prefix+Auto, Prefix Only, Auto Only
+│       ├── Default prefixes changed: VOICE→V, TXT→T
+│       ├── One-time migration for existing users
+│       └── Preferences UI with radio dialog
                                              │
                                       PHASE 1.5 COMPLETE
 

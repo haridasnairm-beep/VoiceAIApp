@@ -42,6 +42,10 @@ class SettingsState {
   final List<String> dismissedTips; // Contextual tip IDs dismissed by user
   final String? lastSeenAppVersion; // For What's New screen
   final String noteSortOrder; // newest, oldest, titleAZ, titleZA, longest
+  final bool permissionScreenShown;
+  final int fabSwipeHintShownCount; // Idle hint shown count (max 2)
+  final int sessionCount; // Incremented on each app launch
+  final String noteNamingStyle; // 'prefix_only', 'prefix_auto', 'auto_only'
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -76,6 +80,10 @@ class SettingsState {
     this.dismissedTips = const [],
     this.lastSeenAppVersion,
     this.noteSortOrder = 'newest',
+    this.permissionScreenShown = false,
+    this.fabSwipeHintShownCount = 0,
+    this.sessionCount = 0,
+    this.noteNamingStyle = 'prefix_auto',
   });
 
   SettingsState copyWith({
@@ -111,6 +119,10 @@ class SettingsState {
     List<String>? dismissedTips,
     String? Function()? lastSeenAppVersion,
     String? noteSortOrder,
+    bool? permissionScreenShown,
+    int? fabSwipeHintShownCount,
+    int? sessionCount,
+    String? noteNamingStyle,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -148,6 +160,10 @@ class SettingsState {
       dismissedTips: dismissedTips ?? this.dismissedTips,
       lastSeenAppVersion: lastSeenAppVersion != null ? lastSeenAppVersion() : this.lastSeenAppVersion,
       noteSortOrder: noteSortOrder ?? this.noteSortOrder,
+      permissionScreenShown: permissionScreenShown ?? this.permissionScreenShown,
+      fabSwipeHintShownCount: fabSwipeHintShownCount ?? this.fabSwipeHintShownCount,
+      sessionCount: sessionCount ?? this.sessionCount,
+      noteNamingStyle: noteNamingStyle ?? this.noteNamingStyle,
     );
   }
 
@@ -230,6 +246,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
       dismissedTips: settings.dismissedTips,
       lastSeenAppVersion: settings.lastSeenAppVersion,
       noteSortOrder: settings.noteSortOrder,
+      permissionScreenShown: settings.permissionScreenShown,
+      fabSwipeHintShownCount: settings.fabSwipeHintShownCount,
+      sessionCount: settings.sessionCount,
+      noteNamingStyle: settings.noteNamingStyle,
     );
   }
 
@@ -383,12 +403,32 @@ class SettingsNotifier extends Notifier<SettingsState> {
     state = state.copyWith(crashReportingEnabled: enabled);
   }
 
+  Future<void> setPermissionScreenShown(bool shown) async {
+    await ref.read(settingsRepositoryProvider).setPermissionScreenShown(shown);
+    state = state.copyWith(permissionScreenShown: shown);
+  }
+
   Future<void> setNoteSortOrder(String order) async {
     final repo = ref.read(settingsRepositoryProvider);
     final settings = repo.getSettings();
     settings.noteSortOrder = order;
     await repo.saveSettings(settings);
     state = state.copyWith(noteSortOrder: order);
+  }
+
+  Future<void> setFabSwipeHintShownCount(int count) async {
+    await ref.read(settingsRepositoryProvider).setFabSwipeHintShownCount(count);
+    state = state.copyWith(fabSwipeHintShownCount: count);
+  }
+
+  Future<void> setNoteNamingStyle(String style) async {
+    await ref.read(settingsRepositoryProvider).setNoteNamingStyle(style);
+    state = state.copyWith(noteNamingStyle: style);
+  }
+
+  Future<void> incrementSessionCount() async {
+    await ref.read(settingsRepositoryProvider).incrementSessionCount();
+    state = state.copyWith(sessionCount: state.sessionCount + 1);
   }
 }
 

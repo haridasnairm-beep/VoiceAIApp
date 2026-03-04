@@ -13,6 +13,7 @@ import '../services/whisper_service.dart';
 import '../services/title_generator_service.dart';
 import '../utils/profanity_filter.dart';
 import 'folders_provider.dart';
+import 'project_documents_provider.dart';
 import 'settings_provider.dart';
 
 /// Provider for the NotesRepository singleton.
@@ -40,22 +41,22 @@ class NotesNotifier extends Notifier<List<Note>> {
     return ref.read(notesRepositoryProvider).getAllNotes();
   }
 
-  /// Recover stuck transcriptions — notes with isProcessed=false that are
-  /// older than [staleThreshold]. These notes were being transcribed when the
-  /// app was killed or crashed. We retry transcription if the audio file exists,
-  /// otherwise mark them as processed with a fallback message.
-  Future<void> recoverStuckTranscriptions({
-    Duration staleThreshold = const Duration(minutes: 2),
-  }) async {
+  /// Recover stuck transcriptions — notes with isProcessed=false.
+  /// On cold start, no Whisper transcription can be in-flight (new Dart VM),
+  /// so ALL unprocessed notes are stuck from a previous crashed session.
+  /// Retries transcription if the audio file exists, otherwise marks as processed.
+  Future<void> recoverStuckTranscriptions() async {
     final repo = ref.read(notesRepositoryProvider);
-    final stuckNotes = repo.getAllNotes().where((n) =>
-        !n.isProcessed &&
-        DateTime.now().difference(n.createdAt) > staleThreshold);
+    final stuckNotes = repo.getAllNotes().where((n) => !n.isProcessed);
 
-    for (final note in stuckNotes) {
+    final stuckList = stuckNotes.toList();
+    if (stuckList.isNotEmpty) {
+      print('RecoverStuck: found ${stuckList.length} unprocessed note(s)');
+    }
+    for (final note in stuckList) {
       if (note.audioFilePath.isNotEmpty && File(note.audioFilePath).existsSync()) {
         // Retry transcription
-        debugPrint('RecoverStuck: retrying transcription for ${note.id}');
+        print('RecoverStuck: retrying transcription for ${note.id}');
         transcribeInBackground(
           note.id,
           note.audioFilePath,
@@ -68,14 +69,21 @@ class NotesNotifier extends Notifier<List<Note>> {
             ? 'Transcription interrupted — no audio file available'
             : note.rawTranscription;
         await repo.updateNote(note);
-        debugPrint('RecoverStuck: marked ${note.id} as processed (no audio)');
+        print('RecoverStuck: marked ${note.id} as processed (no audio)');
       }
     }
-    if (stuckNotes.isNotEmpty) refresh();
+    if (stuckList.isNotEmpty) refresh();
   }
 
   void refresh() {
     state = ref.read(notesRepositoryProvider).getAllNotes();
+  }
+
+  /// Move a note to a different folder (atomic).
+  Future<void> moveNoteToFolder(String noteId, String newFolderId) async {
+    await ref.read(notesRepositoryProvider).moveNoteToFolder(noteId, newFolderId);
+    refresh();
+    ref.read(foldersProvider.notifier).refresh();
   }
 
   /// Generate the next auto-incrementing title using the given prefix.
@@ -93,6 +101,29 @@ class NotesNotifier extends Notifier<List<Note>> {
     }
     final next = maxNum + 1;
     return '$prefix${next.toString().padLeft(3, '0')}';
+  }
+
+  /// Apply auto-generated title based on the user's naming style preference.
+  void _applyAutoTitle(Note note, String autoTitle) {
+    final style = ref.read(settingsProvider).noteNamingStyle;
+    switch (style) {
+      case 'prefix_auto':
+        // Extract prefix+number from current title (e.g., "V001")
+        final prefixMatch = RegExp(r'^[A-Za-z]+\d{3}').firstMatch(note.title);
+        if (prefixMatch != null) {
+          note.title = '${prefixMatch.group(0)} — $autoTitle';
+        } else {
+          note.title = autoTitle;
+        }
+        break;
+      case 'auto_only':
+        note.title = autoTitle;
+        break;
+      case 'prefix_only':
+      default:
+        // Keep prefix title, don't apply auto-title
+        break;
+    }
   }
 
   /// Generate title for voice notes using notePrefix setting.
@@ -227,6 +258,14 @@ class NotesNotifier extends Notifier<List<Note>> {
           debugPrint('VoiceCmd: assigned folder ${result.folderId}');
         }
 
+        // Auto-link note to project if detected by voice command
+        if (result.projectId != null) {
+          await ref
+              .read(projectDocumentsProvider.notifier)
+              .addNoteBlock(result.projectId!, noteId);
+          debugPrint('VoiceCmd: linked note to project ${result.projectId}');
+        }
+
         // Auto-assign tags if detected by voice command
         if (result.tags.isNotEmpty) {
           for (final tag in result.tags) {
@@ -238,6 +277,7 @@ class NotesNotifier extends Notifier<List<Note>> {
         // Build feedback message for UI
         final parts = <String>[];
         if (result.folderId != null) parts.add('Folder assigned');
+        if (result.projectId != null) parts.add('Project linked');
         if (result.tags.isNotEmpty) parts.add('Tags: ${result.tags.map((t) => '#$t').join(', ')}');
 
         // Auto-create task item if voice command detected a task keyword
@@ -288,7 +328,7 @@ class NotesNotifier extends Notifier<List<Note>> {
           reminders: note.reminders.map((r) => r.text).toList(),
         );
         if (autoTitle != null) {
-          note.title = autoTitle;
+          _applyAutoTitle(note, autoTitle);
         }
       }
 
@@ -348,7 +388,7 @@ class NotesNotifier extends Notifier<List<Note>> {
       if (!note.isUserEditedTitle && note.rawTranscription.isNotEmpty) {
         final autoTitle = TitleGeneratorService.generate(note.rawTranscription);
         if (autoTitle != null) {
-          note.title = autoTitle;
+          _applyAutoTitle(note, autoTitle);
         }
       }
 

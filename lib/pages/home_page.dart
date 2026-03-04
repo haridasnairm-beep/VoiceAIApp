@@ -4,13 +4,18 @@ import 'package:go_router/go_router.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../models/note.dart';
+import '../models/project_block.dart';
+import '../models/project_document.dart';
 import '../providers/notes_provider.dart';
 import '../providers/folders_provider.dart';
+import '../providers/project_documents_provider.dart';
 import '../providers/tasks_provider.dart';
+import '../widgets/gesture_fab.dart';
 import '../widgets/speed_dial_fab.dart';
 import '../widgets/tasks_tab.dart';
 import '../widgets/note_card.dart';
 import '../widgets/template_picker_sheet.dart';
+import '../constants/note_templates.dart';
 import '../widgets/empty_state_illustrated.dart';
 import '../widgets/backup_reminder_banner.dart';
 import '../providers/settings_provider.dart';
@@ -58,12 +63,12 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     final notes = ref.watch(notesProvider);
     final folders = ref.watch(foldersProvider);
+    final projects = ref.watch(projectDocumentsProvider);
     final allTasks = ref.watch(tasksProvider);
     final settings = ref.watch(settingsProvider);
     final openTaskCount = allTasks.where((t) => !t.isCompleted).length;
 
-    // Progressive disclosure: show stats cards once user has 5+ notes and 2+ folders
-    final showStats = notes.length >= 5 && folders.length >= 2;
+    final showStats = notes.isNotEmpty || folders.isNotEmpty;
 
     // Guided first-recording banner: show when not completed and no notes yet
     final showGuidedBanner =
@@ -82,7 +87,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       });
     }
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_selectionMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _selectionMode) {
+          _exitSelectionMode();
+        }
+      },
+      child: Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _selectionMode
           ? AppBar(
@@ -252,7 +264,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Statistics cards — progressive disclosure (5+ notes, 2+ folders)
+                  // Statistics cards
                   if (showStats) Row(
                     children: [
                       Expanded(
@@ -269,7 +281,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                           hasBorder: true,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _CategoryCard(
                           icon: Icons.folder_rounded,
@@ -289,41 +301,43 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   if (showStats) const SizedBox(height: 16),
 
-                  // Notes / Tasks tab bar (below stats)
-                  SegmentedButton<int>(
-                    segments: [
-                      const ButtonSegment(
-                        value: 0,
-                        label: Text('Notes'),
-                        icon: Icon(Icons.description_outlined, size: 18),
-                      ),
-                      ButtonSegment(
-                        value: 1,
-                        label: Text('Tasks'),
-                        icon: Badge(
-                          isLabelVisible: openTaskCount > 0 && _selectedTab != 1,
-                          label: Text(
-                            openTaskCount > 99
-                                ? '99+'
-                                : openTaskCount.toString(),
-                            style: const TextStyle(fontSize: 10),
-                          ),
-                          child: const Icon(Icons.task_alt_rounded, size: 18),
+                  // Notes / Tasks tab bar — only show if user has tasks
+                  if (allTasks.isNotEmpty) ...[
+                    SegmentedButton<int>(
+                      segments: [
+                        const ButtonSegment(
+                          value: 0,
+                          label: Text('Notes'),
+                          icon: Icon(Icons.description_outlined, size: 18),
                         ),
+                        ButtonSegment(
+                          value: 1,
+                          label: Text('Tasks'),
+                          icon: Badge(
+                            isLabelVisible: openTaskCount > 0 && _selectedTab != 1,
+                            label: Text(
+                              openTaskCount > 99
+                                  ? '99+'
+                                  : openTaskCount.toString(),
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                            child: const Icon(Icons.task_alt_rounded, size: 18),
+                          ),
+                        ),
+                      ],
+                      selected: {_selectedTab},
+                      onSelectionChanged: (selected) =>
+                          setState(() => _selectedTab = selected.first),
+                      style: SegmentedButton.styleFrom(
+                        selectedBackgroundColor: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.12),
+                        selectedForegroundColor:
+                            Theme.of(context).colorScheme.primary,
                       ),
-                    ],
-                    selected: {_selectedTab},
-                    onSelectionChanged: (selected) =>
-                        setState(() => _selectedTab = selected.first),
-                    style: SegmentedButton.styleFrom(
-                      selectedBackgroundColor: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.12),
-                      selectedForegroundColor:
-                          Theme.of(context).colorScheme.primary,
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 16),
 
                   // Tab content
@@ -340,15 +354,15 @@ class _HomePageState extends ConsumerState<HomePage> {
                             _backupReminderDismissed = true),
                       ),
 
-                    // Notes List or Empty State
-                    if (notes.isEmpty && !showGuidedBanner)
+                    // Notes + Projects List or Empty State
+                    if (notes.isEmpty && projects.isEmpty && !showGuidedBanner)
                       _buildEmptyState(context)
-                    else if (notes.isNotEmpty) ...[
+                    else if (notes.isNotEmpty || projects.isNotEmpty) ...[
                       // Sort selector
                       _buildSortRow(context, ref, settings.noteSortOrder),
-                      // Split into pinned and unpinned
+                      // Split into pinned and unpinned (mixed with projects)
                       ..._buildPinnedSection(
-                        context, ref, notes, folders, settings.noteSortOrder),
+                        context, ref, notes, folders, projects, settings.noteSortOrder),
                     ],
                   ] else ...[
                     // Tasks tab
@@ -446,6 +460,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 },
                               ),
                               _ActionBarButton(
+                                icon: Icons.article_rounded,
+                                label: 'Project',
+                                onTap: () {
+                                  _showBulkProjectPicker(
+                                      context, ref);
+                                },
+                              ),
+                              _ActionBarButton(
                                 icon: Icons.delete_rounded,
                                 label: 'Delete',
                                 color: Colors.red,
@@ -460,10 +482,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                             children: [
                               _ActionBarButton(
                                 icon: Icons.folder_rounded,
-                                label: 'Add to Folder',
+                                label: 'Folder',
                                 onTap: () {
                                   _showBulkFolderPicker(
                                       context, ref, notes);
+                                },
+                              ),
+                              _ActionBarButton(
+                                icon: Icons.article_rounded,
+                                label: 'Project',
+                                onTap: () {
+                                  _showBulkProjectPicker(
+                                      context, ref);
                                 },
                               ),
                               _ActionBarButton(
@@ -479,14 +509,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
 
-            // Speed Dial FAB (hide during selection)
+            // Gesture FAB (hide during selection)
             if (!_selectionMode)
             Align(
               alignment: Alignment.bottomRight,
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
-                child: SpeedDialFab(
-                  items: [
+                child: GestureFab(
+                  sessionCount: settings.sessionCount,
+                  showSubtitleHint: settings.sessionCount <= 10,
+                  onRecord: () {
+                    setState(() => _selectedTab = 0);
+                    context.push(AppRoutes.recording);
+                  },
+                  speedDialItems: [
                     SpeedDialItem(
                       icon: Icons.search_rounded,
                       label: 'Search',
@@ -510,16 +546,17 @@ class _HomePageState extends ConsumerState<HomePage> {
                         setState(() => _selectedTab = 0);
                         final template = await showModalBottomSheet<dynamic>(
                           context: context,
+                          isScrollControlled: true,
                           builder: (_) => const TemplatePickerSheet(),
                         );
-                        // null from "Blank Note", NoteTemplate from a template,
-                        // or nothing if sheet dismissed
+                        // null = dismissed (no action), 'blank' = blank note,
+                        // NoteTemplate = template selected
                         if (!mounted) return;
-                        if (template == false) return; // dismissed
+                        if (template == null) return;
                         final extras = <String, dynamic>{
                           'isNewTextNote': true,
                         };
-                        if (template != null) {
+                        if (template is NoteTemplate) {
                           extras['templateContent'] = template.content;
                           extras['templateTitle'] =
                               '${template.name} — ${_formatDate(DateTime.now())}';
@@ -535,6 +572,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                         context.push(AppRoutes.recording);
                       },
                     ),
+                    SpeedDialItem(
+                      icon: Icons.article_rounded,
+                      label: 'New Project',
+                      onTap: () {
+                        setState(() => _selectedTab = 0);
+                        _showNewProjectDialog(context, ref);
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -542,6 +587,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -699,6 +745,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     WidgetRef ref,
     List<Note> notes,
     List<dynamic> folders,
+    List<ProjectDocument> projects,
     String sortOrder,
   ) {
     final pinned = notes.where((n) => n.isPinned).toList()
@@ -706,6 +753,23 @@ class _HomePageState extends ConsumerState<HomePage> {
           (b.pinnedAt ?? DateTime.now()).compareTo(a.pinnedAt ?? DateTime.now()));
     final unpinned = _applySortOrder(
         notes.where((n) => !n.isPinned).toList(), sortOrder);
+
+    // Build mixed list of unpinned notes + projects sorted together
+    final List<_FeedItem> feedItems = [
+      ...unpinned.map((n) => _FeedItem(note: n, createdAt: n.createdAt, title: n.title)),
+      ...projects.map((p) => _FeedItem(project: p, createdAt: p.createdAt, title: p.title)),
+    ];
+    // Apply same sort order to mixed list
+    switch (sortOrder) {
+      case 'oldest':
+        feedItems.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      case 'titleAZ':
+        feedItems.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      case 'titleZA':
+        feedItems.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+      default: // newest, longest
+        feedItems.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
 
     final widgets = <Widget>[];
 
@@ -733,7 +797,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         widgets.add(_buildNoteItem(context, ref, note, folders));
       }
       // Recent section header
-      if (unpinned.isNotEmpty) {
+      if (feedItems.isNotEmpty) {
         widgets.add(Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 8),
           child: Text(
@@ -747,12 +811,112 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
     }
 
-    // Unpinned notes
-    for (final note in unpinned) {
-      widgets.add(_buildNoteItem(context, ref, note, folders));
+    // Mixed unpinned notes + projects
+    for (final item in feedItems) {
+      if (item.note != null) {
+        widgets.add(_buildNoteItem(context, ref, item.note!, folders));
+      } else if (item.project != null) {
+        widgets.add(_buildProjectItem(context, ref, item.project!, folders));
+      }
     }
 
     return widgets;
+  }
+
+  Widget _buildProjectItem(
+    BuildContext context,
+    WidgetRef ref,
+    ProjectDocument project,
+    List<dynamic> folders,
+  ) {
+    final blockCount = project.blocks.length;
+    final folderName = folders
+        .where((f) => (f.projectDocumentIds as List).contains(project.id))
+        .map((f) => f.name as String)
+        .toList();
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: () => context.push(
+        AppRoutes.projectDocumentDetail,
+        extra: {'documentId': project.id},
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
+          border: Border.all(color: theme.dividerColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Row 1: Metadata
+            Row(
+              children: [
+                Icon(Icons.access_time_rounded,
+                    size: 12, color: theme.hintColor),
+                const SizedBox(width: 3),
+                Text(
+                  _formatDate(project.createdAt),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                Text(' · ',
+                    style: TextStyle(color: theme.hintColor, fontSize: 12)),
+                Text(
+                  '$blockCount ${blockCount == 1 ? 'block' : 'blocks'}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                ),
+              ],
+            ),
+            // Row 2: Description
+            if (project.description != null && project.description!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                project.description!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.secondary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            // Row 3: Labels
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                _ProjectLabelChip(
+                  icon: Icons.article_rounded,
+                  label: project.title,
+                  bgColor: const Color(0xFFF3E5F5),
+                  textColor: const Color(0xFF7B1FA2),
+                ),
+                ...folderName.map((name) => _ProjectLabelChip(
+                      icon: Icons.folder_rounded,
+                      label: name,
+                      bgColor: const Color(0xFFE3F2FD),
+                      textColor: const Color(0xFF1565C0),
+                    )),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildNoteItem(
@@ -1081,7 +1245,13 @@ class _HomePageState extends ConsumerState<HomePage> {
   void _showBulkFolderPicker(
       BuildContext context, WidgetRef ref, List<Note> allNotes) {
     var folders = ref.read(foldersProvider);
+    // Pre-select folders that already contain the selected notes
     final selected = <String>{};
+    for (final folder in folders) {
+      if (_selectedNoteIds.every((nid) => folder.noteIds.contains(nid))) {
+        selected.add(folder.id);
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -1264,6 +1434,182 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  void _showNewProjectDialog(BuildContext context, WidgetRef ref) async {
+    final name = await _showNewNameDialog(
+        context, 'New Project', 'Project name');
+    if (name != null && name.trim().isNotEmpty && mounted) {
+      // Assign to General folder by default
+      final folders = ref.read(foldersProvider);
+      final generalFolder = folders.where((f) => f.name == 'General').toList();
+      final folderId = generalFolder.isNotEmpty ? generalFolder.first.id : null;
+      final doc = await ref
+          .read(projectDocumentsProvider.notifier)
+          .create(title: name.trim(), folderId: folderId);
+      if (mounted) {
+        context.push(
+          AppRoutes.projectDocumentDetail,
+          extra: {'documentId': doc.id},
+        );
+      }
+    }
+  }
+
+  void _showBulkProjectPicker(BuildContext context, WidgetRef ref) {
+    var projects = ref.read(projectDocumentsProvider);
+    String? selectedProjectId;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.8,
+          builder: (_, scrollController) => Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 8, bottom: 4),
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).hintColor.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      'Add to Project',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 4),
+                    FilledButton(
+                      onPressed: selectedProjectId == null
+                          ? null
+                          : () async {
+                              // Add notes as noteReference blocks in the project
+                              final project = projects.firstWhere(
+                                  (p) => p.id == selectedProjectId);
+                              for (final nid in _selectedNoteIds) {
+                                // Skip if already linked
+                                final alreadyLinked = project.blocks.any(
+                                    (b) => b.type == BlockType.noteReference &&
+                                        b.noteId == nid);
+                                if (!alreadyLinked) {
+                                  await ref
+                                      .read(projectDocumentsProvider.notifier)
+                                      .addNoteBlock(project.id, nid);
+                                }
+                              }
+                              // Also move notes to project's folder
+                              if (project.folderId != null) {
+                                for (final nid in _selectedNoteIds) {
+                                  ref
+                                      .read(notesProvider.notifier)
+                                      .moveNoteToFolder(nid, project.folderId!);
+                                }
+                              }
+                              Navigator.of(ctx).pop();
+                              _exitSelectionMode();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(
+                                        'Added to "${project.title}"')),
+                              );
+                            },
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Icon(Icons.add_circle_outline_rounded,
+                    color: Theme.of(context).colorScheme.primary),
+                title: const Text('New Project'),
+                onTap: () async {
+                  final name = await _showNewNameDialog(
+                      context, 'New Project', 'Project name');
+                  if (name != null && name.trim().isNotEmpty) {
+                    // Assign to General folder
+                    final allFolders = ref.read(foldersProvider);
+                    final general = allFolders.where((f) => f.name == 'General').toList();
+                    final folderId = general.isNotEmpty ? general.first.id : null;
+                    final doc = await ref
+                        .read(projectDocumentsProvider.notifier)
+                        .create(title: name.trim(), folderId: folderId);
+                    setSheetState(() {
+                      projects = ref.read(projectDocumentsProvider);
+                      selectedProjectId = doc.id;
+                    });
+                  }
+                },
+              ),
+              const Divider(height: 1),
+              if (projects.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Text(
+                    'No projects yet.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).hintColor,
+                        ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: projects.length,
+                    itemBuilder: (_, index) {
+                      final project = projects[index];
+                      final isSelected = selectedProjectId == project.id;
+                      return ListTile(
+                        leading: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3E5F5),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                          ),
+                          child: const Icon(Icons.article_rounded,
+                              color: Color(0xFF7B1FA2), size: 20),
+                        ),
+                        title: Text(project.title),
+                        subtitle: Text(
+                          '${project.blocks.length} blocks',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).hintColor,
+                                  ),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded,
+                                color: Theme.of(context).colorScheme.primary)
+                            : null,
+                        selected: isSelected,
+                        onTap: () => setSheetState(
+                            () => selectedProjectId = project.id),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<String?> _showNewNameDialog(
       BuildContext context, String title, String hint) async {
     final controller = TextEditingController();
@@ -1378,6 +1724,60 @@ class _CategoryCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FeedItem {
+  final Note? note;
+  final ProjectDocument? project;
+  final DateTime createdAt;
+  final String title;
+
+  _FeedItem({this.note, this.project, required this.createdAt, required this.title});
+}
+
+class _ProjectLabelChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color bgColor;
+  final Color textColor;
+
+  const _ProjectLabelChip({
+    required this.icon,
+    required this.label,
+    required this.bgColor,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: textColor),
+          const SizedBox(width: 4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 100),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -295,6 +296,7 @@ class WhisperService {
 
     try {
       debugPrint('WhisperService: transcribing $wavPath (model: $_currentModelName, language: $language, translate: $isTranslate)');
+      // Timeout: 3 minutes max — prevents hanging when app is backgrounded
       final result = await _whisper!.transcribe(
         transcribeRequest: TranscribeRequest(
           audio: wavPath,
@@ -303,6 +305,12 @@ class WhisperService {
           isNoTimestamps: true,
           splitOnWord: true,
         ),
+      ).timeout(
+        const Duration(minutes: 3),
+        onTimeout: () {
+          debugPrint('WhisperService: transcription timed out after 3 minutes');
+          throw TimeoutException('Whisper transcription timed out');
+        },
       );
       // Strip Whisper hallucination artifacts and noise markers.
       var text = result.text;

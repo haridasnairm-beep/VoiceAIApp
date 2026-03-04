@@ -260,6 +260,27 @@ class HiveService {
     }
   }
 
+  /// Migrate old default prefixes VOICE→V and TXT→T.
+  /// Only migrates if the prefix still matches the old default (user-customized prefixes are untouched).
+  static Future<void> migrateNotePrefixes() async {
+    const settingsKey = 'user_settings';
+    final settings = settingsBox.get(settingsKey);
+    if (settings == null) return;
+    bool changed = false;
+    if (settings.notePrefix == 'VOICE') {
+      settings.notePrefix = 'V';
+      changed = true;
+    }
+    if (settings.textNotePrefix == 'TXT') {
+      settings.textNotePrefix = 'T';
+      changed = true;
+    }
+    if (changed) {
+      await settingsBox.put(settingsKey, settings);
+      debugPrint('HiveService: migrated note prefixes (VOICE→V, TXT→T)');
+    }
+  }
+
   /// Ensure a default folder exists. Creates "General" on first launch.
   static Future<void> ensureDefaultFolder() async {
     const settingsKey = 'user_settings';
