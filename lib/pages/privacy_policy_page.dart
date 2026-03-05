@@ -41,7 +41,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               ),
               Center(
                 child: Text(
-                  'VOICENOTES AI',
+                  'VAANIX',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.primary,
@@ -72,7 +72,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  'YOUR DATA LIVES ON YOUR DEVICE. VoiceNotes AI is a privacy-first, '
+                  'YOUR DATA LIVES ON YOUR DEVICE. Vaanix is a privacy-first, '
                   'local-only application. No data is sent to the cloud. No account is required. '
                   'Everything stays on your phone.',
                   style: bodyStyle?.copyWith(fontWeight: FontWeight.w600),
@@ -109,7 +109,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               // 3. ON-DEVICE TRANSCRIPTION
               _sectionHeader('3. ON-DEVICE TRANSCRIPTION', headingStyle),
               Text(
-                'VoiceNotes AI offers two transcription modes, both of which operate entirely '
+                'Vaanix offers two transcription modes, both of which operate entirely '
                 'on your device:\n\n'
                 'Live Transcription uses your device\'s built-in speech recognition engine. '
                 'No audio is sent to external servers.\n\n'
@@ -124,7 +124,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               // 4. NO ACCOUNT REQUIRED
               _sectionHeader('4. NO ACCOUNT REQUIRED', headingStyle),
               Text(
-                'VoiceNotes AI does not require any account creation, login, or sign-in. '
+                'Vaanix does not require any account creation, login, or sign-in. '
                 'There is no authentication system. You start using the app immediately '
                 'with zero setup. No email, no password, no phone number — nothing.',
                 style: bodyStyle,
@@ -134,7 +134,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               // 5. NOTIFICATIONS
               _sectionHeader('5. NOTIFICATIONS', headingStyle),
               Text(
-                'VoiceNotes AI uses local notifications to deliver reminders you set manually. '
+                'Vaanix uses local notifications to deliver reminders you set manually. '
                 'These notifications are scheduled entirely on-device using the system notification '
                 'service. No push notification tokens are sent to any server. No cloud messaging '
                 'service is used.\n\n'
@@ -160,7 +160,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               // 7. MICROPHONE ACCESS
               _sectionHeader('7. MICROPHONE ACCESS', headingStyle),
               Text(
-                'VoiceNotes AI requests microphone permission to record voice notes. '
+                'Vaanix requests microphone permission to record voice notes. '
                 'The microphone is used exclusively for recording audio that is saved locally '
                 'on your device. Audio is never streamed, uploaded, or transmitted anywhere. '
                 'You can revoke microphone permission at any time via your device settings — '
@@ -173,7 +173,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               _sectionHeader('8. STORAGE ACCESS', headingStyle),
               Text(
                 'The app stores voice recordings and the Whisper model in your device\'s '
-                'app-private storage directory. This storage is accessible only to VoiceNotes AI '
+                'app-private storage directory. This storage is accessible only to Vaanix '
                 'and is automatically deleted when you uninstall the app. All database content '
                 'is encrypted with AES-256 encryption.',
                 style: bodyStyle,
@@ -198,7 +198,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               // 10. CHILDREN'S PRIVACY
               _sectionHeader('10. CHILDREN\'S PRIVACY', headingStyle),
               Text(
-                'VoiceNotes AI is intended for users 13 years and older. Since the app does '
+                'Vaanix is intended for users 13 years and older. Since the app does '
                 'not collect any data or communicate with any server, there is no data '
                 'collection from children or any other users.',
                 style: bodyStyle,
@@ -210,7 +210,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               Text(
                 'All local data is stored in an AES-256 encrypted Hive database within your '
                 'device\'s app-private storage. This storage is sandboxed by the operating system '
-                'and accessible only to VoiceNotes AI. No data is transmitted over any network '
+                'and accessible only to Vaanix. No data is transmitted over any network '
                 '(except the one-time Whisper model download over HTTPS).',
                 style: bodyStyle,
               ),
@@ -235,7 +235,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               // 14. DEVELOPER
               _sectionHeader('14. DEVELOPER', headingStyle),
               Text(
-                'VoiceNotes AI is developed by HDMPixels.',
+                'Vaanix is developed by HDMPixels.',
                 style: bodyStyle,
               ),
               const SizedBox(height: 40),

@@ -50,17 +50,17 @@ void main() async {
   NotesRepository().purgeExpiredTrash();
   FoldersRepository().purgeExpiredTrash();
   ProjectDocumentsRepository().purgeExpiredTrash();
-  runApp(const ProviderScope(child: VoiceNotesApp()));
+  runApp(const ProviderScope(child: VaanixApp()));
 }
 
-class VoiceNotesApp extends ConsumerStatefulWidget {
-  const VoiceNotesApp({super.key});
+class VaanixApp extends ConsumerStatefulWidget {
+  const VaanixApp({super.key});
 
   @override
-  ConsumerState<VoiceNotesApp> createState() => _VoiceNotesAppState();
+  ConsumerState<VaanixApp> createState() => _VaanixAppState();
 }
 
-class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
+class _VaanixAppState extends ConsumerState<VaanixApp>
     with WidgetsBindingObserver {
   @override
   void initState() {
@@ -118,16 +118,16 @@ class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
   void _onWidgetClicked(Uri? uri) {
     if (uri == null) return;
     final uriStr = uri.toString();
-    if (uriStr == 'voicenotesai://record') {
+    if (uriStr == 'vaanix://record') {
       AppRouter.router.go(AppRoutes.recording);
-    } else if (uriStr == 'voicenotesai://search') {
+    } else if (uriStr == 'vaanix://search') {
       AppRouter.router.go(AppRoutes.search);
     }
   }
 
   /// Check if the app was launched by opening a .vnbak file.
   Future<void> _checkFileIntent() async {
-    const channel = MethodChannel('com.hariappbuilders.voicenotesai/file_intent');
+    const channel = MethodChannel('com.vaanix.app/file_intent');
     try {
       final String? filePath = await channel.invokeMethod('getOpenFilePath');
       if (filePath != null && filePath.isNotEmpty) {
@@ -172,7 +172,7 @@ class _VoiceNotesAppState extends ConsumerState<VoiceNotesApp>
     ));
 
     return MaterialApp.router(
-      title: 'VoiceNotes AI',
+      title: 'Vaanix',
       debugShowCheckedModeBanner: false,
       theme: lightTheme,
       darkTheme: settings.isAmoled ? amoledTheme : darkTheme,

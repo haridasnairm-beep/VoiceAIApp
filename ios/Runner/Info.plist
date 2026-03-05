@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>VoiceNotes AI</string>
+	<string>Vaanix</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>VoiceNotes AI</string>
+	<string>Vaanix</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -48,6 +48,6 @@
 
 	<!-- Microphone permission for voice recording -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>VoiceNotes AI needs microphone access to record voice notes.</string>
+	<string>Vaanix needs microphone access to record voice notes.</string>
 </dict>
 </plist>

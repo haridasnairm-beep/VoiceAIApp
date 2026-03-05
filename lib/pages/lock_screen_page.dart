@@ -64,7 +64,7 @@ class _LockScreenPageState extends State<LockScreenPage>
         return;
       }
       final didAuth = await _localAuth.authenticate(
-        localizedReason: 'Unlock VoiceNotes AI',
+        localizedReason: 'Unlock Vaanix',
         options: const AuthenticationOptions(
           biometricOnly: false,
           stickyAuth: true,
@@ -183,7 +183,7 @@ class _LockScreenPageState extends State<LockScreenPage>
                 ),
               ),
               const SizedBox(height: 16),
-              Text('VoiceNotes AI',
+              Text('Vaanix',
                   style: theme.textTheme.titleLarge
                       ?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),

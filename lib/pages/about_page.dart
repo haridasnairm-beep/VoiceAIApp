@@ -26,7 +26,7 @@ class AboutPage extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            const Text('About VoiceNotes AI'),
+            const Text('About Vaanix'),
           ],
         ),
       ),
@@ -49,7 +49,7 @@ class AboutPage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'VoiceNotes AI',
+                'Vaanix',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -108,7 +108,7 @@ class AboutPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'VoiceNotes AI uses Whisper — a state-of-the-art speech recognition model '
+                      'Vaanix uses Whisper — a state-of-the-art speech recognition model '
                       'that runs 100% on your device. No audio ever leaves your phone.',
                       style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
                     ),
@@ -274,7 +274,7 @@ class AboutPage extends StatelessWidget {
                         color: theme.colorScheme.error, size: 40),
                     const SizedBox(height: 12),
                     Text(
-                      'Keep VoiceNotes AI Free & Ad-Free',
+                      'Keep Vaanix Free & Ad-Free',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -282,7 +282,7 @@ class AboutPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'VoiceNotes AI is completely free to use with no ads, no subscriptions, '
+                      'Vaanix is completely free to use with no ads, no subscriptions, '
                       'and no data tracking. Your privacy and experience come first.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         height: 1.5,
@@ -293,7 +293,7 @@ class AboutPage extends StatelessWidget {
                     const SizedBox(height: 12),
                     Text(
                       'Building and maintaining great software takes time and resources. '
-                      'If VoiceNotes AI has been helpful to you, consider buying us a coffee!',
+                      'If Vaanix has been helpful to you, consider buying us a coffee!',
                       style: theme.textTheme.bodySmall?.copyWith(
                         height: 1.5,
                         color: theme.colorScheme.onSurfaceVariant,

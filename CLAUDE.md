@@ -1,4 +1,4 @@
-# CLAUDE.md — VoiceNotes AI Agent Reference
+# CLAUDE.md — Vaanix Agent Reference
 
 This file provides context for AI agents (Claude Code, Copilot, etc.) working on this project.
 
@@ -9,7 +9,7 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 
 ## Project Summary
 
-**VoiceNotes AI** is a privacy-first, voice-driven note-taking and task management mobile app built with Flutter. Users record voice notes, the app transcribes audio on-device, and organizes content into folders with manual categorization.
+**Vaanix** is a privacy-first, voice-driven note-taking and task management mobile app built with Flutter. Users record voice notes, the app transcribes audio on-device, and organizes content into folders with manual categorization.
 
 **Current Phase:** Phase 1 (Release) — 100% complete. All 7 core steps + Steps 4.5/4.6/4.7 + post-release enhancements (Issues #7–#12) + all 8 value proposition gap features (Steps 8–10.7). Version 1.0.0. **Next:** Phase 2 (AI-powered features).
 
@@ -313,7 +313,7 @@ flutter analyze
 
 ## Important Notes for Agents
 
-1. **Always read the concept document** (`documents/voicenotes-ai-concept.md`) for product decisions.
+1. **Read PROJECT_SPECIFICATION.md** for product decisions (authoritative source).
 2. **Check PROJECT_STATUS.md** before starting work to understand current state.
 3. **Follow IMPLEMENTATION_PLAN.md** step order — each step depends on the previous.
 4. **Phase 1 = NO AI.** Remove/hide all AI UI elements. See the AI exclusion table above.

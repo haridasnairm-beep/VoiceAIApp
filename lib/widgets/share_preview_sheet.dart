@@ -61,7 +61,7 @@ class _SharePreviewSheetState extends State<SharePreviewSheet> {
     final theme = Theme.of(context);
     final preview = _previewText;
     final isEmpty = preview.trim().isEmpty ||
-        preview.trim() == '— Shared from VoiceNotes AI';
+        preview.trim() == '— Shared from Vaanix';
 
     return SafeArea(
       child: Padding(

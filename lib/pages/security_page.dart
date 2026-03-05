@@ -389,7 +389,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Enable Biometric?'),
         content: const Text(
-            'Use fingerprint or Face ID to unlock VoiceNotes AI?'),
+            'Use fingerprint or Face ID to unlock Vaanix?'),
         actions: [
           TextButton(
             onPressed: () {

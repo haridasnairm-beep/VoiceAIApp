@@ -1,4 +1,4 @@
-package com.hariappbuilders.voicenotesai
+package com.vaanix.app
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
@@ -13,7 +13,7 @@ import es.antonborri.home_widget.HomeWidgetProvider
  * Tapping anywhere opens the Recording screen directly.
  * No note content is displayed — always safe regardless of App Lock state.
  */
-class VoiceNotesWidgetSmall : HomeWidgetProvider() {
+class VaanixWidgetSmall : HomeWidgetProvider() {
 
     override fun onUpdate(
         context: Context,
@@ -28,7 +28,7 @@ class VoiceNotesWidgetSmall : HomeWidgetProvider() {
             val recordIntent = HomeWidgetLaunchIntent.getActivity(
                 context,
                 MainActivity::class.java,
-                Uri.parse("voicenotesai://record"),
+                Uri.parse("vaanix://record"),
             )
             views.setOnClickPendingIntent(R.id.widget_small_container, recordIntent)
 

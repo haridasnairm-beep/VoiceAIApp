@@ -35,7 +35,7 @@ class SupportUsPage extends StatelessWidget {
                   color: theme.colorScheme.error, size: 56),
               const SizedBox(height: 16),
               Text(
-                'Keep VoiceNotes AI\nFree & Ad-Free',
+                'Keep Vaanix\nFree & Ad-Free',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -85,7 +85,7 @@ class SupportUsPage extends StatelessWidget {
               // Message
               Text(
                 'Building and maintaining great software takes time and resources. '
-                'If VoiceNotes AI has been helpful to you, consider buying us a coffee!',
+                'If Vaanix has been helpful to you, consider buying us a coffee!',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   height: 1.6,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -94,7 +94,7 @@ class SupportUsPage extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Your support directly funds new features and keeps VoiceNotes AI running.',
+                'Your support directly funds new features and keeps Vaanix running.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   height: 1.6,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -158,7 +158,7 @@ class SupportUsPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Share VoiceNotes AI with friends and family!',
+                      'Share Vaanix with friends and family!',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

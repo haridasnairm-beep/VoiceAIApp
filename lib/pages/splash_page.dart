@@ -110,7 +110,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
     setState(() => _isAuthenticating = true);
     try {
       final didAuth = await _localAuth.authenticate(
-        localizedReason: 'Unlock VoiceNotes AI',
+        localizedReason: 'Unlock Vaanix',
         options: const AuthenticationOptions(
           biometricOnly: false,
           stickyAuth: true,
@@ -245,7 +245,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
         _buildLogo(primaryColor, size: 140),
         const SizedBox(height: 32),
         Text(
-          'VoiceNotes AI',
+          'Vaanix',
           style: theme.textTheme.headlineLarge?.copyWith(
             fontWeight: FontWeight.w800,
             letterSpacing: -0.5,
@@ -317,7 +317,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
         _buildLogo(primaryColor, size: 120),
         const SizedBox(height: 24),
         Text(
-          'VoiceNotes AI',
+          'Vaanix',
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w800,
             letterSpacing: -0.5,

@@ -109,7 +109,7 @@ class _DownloadProgressSheetState extends State<DownloadProgressSheet>
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'VoiceNotes AI',
+                  'Vaanix',
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onSurface,

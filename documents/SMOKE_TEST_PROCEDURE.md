@@ -1,4 +1,4 @@
-# VoiceNotes AI — Smoke Test Procedure
+# Vaanix — Smoke Test Procedure
 
 **Purpose:** Quick manual validation of all core features before a release.
 **Estimated time:** 15–20 minutes

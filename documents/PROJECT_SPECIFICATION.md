@@ -1,17 +1,17 @@
-# VoiceNotes AI - Project Specification
+# Vaanix - Project Specification
 
 **Version:** 3.0
 **Last Updated:** 2026-03-03
 **Platform:** Cross-platform (iOS + Android) via Flutter
 **Dart SDK:** ^3.6.0
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [VoiceNotes AI Concept Document](voicenotes-ai-concept.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Phase 1 Value Gaps](FEATURE_PHASE1_VALUE_GAPS.md) | [UX Audit](UX_PRODUCT_AUDIT.md) | [Gesture FAB](FEATURE_GESTURE_FAB.md)
+**Reference:** [UX Audit](UX_PRODUCT_AUDIT.md)
 
 ---
 
 ## 1. Product Overview
 
-VoiceNotes AI is a **privacy-first, voice-driven** note-taking and task management mobile app. Users capture thoughts, tasks, and ideas by voice. The app transcribes audio in real-time, auto-detects the spoken language, and intelligently structures content into actions, todos, reminders, and general notes — without requiring the user to type a single word.
+Vaanix is a **privacy-first, voice-driven** note-taking and task management mobile app. Users capture thoughts, tasks, and ideas by voice. The app transcribes audio in real-time, auto-detects the spoken language, and intelligently structures content into actions, todos, reminders, and general notes — without requiring the user to type a single word.
 
 **Core Positioning:** Record your voice. Get organized notes. 100% private.
 
@@ -309,7 +309,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 ### 4.17 Reminder Enhancement (Hybrid Model)
 - **Existing in-app reminders preserved** — local notifications with deep-link back to note
 - **"Also add to OS" option** — after creating a reminder, bottom sheet offers:
-  - "Keep in VoiceNotes AI" — existing behavior (in-app notification)
+  - "Keep in Vaanix" — existing behavior (in-app notification)
   - "Also add to OS Reminders" — creates in-app reminder AND opens native calendar with pre-filled event (via `add_2_calendar`)
 - **Per-reminder choice** — not a global setting; user decides per reminder
 - **Reschedule** — clock icon or overflow menu; opens date/time picker pre-filled with current time; cancels old notification and schedules new one

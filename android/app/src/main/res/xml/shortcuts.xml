@@ -8,9 +8,9 @@
         android:shortcutLongLabel="@string/shortcut_record_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.hariappbuilders.voicenotesai"
-            android:targetClass="com.hariappbuilders.voicenotesai.MainActivity"
-            android:data="voicenotesai://record" />
+            android:targetPackage="com.vaanix.app"
+            android:targetClass="com.vaanix.app.MainActivity"
+            android:data="vaanix://record" />
     </shortcut>
     <shortcut
         android:shortcutId="search_notes"
@@ -20,8 +20,8 @@
         android:shortcutLongLabel="@string/shortcut_search_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.hariappbuilders.voicenotesai"
-            android:targetClass="com.hariappbuilders.voicenotesai.MainActivity"
-            android:data="voicenotesai://search" />
+            android:targetPackage="com.vaanix.app"
+            android:targetClass="com.vaanix.app.MainActivity"
+            android:data="vaanix://search" />
     </shortcut>
 </shortcuts>

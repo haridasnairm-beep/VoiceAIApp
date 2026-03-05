@@ -59,7 +59,7 @@ class ReminderDestinationSheet extends StatelessWidget {
               label: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Keep in VoiceNotes AI'),
+                  const Text('Keep in Vaanix'),
                   Text(
                     'Notification with link to this note',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(

@@ -14,7 +14,7 @@ class OsReminderService {
   }) async {
     final event = Event(
       title: reminderText,
-      description: 'From VoiceNotes AI: $noteTitle',
+      description: 'From Vaanix: $noteTitle',
       startDate: reminderTime,
       endDate: reminderTime.add(const Duration(minutes: 15)),
       allDay: false,

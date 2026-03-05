@@ -13,7 +13,7 @@
     <!-- Biometric authentication for App Lock -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <application
-        android:label="VoiceNotes AI"
+        android:label="Vaanix"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -82,7 +82,7 @@
 
         <!-- Home Screen Widgets -->
         <receiver
-            android:name=".VoiceNotesWidgetSmall"
+            android:name=".VaanixWidgetSmall"
             android:exported="true"
             android:label="Quick Record">
             <intent-filter>
@@ -94,9 +94,9 @@
         </receiver>
 
         <receiver
-            android:name=".VoiceNotesWidgetDashboard"
+            android:name=".VaanixWidgetDashboard"
             android:exported="true"
-            android:label="VoiceNotes Dashboard">
+            android:label="Vaanix Dashboard">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

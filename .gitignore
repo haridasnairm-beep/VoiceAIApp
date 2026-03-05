@@ -48,6 +48,8 @@ app.*.map.json
 android/app/google-services.json
 android/local.properties
 android/key.properties
+*.keystore
+*.jks
 
 .prompt_attachments
 *.hologram.dart

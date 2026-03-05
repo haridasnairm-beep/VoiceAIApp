@@ -1,4 +1,4 @@
-package com.hariappbuilders.voicenotesai
+package com.vaanix.app
 
 import android.content.Intent
 import android.os.Bundle
@@ -8,7 +8,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity : FlutterFragmentActivity() {
-    private val CHANNEL = "com.hariappbuilders.voicenotesai/file_intent"
+    private val CHANNEL = "com.vaanix.app/file_intent"
     private var pendingFilePath: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

@@ -10,13 +10,13 @@ import '../models/note.dart';
 class HomeWidgetService {
   // Android widget class names (qualified)
   static const String _androidSmall =
-      'com.hariappbuilders.voicenotesai.VoiceNotesWidgetSmall';
+      'com.vaanix.app.VaanixWidgetSmall';
   static const String _androidDashboard =
-      'com.hariappbuilders.voicenotesai.VoiceNotesWidgetDashboard';
+      'com.vaanix.app.VaanixWidgetDashboard';
 
   // iOS app group for shared data (requires Xcode configuration)
   static const String _iosAppGroup =
-      'group.com.hariappbuilders.voicenotesai';
+      'group.com.vaanix.app';
 
   /// Initialize the widget service. Call once on app startup.
   static Future<void> initialize() async {

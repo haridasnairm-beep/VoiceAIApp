@@ -1,4 +1,4 @@
-# VoiceNotes AI - Changelog
+# Vaanix - Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -72,7 +72,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-03-03 - Step 16 (Wave 6): Power User Features
 
 ### Added
-- **Android app shortcuts** — long-press launcher icon shows "Record" and "Search" shortcuts; deep-links via `voicenotesai://record` and `voicenotesai://search`; `shortcuts.xml` + `AndroidManifest.xml` meta-data
+- **Android app shortcuts** — long-press launcher icon shows "Record" and "Search" shortcuts; deep-links via `vaanix://record` and `vaanix://search`; `shortcuts.xml` + `AndroidManifest.xml` meta-data
 - **Note sorting on home feed** — sort selector (popup menu) with 5 options: Newest, Oldest, A-Z, Z-A, Longest; persisted in `UserSettings.noteSortOrder` (HiveField 30); applied to unpinned notes, pinned notes always at top
 - **Swipe gestures on note cards** — swipe right to pin/unpin (blue background + pin icon + haptic), swipe left to delete (red background + confirmation dialog); disabled during multi-select mode
 - **Folder archive** — `isArchived: bool` (HiveField 11) + `sortOrder: int` (HiveField 12) on Folder model; "Archive" action in folder detail overflow menu; "N archived" row in Library links to bottom sheet with unarchive option; archived folders hidden from main list
@@ -236,12 +236,12 @@ All notable changes to this project will be documented in this file.
 - **Dashboard widget (4×2)** — shows note count, open task count, and latest note preview; content adapts to Widget Privacy setting when App Lock is enabled
 - **Widget Privacy setting** — new option in Settings → Security (visible only when App Lock is on); three levels: Full (counts + preview), Record-Only (counts only, default), Minimal (icon + record only)
 - `HomeWidgetService` — Flutter service that pushes note/task data to the widget; respects App Lock + Widget Privacy to determine what data to expose
-- `VoiceNotesWidgetSmall.kt` — Android AppWidgetProvider for the Quick Record widget
-- `VoiceNotesWidgetDashboard.kt` — Android AppWidgetProvider for the Dashboard widget; reads `HomeWidgetPreferences` SharedPreferences written by `home_widget`
+- `VaanixWidgetSmall.kt` — Android AppWidgetProvider for the Quick Record widget
+- `VaanixWidgetDashboard.kt` — Android AppWidgetProvider for the Dashboard widget; reads `HomeWidgetPreferences` SharedPreferences written by `home_widget`
 - Widget layout XML: `widget_small.xml`, `widget_dashboard.xml`
 - Widget info XML: `widget_small_info.xml`, `widget_dashboard_info.xml`
 - Widget drawable resources: `widget_background.xml`, `widget_btn_background.xml`
-- Widget click deep-link via `HomeWidgetLaunchIntent` — widget record taps emit `voicenotesai://record` URI to `HomeWidget.widgetClicked` stream
+- Widget click deep-link via `HomeWidgetLaunchIntent` — widget record taps emit `vaanix://record` URI to `HomeWidget.widgetClicked` stream
 - `_onWidgetClicked` / `_checkWidgetLaunch` in `main.dart` — routes widget tap URI to `/recording` screen
 - Widget data refresh on app foreground (`didChangeAppLifecycleState` resumed)
 
@@ -249,7 +249,7 @@ All notable changes to this project will be documented in this file.
 - `UserSettings` — added `widgetPrivacyLevel` (HiveField 23, default `'record_only'`)
 - `SettingsRepository` — added `setWidgetPrivacyLevel()`
 - `SettingsState` / `SettingsNotifier` — expose `widgetPrivacyLevel` field and setter
-- `AndroidManifest.xml` — added `VoiceNotesWidgetSmall` and `VoiceNotesWidgetDashboard` widget receivers; added `HOME_WIDGET_LAUNCH_ACTION` intent-filter to MainActivity
+- `AndroidManifest.xml` — added `VaanixWidgetSmall` and `VaanixWidgetDashboard` widget receivers; added `HOME_WIDGET_LAUNCH_ACTION` intent-filter to MainActivity
 - `SecurityPage` — added Widget Privacy picker row (only shown when App Lock enabled); updated info text
 - `main.dart` — `HomeWidgetService.initialize()` on startup; `HomeWidget.widgetClicked` stream listener; widget refresh on resume
 
@@ -257,7 +257,7 @@ All notable changes to this project will be documented in this file.
 - `home_widget: ^0.9.0` — cross-platform home screen widget support
 
 ### Platform Notes
-- **Android:** Fully functional. Add the widget via long-press on home screen → Widgets → VoiceNotes AI.
+- **Android:** Fully functional. Add the widget via long-press on home screen → Widgets → Vaanix.
 - **iOS:** Requires additional Xcode setup (App Group, WidgetKit extension). `HomeWidgetService.initialize()` sets the app group ID; native extension not yet created.
 
 ---
@@ -497,8 +497,8 @@ All notable changes to this project will be documented in this file.
   - Action items, todos, reminders as checkbox lists with strikethrough for completed
   - Project documents with section headers, note reference cards (bordered), image captions
   - Multi-page automatic pagination
-  - Footer: "Shared from VoiceNotes AI"
-- **Email subject line** — `Share.share()` now passes a subject: `"Title — Notes from VoiceNotes AI"` (notes) or `"Title — Project from VoiceNotes AI"` (projects)
+  - Footer: "Shared from Vaanix"
+- **Email subject line** — `Share.share()` now passes a subject: `"Title — Notes from Vaanix"` (notes) or `"Title — Project from Vaanix"` (projects)
 - **Real Quill Delta → Markdown conversion** — `_deltaToMarkdown()` now properly converts bold→`**text**`, italic→`*text*`, headers→`#`/`##`, bullet lists→`- item`
 - **Temp file cleanup** — `SharingService.cleanupTempExports()` runs at app startup to remove leftover .pdf/.md/.txt files from temp directory
 
@@ -803,15 +803,15 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 ## [Unreleased] - 2026-02-27 - About Page
 
 ### Added
-- **About VoiceNotes AI page** — full about screen with app logo, version, description, development credits (HDMPixels + Claude Code), Phase 2 roadmap, "Buy Me a Coffee" support section, legal links (Privacy Policy & Terms), and technical details
-- Accessible from Settings > About > About VoiceNotes AI
+- **About Vaanix page** — full about screen with app logo, version, description, development credits (HDMPixels + Claude Code), Phase 2 roadmap, "Buy Me a Coffee" support section, legal links (Privacy Policy & Terms), and technical details
+- Accessible from Settings > About > About Vaanix
 
 ### Files Added
 - `lib/pages/about_page.dart` — About page
 
 ### Files Modified
 - `lib/nav.dart` — added `/about` route
-- `lib/pages/settings_page.dart` — added "About VoiceNotes AI" item in ABOUT group
+- `lib/pages/settings_page.dart` — added "About Vaanix" item in ABOUT group
 
 ---
 
@@ -1009,7 +1009,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 - **Reminder reschedule** — reschedule any reminder via date/time picker from overflow menu; cancels old notification, schedules new one
 - **Overdue highlighting** — todos and reminders with past due dates shown in red across all surfaces
 - **OS calendar bridge** — "Also add to Calendar" bottom sheet after creating a reminder; uses `add_2_calendar` to create pre-filled OS calendar event
-- **Reminder destination sheet** — bottom sheet widget offering "Keep in VoiceNotes AI" or "Also add to Calendar" after reminder creation
+- **Reminder destination sheet** — bottom sheet widget offering "Keep in Vaanix" or "Also add to Calendar" after reminder creation
 - **Collapsible tasks in Project Documents** — note reference blocks now show a collapsible "Tasks" sub-section with interactive checkboxes for the linked note's todos and actions
 - **Task count summary** — collapsed state shows "N tasks (M completed)" in note reference blocks
 - **TaskItem view model** — `lib/models/task_item.dart` with `TaskType` enum (todo/action/reminder) for aggregated tasks
@@ -1283,7 +1283,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 
 ### Changed
 - Replaced manual header Rows with proper AppBar widgets on Home, Folders, and Folder Detail pages
-- Home page: AppBar with "My Notes" title, "VoiceNotes AI" subtitle, settings icon action
+- Home page: AppBar with "My Notes" title, "Vaanix" subtitle, settings icon action
 - Folders page: AppBar with "Library" title, "Your folders" subtitle, back button, search action
 - Folder Detail page: AppBar with folder name title, note count subtitle, back button, search + popup menu actions
 - Reduced top spacing across pages — AppBar handles SafeArea automatically for more compact headers
@@ -1333,7 +1333,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 - Removed cloud sync from MVP scope (moved to Phase 2)
 
 ### Added
-- Product Concept Document (`documents/voicenotes-ai-concept.md`)
+- Product Concept Document (`documents/vaanix-concept.md`) *(removed — superseded by PROJECT_SPECIFICATION.md)*
 - Implementation Plan (`documents/IMPLEMENTATION_PLAN.md`) — 8-step roadmap
 - CLAUDE.md agent reference file at project root
 - "Not In Use" header comment on `lib/pages/login_page.dart`
@@ -1352,7 +1352,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 ### Added
 
 #### Project Setup
-- Initialized Flutter project (`voicenotes_ai`) with Dart SDK ^3.6.0
+- Initialized Flutter project (`vaanix`) with Dart SDK ^3.6.0
 - Configured Material Design 3 with custom theme system
 - Set up Android, iOS, Web, macOS, Linux, and Windows platform targets
 - Added `.gitignore` and `analysis_options.yaml`
@@ -1399,7 +1399,7 @@ The Whisper `base` model (74M parameters) cannot reliably output non-Latin scrip
 - Web: PWA manifest and icons
 
 ### Known Issues
-- Android app label reads "dreamflow" instead of "VoiceNotes AI"
+- Android app label reads "dreamflow" instead of "Vaanix"
 - `main.dart` app title is empty string
 - Provider state management dependency needs replacement with Riverpod/Bloc
 - All screens are UI shells only — no functional business logic connected

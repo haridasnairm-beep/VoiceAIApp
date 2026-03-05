@@ -30,10 +30,10 @@ class SharingService {
   // ---------------------------------------------------------------------------
 
   static String noteSubject(String title) =>
-      '$title — Notes from VoiceNotes AI';
+      '$title — Notes from Vaanix';
 
   static String documentSubject(String title) =>
-      '$title — Project from VoiceNotes AI';
+      '$title — Project from Vaanix';
 
   // ---------------------------------------------------------------------------
   // Text assembly — Notes
@@ -65,7 +65,7 @@ class SharingService {
 
     _appendActionsAndTasks(buffer, note);
 
-    buffer.writeln('— Shared from VoiceNotes AI');
+    buffer.writeln('— Shared from Vaanix');
     return buffer.toString().trimRight();
   }
 
@@ -136,7 +136,7 @@ class SharingService {
       }
     }
 
-    buffer.writeln('— Shared from VoiceNotes AI');
+    buffer.writeln('— Shared from Vaanix');
     return buffer.toString().trimRight();
   }
 
@@ -232,7 +232,7 @@ class SharingService {
       margin: const pw.EdgeInsets.all(40),
       footer: (context) => pw.Container(
         alignment: pw.Alignment.centerRight,
-        child: pw.Text('Shared from VoiceNotes AI',
+        child: pw.Text('Shared from Vaanix',
             style: pw.TextStyle(
                 fontSize: 8,
                 color: PdfColors.grey500,
@@ -299,7 +299,7 @@ class SharingService {
       margin: const pw.EdgeInsets.all(40),
       footer: (context) => pw.Container(
         alignment: pw.Alignment.centerRight,
-        child: pw.Text('Shared from VoiceNotes AI',
+        child: pw.Text('Shared from Vaanix',
             style: pw.TextStyle(
                 fontSize: 8,
                 color: PdfColors.grey500,
@@ -933,7 +933,7 @@ class SharingService {
       }
     }
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/voicenotes_tasks.csv');
+    final file = File('${dir.path}/vaanix_tasks.csv');
     await file.writeAsString(buf.toString());
     return file;
   }
@@ -954,7 +954,7 @@ class SharingService {
     };
     final json = const JsonEncoder.withIndent('  ').convert(data);
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/voicenotes_export.json');
+    final file = File('${dir.path}/vaanix_export.json');
     await file.writeAsString(json);
     return file;
   }

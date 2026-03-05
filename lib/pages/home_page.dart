@@ -140,7 +140,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ),
                   ),
                   Text(
-                    'VoiceNotes AI',
+                    'Vaanix',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.secondary,
                         ),

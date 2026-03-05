@@ -1,4 +1,4 @@
-package com.hariappbuilders.voicenotesai
+package com.vaanix.app
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
@@ -15,7 +15,7 @@ import es.antonborri.home_widget.HomeWidgetProvider
  * Content displayed depends on App Lock + Widget Privacy settings
  * (written by HomeWidgetService via home_widget SharedPreferences).
  */
-class VoiceNotesWidgetDashboard : HomeWidgetProvider() {
+class VaanixWidgetDashboard : HomeWidgetProvider() {
 
     override fun onUpdate(
         context: Context,
@@ -48,7 +48,7 @@ class VoiceNotesWidgetDashboard : HomeWidgetProvider() {
             val recordIntent = HomeWidgetLaunchIntent.getActivity(
                 context,
                 MainActivity::class.java,
-                Uri.parse("voicenotesai://record"),
+                Uri.parse("vaanix://record"),
             )
             views.setOnClickPendingIntent(R.id.widget_record_btn, recordIntent)
 

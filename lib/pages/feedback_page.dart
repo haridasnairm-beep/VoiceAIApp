@@ -37,7 +37,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
       return;
     }
 
-    final subject = 'VoiceNotes AI Feedback: $_selectedCategory';
+    final subject = 'Vaanix Feedback: $_selectedCategory';
     final body = 'Category: $_selectedCategory\n\n$text';
 
     // Open share sheet so user can pick email client

@@ -1,21 +1,21 @@
-# VoiceNotes AI — Feature Spec: External Recorder Import (Pro)
+# Vaanix — Feature Spec: External Recorder Import (Pro)
 
 **Version:** 1.0
 **Date:** 2026-02-27
 **Status:** Draft — Pending Option Selection
 **Phase:** Phase 2 (Pro Feature)
 **Tier:** Pro Users Only
-**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md)
+**Reference:** [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
 ---
 
 ## 1. Feature Overview
 
-**External Recorder Import** allows pro users to import audio files recorded on standalone voice recorder devices (such as Sony ICD, Zoom, Olympus, TASCAM, Philips VoiceTracer) into VoiceNotes AI for transcription, structuring, and organization — the same AI pipeline applied to in-app recordings.
+**External Recorder Import** allows pro users to import audio files recorded on standalone voice recorder devices (such as Sony ICD, Zoom, Olympus, TASCAM, Philips VoiceTracer) into Vaanix for transcription, structuring, and organization — the same AI pipeline applied to in-app recordings.
 
-**Core Concept:** Users record voice notes on a dedicated recorder device throughout their day — during meetings, commutes, fieldwork, or any situation where pulling out a phone isn't practical. Later, at their convenience, they transfer the audio files to their phone and import them into VoiceNotes AI. The app processes each file through the full AI pipeline: transcription, language detection, and intelligent structuring into todos, actions, reminders, and notes.
+**Core Concept:** Users record voice notes on a dedicated recorder device throughout their day — during meetings, commutes, fieldwork, or any situation where pulling out a phone isn't practical. Later, at their convenience, they transfer the audio files to their phone and import them into Vaanix. The app processes each file through the full AI pipeline: transcription, language detection, and intelligent structuring into todos, actions, reminders, and notes.
 
-**Why this matters:** Professional users — journalists, researchers, medical professionals, field workers, students in lectures — often prefer dedicated recording hardware for superior microphone quality, longer battery life, and distraction-free capture. This feature bridges the gap between professional recording workflows and VoiceNotes AI's intelligent structuring capabilities.
+**Why this matters:** Professional users — journalists, researchers, medical professionals, field workers, students in lectures — often prefer dedicated recording hardware for superior microphone quality, longer battery life, and distraction-free capture. This feature bridges the gap between professional recording workflows and Vaanix's intelligent structuring capabilities.
 
 **Why Pro-only:** External recorder import serves a specific power-user segment. It involves heavier AI processing (longer recordings, batch imports) and adds complexity that casual users don't need. Positioning it as a Pro feature reinforces the premium tier's value proposition without restricting core functionality.
 
@@ -54,7 +54,7 @@
 
 ## 3. User Stories
 
-1. **As a pro user**, I want to import an audio file from my phone's storage into VoiceNotes AI so that it gets transcribed and structured like a regular voice note.
+1. **As a pro user**, I want to import an audio file from my phone's storage into Vaanix so that it gets transcribed and structured like a regular voice note.
 2. **As a pro user**, I want to import multiple audio files at once (batch import) so I can process a full day's recordings in one go.
 3. **As a pro user**, I want to see the import progress for each file so I know what's been processed and what's pending.
 4. **As a pro user**, I want the app to preserve the original recording date/time from the file metadata so my notes are correctly timestamped.
@@ -75,7 +75,7 @@ This section outlines three implementation approaches. **Only one will be select
 
 ### Option A: Manual File Import (Recommended for Initial Build)
 
-**How it works:** User transfers audio files from recorder to phone (via USB cable, SD card reader, AirDrop, or file manager). Then opens VoiceNotes AI and uses an "Import Recording" action to pick files from device storage.
+**How it works:** User transfers audio files from recorder to phone (via USB cable, SD card reader, AirDrop, or file manager). Then opens Vaanix and uses an "Import Recording" action to pick files from device storage.
 
 **User flow:**
 ```
@@ -88,7 +88,7 @@ This section outlines three implementation approaches. **Only one will be select
     ├── Wired file transfer via computer as intermediary
     └── Files app (iOS) / File Manager (Android)
     ↓
-[Open VoiceNotes AI]
+[Open Vaanix]
     ↓
 [Tap "Import Recording" on Home screen or FAB menu]
     ↓
@@ -131,13 +131,13 @@ This section outlines three implementation approaches. **Only one will be select
 
 ### Option B: Bluetooth / WiFi Transfer from Smart Recorders
 
-**How it works:** Certain modern recorders (Olympus WS-883, Philips DVT6110, etc.) have Bluetooth or WiFi built in and offer companion apps or open transfer protocols. VoiceNotes AI could receive files directly from these devices.
+**How it works:** Certain modern recorders (Olympus WS-883, Philips DVT6110, etc.) have Bluetooth or WiFi built in and offer companion apps or open transfer protocols. Vaanix could receive files directly from these devices.
 
 **User flow:**
 ```
 [Record on Bluetooth/WiFi-enabled device]
     ↓
-[On phone: Open VoiceNotes AI → "Connect Recorder" in settings]
+[On phone: Open Vaanix → "Connect Recorder" in settings]
     ↓
 [App scans for available devices via Bluetooth / WiFi Direct]
     ↓
@@ -184,7 +184,7 @@ This section outlines three implementation approaches. **Only one will be select
 
 ### Option C: Watched Folder / Cloud Folder Sync
 
-**How it works:** User configures a folder on their device (or a cloud storage folder like Google Drive, Dropbox, iCloud) as a "watch folder." VoiceNotes AI monitors this folder and automatically detects new audio files, offering to import them.
+**How it works:** User configures a folder on their device (or a cloud storage folder like Google Drive, Dropbox, iCloud) as a "watch folder." Vaanix monitors this folder and automatically detects new audio files, offering to import them.
 
 **User flow:**
 ```
@@ -195,7 +195,7 @@ This section outlines three implementation approaches. **Only one will be select
     ├── User manually drops files into local folder
     └── Computer → cloud sync → phone
     ↓
-[VoiceNotes AI detects new audio files in watched folder]
+[Vaanix detects new audio files in watched folder]
     ↓
 [Notification: "3 new recordings found. Import?"]
     ↓
@@ -301,7 +301,7 @@ ImportError
 └── timestamp: DateTime
 
 NoteSourceType (enum)
-├── in_app       (recorded within VoiceNotes AI)
+├── in_app       (recorded within Vaanix)
 └── imported     (imported from external file)
 ```
 
@@ -472,7 +472,7 @@ External recorder import must maintain the same privacy guarantees as in-app rec
 | **File hash privacy** | SHA-256 hashes used for dedup are stored locally only. Never transmitted. |
 
 If **Option C (cloud folder)** is ever implemented, additional privacy disclosures are required:
-- "Audio files in your [cloud provider] folder are downloaded to your device then processed locally. VoiceNotes AI does not store your cloud credentials beyond the active session."
+- "Audio files in your [cloud provider] folder are downloaded to your device then processed locally. Vaanix does not store your cloud credentials beyond the active session."
 - Option to auto-delete files from cloud folder after successful import.
 - Clear notice that cloud provider's own privacy policy applies to files in their storage.
 

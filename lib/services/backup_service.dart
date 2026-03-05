@@ -233,7 +233,7 @@ class BackupService {
     // 8. Write backup file: magic + version + salt + IV + ciphertext
     final ts = DateTime.now();
     final fileName =
-        'voicenotes_backup_${ts.year}${ts.month.toString().padLeft(2, '0')}${ts.day.toString().padLeft(2, '0')}_${ts.hour.toString().padLeft(2, '0')}${ts.minute.toString().padLeft(2, '0')}.vnbak';
+        'vaanix_backup_${ts.year}${ts.month.toString().padLeft(2, '0')}${ts.day.toString().padLeft(2, '0')}_${ts.hour.toString().padLeft(2, '0')}${ts.minute.toString().padLeft(2, '0')}.vnbak';
     final tempDir = await getTemporaryDirectory();
     final backupFile = File('${tempDir.path}/$fileName');
 
@@ -250,7 +250,7 @@ class BackupService {
     // 9. Share the file
     await Share.shareXFiles(
       [XFile(backupFile.path, mimeType: 'application/octet-stream')],
-      subject: 'VoiceNotes AI Backup',
+      subject: 'Vaanix Backup',
     );
 
     onProgress?.call('Done!', 1.0);
@@ -416,7 +416,7 @@ class BackupService {
         fileBytes[1] != _magic[1] ||
         fileBytes[2] != _magic[2] ||
         fileBytes[3] != _magic[3]) {
-      throw Exception('Not a valid VoiceNotes backup file.');
+      throw Exception('Not a valid Vaanix backup file.');
     }
 
     // Parse header

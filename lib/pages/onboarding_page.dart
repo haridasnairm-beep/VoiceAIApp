@@ -163,7 +163,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       _GuidePage(
         icon: null,
         useLogoAsset: true,
-        title: 'VoiceNotes AI',
+        title: 'Vaanix',
         subtitle: 'Your voice, perfectly organized.',
         description:
             'Transform your spoken ideas into perfectly organized notes. '
@@ -409,7 +409,7 @@ class _WhisperSetupPageState extends State<_WhisperSetupPage> {
           const SizedBox(height: 20),
           // Description
           Text(
-            'VoiceNotes AI uses an on-device Whisper model for high-quality '
+            'Vaanix uses an on-device Whisper model for high-quality '
             'transcription. Download it once (~140 MB) and all transcription '
             'happens privately on your phone — no internet needed.',
             textAlign: TextAlign.center,

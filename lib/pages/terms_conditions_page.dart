@@ -41,7 +41,7 @@ class TermsConditionsPage extends StatelessWidget {
               ),
               Center(
                 child: Text(
-                  'VOICENOTES AI',
+                  'VAANIX',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.primary,
@@ -83,7 +83,7 @@ class TermsConditionsPage extends StatelessWidget {
               // 1. ACCEPTANCE OF TERMS
               _sectionHeader('1. ACCEPTANCE OF TERMS', headingStyle),
               Text(
-                'By accessing or using VoiceNotes AI ("the App"), you agree to be bound by these '
+                'By accessing or using Vaanix ("the App"), you agree to be bound by these '
                 'Terms & Conditions. These terms apply to all users of the App.',
                 style: bodyStyle,
               ),
@@ -93,7 +93,7 @@ class TermsConditionsPage extends StatelessWidget {
               _sectionHeader('2. LICENSE TO USE', headingStyle),
               Text(
                 'We grant you a limited, non-exclusive, non-transferable, revocable license to use '
-                'VoiceNotes AI for personal, non-commercial purposes in accordance with these Terms.',
+                'Vaanix for personal, non-commercial purposes in accordance with these Terms.',
                 style: bodyStyle,
               ),
               const SizedBox(height: 20),
@@ -106,7 +106,7 @@ class TermsConditionsPage extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               _bulletItem(
-                'VoiceNotes AI, including its source code, design, features, graphics, logo, '
+                'Vaanix, including its source code, design, features, graphics, logo, '
                 'and user interface, is owned by HDMPixels and protected by copyright laws.',
                 bulletStyle,
               ),
@@ -152,7 +152,7 @@ class TermsConditionsPage extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               _bulletItem(
-                'VoiceNotes AI is an original work created by HDMPixels.',
+                'Vaanix is an original work created by HDMPixels.',
                 bulletStyle,
               ),
               _bulletItem(
@@ -170,7 +170,7 @@ class TermsConditionsPage extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               _bulletItem(
-                '"VoiceNotes AI" and the VoiceNotes AI logo are trademarks of HDMPixels.',
+                '"Vaanix" and the Vaanix logo are trademarks of HDMPixels.',
                 bulletStyle,
               ),
               _bulletItem(
@@ -184,7 +184,7 @@ class TermsConditionsPage extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               _bulletItem(
-                'If you believe someone has copied VoiceNotes AI, report to: support@hdmpixels.com',
+                'If you believe someone has copied Vaanix, report to: support@hdmpixels.com',
                 bulletStyle,
               ),
               _bulletItem(
@@ -225,7 +225,7 @@ class TermsConditionsPage extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 '6.3 All local data is stored in your device\'s app-private storage, accessible only '
-                'to VoiceNotes AI and encrypted with AES-256.',
+                'to Vaanix and encrypted with AES-256.',
                 style: bodyStyle,
               ),
               const SizedBox(height: 20),
@@ -233,7 +233,7 @@ class TermsConditionsPage extends StatelessWidget {
               // 7. ON-DEVICE TRANSCRIPTION
               _sectionHeader('7. ON-DEVICE TRANSCRIPTION', headingStyle),
               Text(
-                '7.1 VoiceNotes AI offers two transcription modes: Live Transcription (using your '
+                '7.1 Vaanix offers two transcription modes: Live Transcription (using your '
                 'device\'s built-in speech recognition) and Whisper (using a locally downloaded '
                 'AI model). Both operate entirely on your device.',
                 style: bodyStyle,
@@ -255,7 +255,7 @@ class TermsConditionsPage extends StatelessWidget {
               // 8. NOTIFICATIONS
               _sectionHeader('8. NOTIFICATIONS', headingStyle),
               Text(
-                '8.1 VoiceNotes AI uses local notifications (not push notifications) to deliver '
+                '8.1 Vaanix uses local notifications (not push notifications) to deliver '
                 'reminders you set manually. No notification tokens are sent to any server.',
                 style: bodyStyle,
               ),
@@ -275,7 +275,7 @@ class TermsConditionsPage extends StatelessWidget {
               // 9. MICROPHONE ACCESS
               _sectionHeader('9. MICROPHONE ACCESS', headingStyle),
               Text(
-                '9.1 VoiceNotes AI requests microphone permission to record voice notes. The '
+                '9.1 Vaanix requests microphone permission to record voice notes. The '
                 'microphone is used exclusively for recording audio that is saved locally on your device.',
                 style: bodyStyle,
               ),
@@ -484,7 +484,7 @@ class TermsConditionsPage extends StatelessWidget {
               // 21. ACKNOWLEDGMENT
               _sectionHeader('21. ACKNOWLEDGMENT', headingStyle),
               Text(
-                'BY USING VOICENOTES AI, YOU ACKNOWLEDGE THAT:',
+                'BY USING VAANIX, YOU ACKNOWLEDGE THAT:',
                 style: bodyStyle?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
@@ -529,7 +529,7 @@ class TermsConditionsPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'VoiceNotes AI and the VoiceNotes AI logo are trademarks of HDMPixels.\n\n'
+                      'Vaanix and the Vaanix logo are trademarks of HDMPixels.\n\n'
                       'Unauthorized copying, distribution, or modification is strictly prohibited '
                       'and may result in legal action.',
                       style: theme.textTheme.bodySmall?.copyWith(

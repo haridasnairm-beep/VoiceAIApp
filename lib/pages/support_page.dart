@@ -37,7 +37,7 @@ class SupportPage extends StatelessWidget {
                     iconBg: const Color(0xFFE3F2FD),
                     iconColor: const Color(0xFF1565C0),
                     label: "Quick Guide",
-                    sublabel: "Learn how VoiceNotes AI works",
+                    sublabel: "Learn how Vaanix works",
                     type: SettingsType.chevron,
                     hasSublabel: true,
                     onTap: () {
@@ -63,7 +63,7 @@ class SupportPage extends StatelessWidget {
                     iconBg: const Color(0xFFFFEBEE),
                     iconColor: const Color(0xFFD32F2F),
                     label: "Support Us",
-                    sublabel: "Help keep VoiceNotes AI free & ad-free",
+                    sublabel: "Help keep Vaanix free & ad-free",
                     type: SettingsType.chevron,
                     hasSublabel: true,
                     onTap: () {

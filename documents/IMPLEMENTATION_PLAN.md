@@ -1,9 +1,9 @@
-# VoiceNotes AI - Implementation Plan
+# Vaanix - Implementation Plan
 
 **Version:** 4.0
 **Last Updated:** 2026-03-03
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md) | [Phase 1 Value Gaps](FEATURE_PHASE1_VALUE_GAPS.md) | [UX Audit](UX_PRODUCT_AUDIT.md)
+**Reference:** [Specification](PROJECT_SPECIFICATION.md) | [UX Audit](UX_PRODUCT_AUDIT.md)
 
 ---
 
@@ -332,7 +332,7 @@ Based on comprehensive UX/product audit. Organized into 7 waves, each building o
 #### Tasks:
 1. Add `sentry_flutter` (or `firebase_crashlytics`) dependency
 2. Create `CrashReportingService` — initialize only when opted in
-3. Add opt-in prompt during onboarding (final page): "Help improve VoiceNotes AI by sharing anonymous crash reports. No personal data is ever included."
+3. Add opt-in prompt during onboarding (final page): "Help improve Vaanix by sharing anonymous crash reports. No personal data is ever included."
 4. Add toggle in Preferences page: "Anonymous Crash Reporting"
 5. Store preference in `UserSettings.crashReportingEnabled`
 6. Wrap app with error boundary — capture unhandled exceptions and Flutter errors
@@ -564,7 +564,7 @@ Waves 5-7 ship as post-launch updates.
 
 ## Wave 7: Differentiation (Weeks 13-17) — Step 17 ✅ COMPLETE
 
-**Goal:** Features that set VoiceNotes AI apart from competitors. Long-term competitive advantages.
+**Goal:** Features that set Vaanix apart from competitors. Long-term competitive advantages.
 
 ### 17.1 Calendar / Timeline View
 
@@ -640,7 +640,7 @@ TranscriptSegment
 
 #### Tasks:
 1. **Store listing copy:**
-   - Title: "VoiceNotes AI — Voice to Organized Notes"
+   - Title: "Vaanix — Voice to Organized Notes"
    - Short description (80 chars): "Record your voice. Get organized notes. 100% private."
    - Long description: Lead with core value, mention key features (transcription, tasks, folders, privacy), note AI features coming soon
 2. **Screenshots strategy:**

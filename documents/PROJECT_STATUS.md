@@ -1,10 +1,9 @@
-# VoiceNotes AI - Project Status
+# Vaanix - Project Status
 
 **Last Updated:** 2026-03-04
 **Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). **All 7 Phase 1.5 waves complete** (Steps 11–17). Post-wave: Permission Management (Issue #13) + Gesture FAB (Issue #14) + Auto-Naming Preference done. See [FEATURE_PHASE1_VALUE_GAPS.md](FEATURE_PHASE1_VALUE_GAPS.md).
-**Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
-**Reference:** [Concept Document](voicenotes-ai-concept.md) | [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Project Documents Feature Spec](FEATURE_PROJECT_DOCUMENTS.md) | [Tasks & Reminders Feature Spec](FEATURE_TASKS_AND_REMINDERS.md)
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). **All 7 Phase 1.5 waves complete** (Steps 11–17). Post-wave: Permission Management (Issue #13) + Gesture FAB (Issue #14) + Auto-Naming Preference done. **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
+**Reference:** [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
 ---
 
@@ -21,7 +20,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 ## Completed Steps
 
 ### Step 1: Project Alignment & Branding ✅
-- App name changed to "VoiceNotes AI" (Android, iOS, web, main.dart)
+- App name changed to "Vaanix" (Android, iOS, web, main.dart)
 - Login page marked as NOT IN USE
 - Onboarding navigates to Home (not Login)
 - pubspec.yaml cleaned up
@@ -74,7 +73,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Fixed onboarding loop — returning users skip to /home via router redirect
 - Fixed NoteDetailPage back navigation crash (context.canPop check)
 - Fixed ref.watch() anti-pattern — use ref.read() outside build
-- Changed applicationId from `com.mycompany.CounterApp` to `com.hariappbuilders.voicenotesai`
+- Changed applicationId from `com.mycompany.CounterApp` to `com.vaanix.app`
 - Removed dead `WaveformPainter` class
 - Fixed version string (v1.0.0)
 - Replaced hardcoded storage display with real note/folder counts
@@ -187,7 +186,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Dashboard widget (4×2): shows note count, open task count, latest note preview
 - Widget Privacy setting (Security page): Full / Record-Only (default) / Minimal — controls what data is shown when App Lock is enabled
 - `HomeWidgetService` pushes data to widgets on foreground resume
-- Android `VoiceNotesWidgetSmall.kt` + `VoiceNotesWidgetDashboard.kt` (AppWidgetProvider)
+- Android `VaanixWidgetSmall.kt` + `VaanixWidgetDashboard.kt` (AppWidgetProvider)
 
 ### Step 15 (Wave 5): Discoverability & Polish ✅
 - **Overdue task badge** on NoteCard — red badge with overdue count next to pin icon
@@ -288,7 +287,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Share Preview bottom sheet with toggles: Include Title, Include Timestamp, Plain Text Only
 - Live scrollable preview of assembled share text
 - PDF export via `pdf` package (pure Dart, no cloud, ~1.8MB APK increase)
-- Email subject line: "Title — Notes/Project from VoiceNotes AI"
+- Email subject line: "Title — Notes/Project from Vaanix"
 - Real Quill Delta → Markdown conversion (bold, italic, headers, bullets)
 - Shorter separator lines (title-length underscores instead of fixed 30-char)
 - Temp file cleanup at app startup
