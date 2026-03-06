@@ -54,13 +54,21 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       sessionCount: fields[33] == null ? 0 : fields[33] as int,
       noteNamingStyle:
           fields[34] == null ? 'prefix_auto' : fields[34] as String,
+      voiceNoteCounter: fields[35] == null ? 0 : fields[35] as int,
+      textNoteCounter: fields[36] == null ? 0 : fields[36] as int,
+      whisperReadyShown: fields[37] == null ? false : fields[37] as bool,
+      autoBackupEnabled: fields[38] == null ? false : fields[38] as bool,
+      autoBackupFrequency:
+          fields[39] == null ? 'weekly' : fields[39] as String,
+      autoBackupMaxCount: fields[40] == null ? 5 : fields[40] as int,
+      autoBackupLastRun: fields[41] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(35)
+      ..writeByte(42)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -130,7 +138,21 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(33)
       ..write(obj.sessionCount)
       ..writeByte(34)
-      ..write(obj.noteNamingStyle);
+      ..write(obj.noteNamingStyle)
+      ..writeByte(35)
+      ..write(obj.voiceNoteCounter)
+      ..writeByte(36)
+      ..write(obj.textNoteCounter)
+      ..writeByte(37)
+      ..write(obj.whisperReadyShown)
+      ..writeByte(38)
+      ..write(obj.autoBackupEnabled)
+      ..writeByte(39)
+      ..write(obj.autoBackupFrequency)
+      ..writeByte(40)
+      ..write(obj.autoBackupMaxCount)
+      ..writeByte(41)
+      ..write(obj.autoBackupLastRun);
   }
 
   @override

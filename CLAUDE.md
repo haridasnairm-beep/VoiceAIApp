@@ -123,7 +123,7 @@ lib/
 │   ├── todo_item.dart                # Hive model (typeId: 2) — toMap/fromMap
 │   ├── reminder_item.dart            # Hive model (typeId: 3) — toMap/fromMap
 │   ├── folder.dart                   # Hive model (typeId: 4) — includes isDeleted, toMap/fromMap
-│   ├── user_settings.dart            # Hive model (typeId: 5) — HiveFields 0–33, toMap/fromMap
+│   ├── user_settings.dart            # Hive model (typeId: 5) — HiveFields 0–41, toMap/fromMap
 │   ├── project_document.dart         # Hive model (typeId: 6) — toMap/fromMap
 │   ├── project_block.dart            # Hive model (typeId: 7) + BlockType enum (typeId: 9) — toMap/fromMap
 │   ├── transcript_version.dart       # Hive model (typeId: 8) — toMap/fromMap
@@ -235,6 +235,7 @@ lib/
 - **Step 10.7: Local Backup & Restore** ✅ Done (AES-256-CBC encrypted .vnbak archives, passphrase key derivation, full restore)
 - **Permission Management (Issue #13)** ✅ Done (post-onboarding permission page, permissions section in audio settings, permission_handler)
 - **Gesture FAB (Issue #14)** ✅ Done (swipe-up to record, icon crossfade, pulse animation, haptic feedback, subtitle hint label, session count tracking)
+- **Auto-Backup** ✅ Done (scheduled encrypted backups, frequency/retention settings, passphrase in flutter_secure_storage, silent on-launch execution, auto-rotation)
 
 **Phase 2 Steps (future, not in scope):**
 - Whisper API Transcription (cloud-based, higher accuracy)

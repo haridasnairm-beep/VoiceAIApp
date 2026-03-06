@@ -22,16 +22,16 @@ class BackupReminderBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: scheme.tertiaryContainer,
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
         children: [
-          Icon(Icons.backup_rounded,
-              color: scheme.onTertiaryContainer, size: 24),
+          Icon(Icons.shield_rounded,
+              color: scheme.onTertiaryContainer, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

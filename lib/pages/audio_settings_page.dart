@@ -45,7 +45,7 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
     super.initState();
     if (widget.highlightWhisper) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToWhisperSection();
+        _highlightWhisperSection();
       });
     }
   }
@@ -56,20 +56,8 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
     super.dispose();
   }
 
-  Future<void> _scrollToWhisperSection() async {
+  Future<void> _highlightWhisperSection() async {
     await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-
-    final keyContext = _whisperSectionKey.currentContext;
-    if (keyContext != null) {
-      await Scrollable.ensureVisible(
-        keyContext,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-        alignment: 0.3,
-      );
-    }
-
     if (!mounted) return;
     setState(() => _showHighlight = true);
     await Future.delayed(const Duration(milliseconds: 1200));
@@ -201,39 +189,51 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
 
     if (!context.mounted) return;
 
+    final theme = Theme.of(context);
     final picked = await showDialog<String>(
       context: context,
       builder: (ctx) {
-        return SimpleDialog(
+        return AlertDialog(
           title: const Text('Transcription Model'),
-          children: [
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(ctx, 'base'),
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.speed_rounded),
-                title: const Text('Standard (142 MB)'),
-                subtitle: Text(baseDownloaded
-                    ? 'Fast transcription, best for English'
-                    : 'Fast transcription, best for English · Not downloaded'),
+          contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _TranscriptionModeOption(
+                icon: Icons.speed_rounded,
+                title: 'Standard (142 MB)',
+                recommended: false,
+                isSelected: currentModel == 'base',
+                description: baseDownloaded
+                    ? 'Fast transcription, best for English.'
+                    : 'Fast transcription, best for English. Not yet downloaded.',
+                theme: theme,
+                onTap: () => Navigator.pop(ctx, 'base'),
                 trailing: _modelStatusIcon(
                     isSelected: currentModel == 'base',
                     isDownloaded: baseDownloaded),
               ),
-            ),
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(ctx, 'small'),
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.tune_rounded),
-                title: const Text('Enhanced (466 MB)'),
-                subtitle: Text(smallDownloaded
-                    ? 'Better accuracy, supports Hindi & other languages'
-                    : 'Better accuracy, multi-language · Not downloaded'),
+              const SizedBox(height: 10),
+              _TranscriptionModeOption(
+                icon: Icons.tune_rounded,
+                title: 'Enhanced (466 MB)',
+                recommended: true,
+                isSelected: currentModel == 'small',
+                description: smallDownloaded
+                    ? 'Better accuracy, supports Hindi & other languages.'
+                    : 'Better accuracy, multi-language support. Not yet downloaded.',
+                theme: theme,
+                onTap: () => Navigator.pop(ctx, 'small'),
                 trailing: _modelStatusIcon(
                     isSelected: currentModel == 'small',
                     isDownloaded: smallDownloaded),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
             ),
           ],
         );
@@ -291,28 +291,53 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
     if (confirmDownload != true || !context.mounted) return;
 
     // Show animated download experience
-    final success = await showDownloadSheet(context, modelName: picked);
+    final showSplash = !ref.read(settingsProvider).whisperReadyShown;
+    final result = await showDownloadSheet(
+      context,
+      modelName: picked,
+      showReadySplash: showSplash,
+    );
 
-    if (success == true && context.mounted) {
+    if (result != null && result.success && context.mounted) {
       WhisperService.instance.switchModel(picked);
       ref.read(settingsProvider.notifier).setWhisperModel(picked);
       _whisperModelKey.currentState?.refreshStatus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              '${picked == 'small' ? 'Enhanced' : 'Standard'} model downloaded and active.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (showSplash) {
+        ref.read(settingsProvider.notifier).setWhisperReadyShown(true);
+        if (result.wantsUpgrade) {
+          // User wants to download enhanced model — trigger that flow
+          _showModelPicker(context, ref, picked);
+        } else if (!result.goBack) {
+          // Navigate to recording page
+          if (context.mounted) context.push(AppRoutes.recording);
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '${picked == 'small' ? 'Enhanced' : 'Standard'} model downloaded and active.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } else if (context.mounted) {
       _whisperModelKey.currentState?.refreshStatus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Download couldn\'t be completed. Tap on Whisper Model to try again.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (result?.wasPaused == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Download paused. Your progress is saved — resume anytime from Audio Settings.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Download couldn\'t be completed. Tap on Whisper Model to try again.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -629,9 +654,9 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
 
       if (confirmDownload != true || !context.mounted) return;
 
-      final success = await showDownloadSheet(context, modelName: 'small');
+      final result = await showDownloadSheet(context, modelName: 'small');
 
-      if (success == true && context.mounted) {
+      if (result != null && result.success && context.mounted) {
         WhisperService.instance.switchModel('small');
         ref.read(settingsProvider.notifier).setWhisperModel('small');
         ref.read(settingsProvider.notifier).setNoteOutputMode('native');
@@ -644,12 +669,21 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
         );
       } else if (context.mounted) {
         _whisperModelKey.currentState?.refreshStatus();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Download couldn\'t be completed. Tap on Whisper Model to try again.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (result?.wasPaused == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Download paused. Your progress is saved — resume anytime from Audio Settings.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Download couldn\'t be completed. Tap on Whisper Model to try again.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } else {
       // English translation — works on any model
@@ -754,90 +788,50 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
                         ? 'Live'
                         : 'Whisper',
                     hasSublabel: true,
-                    trailing: IconButton(
-                      icon: Icon(
-                        Icons.info_outline_rounded,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      tooltip: 'About transcription modes',
-                      onPressed: () {
-                        showDialog<void>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Transcription Modes'),
-                            content: const SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text('Record & Transcribe (Whisper)',
-                                      style: TextStyle(fontWeight: FontWeight.bold)),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    '• Audio is saved to your device\n'
-                                    '• Transcription runs after you stop recording\n'
-                                    '• Supports audio playback\n'
-                                    '• Higher accuracy, especially for non-English\n'
-                                    '• Works offline — nothing leaves your phone',
-                                  ),
-                                  SizedBox(height: 16),
-                                  Text('Live Transcription',
-                                      style: TextStyle(fontWeight: FontWeight.bold)),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    '• Text appears instantly as you speak\n'
-                                    '• No audio file saved — text only\n'
-                                    '• No playback available\n'
-                                    '• Good for quick capture\n'
-                                    '• Output is always in the speaking language',
-                                  ),
-                                ],
-                              ),
+                    onTap: () async {
+                      final currentMode = settings.transcriptionMode;
+                      final picked = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) {
+                          final dialogTheme = Theme.of(ctx);
+                          return AlertDialog(
+                            title: const Text('Transcription Mode'),
+                            contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _TranscriptionModeOption(
+                                  icon: Icons.mic_rounded,
+                                  title: 'Record & Transcribe',
+                                  recommended: true,
+                                  isSelected: currentMode == 'whisper',
+                                  description:
+                                      'On-device Whisper — nothing leaves your phone. '
+                                      'Higher accuracy, transcription takes a moment after recording. '
+                                      'Audio saved for playback. '
+                                      'Supports English translation for other languages.',
+                                  theme: dialogTheme,
+                                  onTap: () => Navigator.pop(ctx, 'whisper'),
+                                ),
+                                const SizedBox(height: 12),
+                                _TranscriptionModeOption(
+                                  icon: Icons.subtitles_rounded,
+                                  title: 'Live Transcription',
+                                  recommended: false,
+                                  isSelected: currentMode == 'live',
+                                  description:
+                                      'Real-time text while you speak. '
+                                      'No audio file saved — text only. Good for quick capture. '
+                                      'Output is always in the speaking language — no translation.',
+                                  theme: dialogTheme,
+                                  onTap: () => Navigator.pop(ctx, 'live'),
+                                ),
+                              ],
                             ),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx),
-                                child: const Text('Got it'),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    onTap: () async {
-                      final picked = await showDialog<String>(
-                        context: context,
-                        builder: (ctx) {
-                          return SimpleDialog(
-                            title: const Text('Transcription Mode'),
-                            children: [
-                              SimpleDialogOption(
-                                onPressed: () =>
-                                    Navigator.pop(ctx, 'whisper'),
-                                child: const ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: Icon(Icons.mic_rounded),
-                                  title: Text('Record & Transcribe (Recommended)'),
-                                  subtitle: Text(
-                                      'On-device Whisper — nothing leaves your phone. '
-                                      'Higher accuracy, transcription takes a moment after recording. '
-                                      'Audio saved for playback. '
-                                      'Supports English translation for other languages.'),
-                                ),
-                              ),
-                              SimpleDialogOption(
-                                onPressed: () =>
-                                    Navigator.pop(ctx, 'live'),
-                                child: const ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: Icon(Icons.subtitles_rounded),
-                                  title: Text('Live Transcription'),
-                                  subtitle: Text(
-                                      'Real-time text while you speak. '
-                                      'No audio file saved — text only. Good for quick capture. '
-                                      'Output is always in the speaking language — no translation.'),
-                                ),
+                                child: const Text('Cancel'),
                               ),
                             ],
                           );
@@ -882,25 +876,44 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
 
                       if (confirmDownload != true || !context.mounted) return;
 
-                      final success = await showDownloadSheet(context, modelName: 'base');
+                      final result = await showDownloadSheet(
+                        context,
+                        modelName: 'base',
+                        showReadySplash: !ref.read(settingsProvider).whisperReadyShown,
+                      );
 
-                      if (success == true && context.mounted) {
+                      if (result != null && result.success && context.mounted) {
+                        // Mark ready splash as shown
+                        if (!ref.read(settingsProvider).whisperReadyShown) {
+                          ref.read(settingsProvider.notifier).setWhisperReadyShown(true);
+                        }
                         ref.read(settingsProvider.notifier).setTranscriptionMode('whisper');
                         _whisperModelKey.currentState?.refreshStatus();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Whisper model downloaded. Record & Transcribe mode is active.'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+
+                        if (result.wantsUpgrade && context.mounted) {
+                          // User wants the enhanced model — trigger download
+                          _showModelPicker(context, ref, 'base');
+                        } else if (!result.goBack && context.mounted) {
+                          // Navigate to recording page
+                          context.push(AppRoutes.recording);
+                        }
                       } else if (context.mounted) {
                         _whisperModelKey.currentState?.refreshStatus();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Download couldn\'t be completed. Tap on Whisper Model to try again.'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        if (result?.wasPaused == true) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Download paused. Your progress is saved — resume anytime from Audio Settings.'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Download couldn\'t be completed. Tap on Whisper Model to try again.'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
                       }
                     },
                   ),
@@ -1258,6 +1271,99 @@ class _WhisperModelItemState extends State<_WhisperModelItem> {
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TranscriptionModeOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final bool recommended;
+  final bool isSelected;
+  final String description;
+  final ThemeData theme;
+  final VoidCallback onTap;
+  final Widget? trailing;
+
+  const _TranscriptionModeOption({
+    required this.icon,
+    required this.title,
+    required this.recommended,
+    required this.isSelected,
+    required this.description,
+    required this.theme,
+    required this.onTap,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.dividerColor,
+            width: isSelected ? 2 : 1,
+          ),
+          color: isSelected
+              ? theme.colorScheme.primary.withValues(alpha: 0.06)
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: title,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        if (recommended)
+                          TextSpan(
+                            text: '  (Recommended)',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (trailing != null)
+                  trailing!
+                else if (isSelected)
+                  Icon(Icons.check_circle_rounded,
+                      size: 20, color: theme.colorScheme.primary),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              description,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.4,
               ),
             ),
           ],

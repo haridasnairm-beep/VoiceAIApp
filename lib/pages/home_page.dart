@@ -33,6 +33,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _selectionMode = false;
   final Set<String> _selectedNoteIds = {};
   bool _backupReminderDismissed = false;
+  bool _isDialOpen = false;
+  final GlobalKey<GestureFabState> _gestureFabKey = GlobalKey<GestureFabState>();
 
   void _toggleSelection(String noteId) {
     setState(() {
@@ -75,7 +77,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         !settings.guidedRecordingCompleted && notes.isEmpty;
 
     // Backup reminder: show when 10+ notes and never backed up, or backup > 30 days old
+    // Hidden when auto-backup is enabled (auto-backup handles it)
     final showBackupReminder = !_backupReminderDismissed &&
+        !settings.autoBackupEnabled &&
         notes.length >= 10 &&
         (settings.lastBackupDate == null ||
             DateTime.now().difference(settings.lastBackupDate!).inDays > 30);
@@ -88,9 +92,14 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     return PopScope(
-      canPop: !_selectionMode,
+      canPop: !_selectionMode && !_isDialOpen,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _selectionMode) {
+        if (didPop) return;
+        if (_isDialOpen) {
+          _gestureFabKey.currentState?.closeDial();
+          return;
+        }
+        if (_selectionMode) {
           _exitSelectionMode();
         }
       },
@@ -281,6 +290,22 @@ class _HomePageState extends ConsumerState<HomePage> {
                           hasBorder: true,
                         ),
                       ),
+                      if (projects.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _CategoryCard(
+                            icon: Icons.article_rounded,
+                            title: "Projects",
+                            subtitle: "${projects.length}",
+                            backgroundColor:
+                                Theme.of(context).colorScheme.surface,
+                            textColor:
+                                Theme.of(context).colorScheme.onSurface,
+                            iconColor: const Color(0xFF7B1FA2),
+                            hasBorder: true,
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       Expanded(
                         child: _CategoryCard(
@@ -295,6 +320,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                               Theme.of(context).colorScheme.secondary,
                           hasBorder: true,
                           onTap: () => context.push(AppRoutes.folders),
+                          showNavigationHint: true,
                         ),
                       ),
                     ],
@@ -516,8 +542,10 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: GestureFab(
+                  key: _gestureFabKey,
                   sessionCount: settings.sessionCount,
                   showSubtitleHint: settings.sessionCount <= 10,
+                  onDialToggled: (open) => setState(() => _isDialOpen = open),
                   onRecord: () {
                     setState(() => _selectedTab = 0);
                     context.push(AppRoutes.recording);
@@ -540,6 +568,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                       },
                     ),
                     SpeedDialItem(
+                      icon: Icons.article_rounded,
+                      label: 'New Project',
+                      onTap: () {
+                        setState(() => _selectedTab = 0);
+                        _showNewProjectDialog(context, ref);
+                      },
+                    ),
+                    SpeedDialItem(
                       icon: Icons.edit_note_rounded,
                       label: 'Text Note',
                       onTap: () async {
@@ -549,8 +585,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                           isScrollControlled: true,
                           builder: (_) => const TemplatePickerSheet(),
                         );
-                        // null = dismissed (no action), 'blank' = blank note,
-                        // NoteTemplate = template selected
                         if (!mounted) return;
                         if (template == null) return;
                         final extras = <String, dynamic>{
@@ -570,14 +604,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                       onTap: () {
                         setState(() => _selectedTab = 0);
                         context.push(AppRoutes.recording);
-                      },
-                    ),
-                    SpeedDialItem(
-                      icon: Icons.article_rounded,
-                      label: 'New Project',
-                      onTap: () {
-                        setState(() => _selectedTab = 0);
-                        _showNewProjectDialog(context, ref);
                       },
                     ),
                   ],
@@ -1674,6 +1700,7 @@ class _CategoryCard extends StatelessWidget {
   final Color iconColor;
   final bool hasBorder;
   final VoidCallback? onTap;
+  final bool showNavigationHint;
 
   const _CategoryCard({
     required this.icon,
@@ -1684,6 +1711,7 @@ class _CategoryCard extends StatelessWidget {
     required this.iconColor,
     this.hasBorder = false,
     this.onTap,
+    this.showNavigationHint = false,
   });
 
   @override
@@ -1716,11 +1744,21 @@ class _CategoryCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: textColor.withValues(alpha: 0.8),
-                  ),
+            Row(
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: textColor.withValues(alpha: 0.8),
+                      ),
+                ),
+                if (showNavigationHint) ...[
+                  const SizedBox(width: 2),
+                  Icon(Icons.chevron_right_rounded,
+                      size: 14,
+                      color: textColor.withValues(alpha: 0.5)),
+                ],
+              ],
             ),
           ],
         ),

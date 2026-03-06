@@ -126,11 +126,26 @@ class WhisperService {
   /// Active HTTP client for the current download (allows cancellation).
   HttpClient? _activeHttpClient;
 
-  /// Cancel any in-progress download.
+  /// Cancel any in-progress download (partial file kept for resume).
   void cancelDownload() {
     _activeHttpClient?.close(force: true);
     _activeHttpClient = null;
-    debugPrint('WhisperService: download cancelled');
+    debugPrint('WhisperService: download cancelled (partial file kept)');
+  }
+
+  /// Delete partial download (.tmp file) for a model.
+  /// Use after cancel to fully remove progress so next download starts fresh.
+  Future<void> deletePartialDownload(String modelName) async {
+    try {
+      final modelDir = await _getModelDir();
+      final tempFile = File('$modelDir/${modelFileName(modelName)}.tmp');
+      if (tempFile.existsSync()) {
+        await tempFile.delete();
+        debugPrint('WhisperService: partial download deleted for $modelName');
+      }
+    } catch (e) {
+      debugPrint('WhisperService: deletePartialDownload failed: $e');
+    }
   }
 
   /// Download a specific model with a progress callback.

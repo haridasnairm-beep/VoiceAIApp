@@ -109,6 +109,27 @@ class UserSettings extends HiveObject {
   @HiveField(34, defaultValue: 'prefix_auto')
   String noteNamingStyle; // 'prefix_only', 'prefix_auto', 'auto_only'
 
+  @HiveField(35, defaultValue: 0)
+  int voiceNoteCounter; // Persistent auto-increment counter for voice notes (V1, V2, ...)
+
+  @HiveField(36, defaultValue: 0)
+  int textNoteCounter; // Persistent auto-increment counter for text notes (T1, T2, ...)
+
+  @HiveField(37, defaultValue: false)
+  bool whisperReadyShown; // True once the post-download "ready" splash has been displayed
+
+  @HiveField(38, defaultValue: false)
+  bool autoBackupEnabled; // Whether automatic backups are enabled
+
+  @HiveField(39, defaultValue: 'weekly')
+  String autoBackupFrequency; // 'daily', 'every3days', 'weekly'
+
+  @HiveField(40, defaultValue: 5)
+  int autoBackupMaxCount; // Max number of auto-backup files to keep (3, 5, 10)
+
+  @HiveField(41)
+  DateTime? autoBackupLastRun; // When the last auto-backup was performed
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -145,6 +166,13 @@ class UserSettings extends HiveObject {
     this.fabSwipeHintShownCount = 0,
     this.sessionCount = 0,
     this.noteNamingStyle = 'prefix_auto',
+    this.voiceNoteCounter = 0,
+    this.textNoteCounter = 0,
+    this.whisperReadyShown = false,
+    this.autoBackupEnabled = false,
+    this.autoBackupFrequency = 'weekly',
+    this.autoBackupMaxCount = 5,
+    this.autoBackupLastRun,
   })  : dismissedTips = dismissedTips ?? [];
 
   Map<String, dynamic> toMap() => {
@@ -183,6 +211,13 @@ class UserSettings extends HiveObject {
         'fabSwipeHintShownCount': fabSwipeHintShownCount,
         'sessionCount': sessionCount,
         'noteNamingStyle': noteNamingStyle,
+        'voiceNoteCounter': voiceNoteCounter,
+        'textNoteCounter': textNoteCounter,
+        'whisperReadyShown': whisperReadyShown,
+        'autoBackupEnabled': autoBackupEnabled,
+        'autoBackupFrequency': autoBackupFrequency,
+        'autoBackupMaxCount': autoBackupMaxCount,
+        'autoBackupLastRun': autoBackupLastRun?.toIso8601String(),
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -223,5 +258,14 @@ class UserSettings extends HiveObject {
         fabSwipeHintShownCount: m['fabSwipeHintShownCount'] as int? ?? 0,
         sessionCount: m['sessionCount'] as int? ?? 0,
         noteNamingStyle: m['noteNamingStyle'] as String? ?? 'prefix_auto',
+        voiceNoteCounter: m['voiceNoteCounter'] as int? ?? 0,
+        textNoteCounter: m['textNoteCounter'] as int? ?? 0,
+        whisperReadyShown: m['whisperReadyShown'] as bool? ?? false,
+        autoBackupEnabled: m['autoBackupEnabled'] as bool? ?? false,
+        autoBackupFrequency: m['autoBackupFrequency'] as String? ?? 'weekly',
+        autoBackupMaxCount: m['autoBackupMaxCount'] as int? ?? 5,
+        autoBackupLastRun: m['autoBackupLastRun'] != null
+            ? DateTime.parse(m['autoBackupLastRun'] as String)
+            : null,
       );
 }

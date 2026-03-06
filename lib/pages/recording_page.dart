@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:vaanix/nav.dart';
 import 'package:vaanix/providers/settings_provider.dart';
 import 'package:vaanix/services/audio_recorder_service.dart';
@@ -14,6 +12,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:vaanix/theme.dart';
 import 'package:vaanix/providers/notes_provider.dart';
 import 'package:vaanix/providers/folders_provider.dart';
+import 'package:vaanix/providers/project_documents_provider.dart';
 import 'package:vaanix/utils/profanity_filter.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
@@ -38,7 +37,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
   Duration _elapsed = Duration.zero;
   bool _isStarting = true;
   bool _isPaused = false;
-  String? _activePath;
+
 
   // Mode: true = whisper (record then transcribe), false = live STT
   bool _useWhisperMode = false;
@@ -49,8 +48,9 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
   String _detectedLanguage = '';
   bool _speechAvailable = false;
 
-  // Folder selection (whisper mode)
+  // Folder & project selection
   String? _selectedFolderId;
+  String? _selectedProjectId;
 
   // UI feedback state
   bool _isSaving = false;
@@ -228,7 +228,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
       }
 
       setState(() {
-        _activePath = path;
         _isStarting = false;
       });
       _startTimer();
@@ -252,15 +251,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         }
         final langCode = settings.defaultLanguage;
         await _transcription.startListening(localeId: _mapToLocaleId(langCode));
-
-        // Create a placeholder audio file path for the note
-        final appDir = await getApplicationDocumentsDirectory();
-        final recordingsDir = Directory('${appDir.path}/recordings');
-        if (!await recordingsDir.exists()) {
-          await recordingsDir.create(recursive: true);
-        }
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        _activePath = '${recordingsDir.path}/voicenote_$timestamp.m4a';
 
         if (!mounted) return;
         setState(() {
@@ -293,7 +283,6 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         }
 
         setState(() {
-          _activePath = path;
           _isStarting = false;
         });
         _startTimer();
@@ -407,6 +396,11 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         ref.read(foldersProvider.notifier).addNoteToFolder(folderId, note.id);
       }
 
+      // Link note to selected project if chosen
+      if (_selectedProjectId != null) {
+        ref.read(projectDocumentsProvider.notifier).addNoteBlock(_selectedProjectId!, note.id);
+      }
+
       // Fire-and-forget background transcription
       // Pass manual selection flags so voice commands don't override user choices
       ref.read(notesProvider.notifier).transcribeInBackground(
@@ -417,19 +411,16 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
           );
 
       if (!mounted) return;
-      // Pop back to previous screen (home/folder) so user can continue
-      if (context.canPop()) {
-        context.pop();
-      } else {
-        context.go(AppRoutes.home);
-      }
+      // Always navigate to home after saving
+      context.go(AppRoutes.home);
     } else {
-      // Live mode: existing behavior
+      // Live mode
       String transcription = '';
-      String? path = _activePath;
+      String? path;
 
       if (_speechAvailable) {
         transcription = await _transcription.stopListening();
+        // No audio file in live STT mode (mic is owned by speech_to_text)
       } else {
         path = await _recorder.stop();
       }
@@ -451,15 +442,31 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         }
       }
 
-      context.pushReplacement(AppRoutes.noteDetail, extra: {
-        'recordingPath': path ?? _activePath,
-        'transcription': transcription,
-        'duration': _elapsed.inSeconds,
-        'detectedLanguage': _transcription.detectedLanguage.isNotEmpty
-            ? _transcription.detectedLanguage
-            : (ref.read(settingsProvider).defaultLanguage ?? 'en'),
-        if (folderId != null) 'folderId': folderId,
-      });
+      // Save note via provider
+      final audioPath = path ?? '';
+      final note = await ref.read(notesProvider.notifier).addNote(
+            audioFilePath: audioPath,
+            audioDurationSeconds: _elapsed.inSeconds,
+            rawTranscription: transcription,
+            detectedLanguage: _transcription.detectedLanguage.isNotEmpty
+                ? _transcription.detectedLanguage
+                : (ref.read(settingsProvider).defaultLanguage ?? 'en'),
+            folderId: folderId,
+          );
+
+      // Add note to selected folder if chosen
+      if (folderId != null) {
+        ref.read(foldersProvider.notifier).addNoteToFolder(folderId, note.id);
+      }
+
+      // Link note to selected project if chosen
+      if (_selectedProjectId != null) {
+        ref.read(projectDocumentsProvider.notifier).addNoteBlock(_selectedProjectId!, note.id);
+      }
+
+      if (!mounted) return;
+      // Always navigate to home after saving
+      context.go(AppRoutes.home);
     }
   }
 
@@ -482,331 +489,329 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         body: SafeArea(
           child: Stack(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: LayoutBuilder(
-                  builder: (context, constraints) => SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                      child: IntrinsicHeight(
-                        child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Top Bar
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          color: Theme.of(context).colorScheme.onSurface,
-                          onPressed: _goBack,
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                                color: Theme.of(context).dividerColor),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+              Column(
+                children: [
+                  // Scrollable content area
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Top Bar
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(
-                                  _useWhisperMode
-                                      ? Icons.mic_rounded
-                                      : Icons.language,
-                                  size: 14,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary),
-                              const SizedBox(width: 4),
-                              Text(
-                                _useWhisperMode
-                                    ? 'Record & Transcribe'
-                                    : languageLabel,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondary,
-                                    ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                color: Theme.of(context).colorScheme.onSurface,
+                                onPressed: _goBack,
                               ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                      color: Theme.of(context).dividerColor),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                        _useWhisperMode
+                                            ? Icons.mic_rounded
+                                            : Icons.language,
+                                        size: 14,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _useWhisperMode
+                                          ? 'Record & Transcribe'
+                                          : languageLabel,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .secondary,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 48),
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 48),
-                      ],
-                    ),
 
-                    const Spacer(),
+                          const SizedBox(height: 16),
 
-                    // Waveform & Timer
-                    Column(
-                      children: [
-                        SizedBox(
-                          height: 120,
-                          child: Center(
-                            child: ValueListenableBuilder<double>(
-                              valueListenable: _recorder.level,
-                              builder: (context, level, _) {
-                                return _WaveformRow(
-                                    level: _isPaused ? 0 : level);
-                              },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        Text(
-                          timerText,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color:
-                                    Theme.of(context).colorScheme.onSurface,
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
-                        if (_isStarting || _isPaused) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            _isStarting ? 'Starting…' : 'Paused',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color:
-                                      Theme.of(context).colorScheme.secondary,
-                                ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                        const SizedBox(height: 8),
-                        Text(
-                          _useWhisperMode
-                              ? 'Audio saved · transcribed after recording'
-                              : 'Instant text as you speak · no audio replay',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-
-                    const Spacer(),
-
-                    // Transcription area
-                    if (_useWhisperMode) ...[
-                      // Compact whisper recording indicator
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(AppRadius.lg),
-                          border: Border.all(
-                              color: Theme.of(context).dividerColor),
-                        ),
-                        child: Row(
-                          children: [
-                            AnimatedBuilder(
-                              animation: _pulseAnimation,
-                              builder: (context, child) => Transform.scale(
-                                scale: _isPaused ? 1.0 : _pulseAnimation.value,
-                                child: child,
-                              ),
-                              child: Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: _isPaused
-                                      ? Theme.of(context).colorScheme.secondary
-                                      : Colors.red,
-                                  shape: BoxShape.circle,
+                          // Waveform & Timer
+                          Column(
+                            children: [
+                              SizedBox(
+                                height: 100,
+                                child: Center(
+                                  child: ValueListenableBuilder<double>(
+                                    valueListenable: _useWhisperMode
+                                        ? _recorder.level
+                                        : _transcription.soundLevel,
+                                    builder: (context, level, _) {
+                                      return _WaveformRow(
+                                          level: _isPaused ? 0 : level);
+                                    },
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Recording audio for Whisper transcription',
+                              const SizedBox(height: 16),
+                              Text(
+                                timerText,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Theme.of(context).colorScheme.onSurface,
+                                    ),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (_isStarting || _isPaused) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  _isStarting ? 'Starting…' : 'Paused',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color:
+                                            Theme.of(context).colorScheme.secondary,
+                                      ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                              const SizedBox(height: 4),
+                              Text(
+                                _useWhisperMode
+                                    ? 'Audio saved · transcribed after recording'
+                                    : 'Instant text as you speak · no audio replay',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
                                     ?.copyWith(
                                       color: Theme.of(context)
                                           .colorScheme
-                                          .secondary,
-                                      fontWeight: FontWeight.w500,
+                                          .onSurfaceVariant,
                                     ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Keep Screen Awake toggle
-                      _buildScreenAwakeToggle(context),
-                      const SizedBox(height: 12),
-                      // Folder & Project selection
-                      _buildFolderSelection(context),
-                    ] else ...[
-                      Container(
-                        height: 240,
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(AppRadius.xl),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                          border: Border.all(
-                              color: Theme.of(context).dividerColor),
-                        ),
-                        child: _buildLiveModeBox(context, hasTranscription),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildScreenAwakeToggle(context),
-                    ],
-
-                    const SizedBox(height: 24),
-
-                    // Controls
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          Column(
-                            children: [
-                              _ActionButton(
-                                icon: _isPaused
-                                    ? Icons.play_arrow_rounded
-                                    : Icons.pause_rounded,
-                                iconColor: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface,
-                                bg: Theme.of(context).colorScheme.surface,
-                                borderColor:
-                                    Theme.of(context).dividerColor,
-                                onTap: _togglePause,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _isPaused ? 'Resume' : 'Pause',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelMedium
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondary,
-                                    ),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
-                          Column(
-                            children: [
-                              Semantics(
-                                label: 'Stop and save recording',
-                                button: true,
-                                child: GestureDetector(
-                                  onTap: _saveAndProcess,
-                                  child: Container(
-                                    width: 84,
-                                    height: 84,
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withValues(alpha: 0.4),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
+
+                          const SizedBox(height: 16),
+
+                          // Transcription area
+                          if (_useWhisperMode) ...[
+                            // Compact whisper recording indicator
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(AppRadius.lg),
+                                border: Border.all(
+                                    color: Theme.of(context).dividerColor),
+                              ),
+                              child: Row(
+                                children: [
+                                  AnimatedBuilder(
+                                    animation: _pulseAnimation,
+                                    builder: (context, child) => Transform.scale(
+                                      scale: _isPaused ? 1.0 : _pulseAnimation.value,
+                                      child: child,
                                     ),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.stop_rounded,
+                                    child: Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: _isPaused
+                                            ? Theme.of(context).colorScheme.secondary
+                                            : Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Recording audio for Whisper transcription',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .secondary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            Container(
+                              height: 220,
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(AppRadius.xl),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                                border: Border.all(
+                                    color: Theme.of(context).dividerColor),
+                              ),
+                              child: _buildLiveModeBox(context, hasTranscription),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          _buildScreenAwakeToggle(context),
+                          const SizedBox(height: 12),
+                          _buildFolderSelection(context),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Fixed bottom controls
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _ActionButton(
+                              icon: _isPaused
+                                  ? Icons.play_arrow_rounded
+                                  : Icons.pause_rounded,
+                              iconColor: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface,
+                              bg: Theme.of(context).colorScheme.surface,
+                              borderColor:
+                                  Theme.of(context).dividerColor,
+                              onTap: _togglePause,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _isPaused ? 'Resume' : 'Pause',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Semantics(
+                              label: 'Stop and save recording',
+                              button: true,
+                              child: GestureDetector(
+                                onTap: _saveAndProcess,
+                                child: Container(
+                                  width: 84,
+                                  height: 84,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
                                         color: Theme.of(context)
                                             .colorScheme
-                                            .onPrimary,
-                                        size: 40,
+                                            .primary
+                                            .withValues(alpha: 0.4),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
                                       ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.stop_rounded,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimary,
+                                      size: 40,
                                     ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Save & Process",
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelMedium
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              _ActionButton(
-                                icon: Icons.delete_outline_rounded,
-                                iconColor:
-                                    Theme.of(context).colorScheme.error,
-                                bg: Theme.of(context).colorScheme.surface,
-                                borderColor:
-                                    Theme.of(context).dividerColor,
-                                onTap: _discard,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Discard",
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelMedium
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondary,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Save & Process",
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _ActionButton(
+                              icon: Icons.delete_outline_rounded,
+                              iconColor:
+                                  Theme.of(context).colorScheme.error,
+                              bg: Theme.of(context).colorScheme.surface,
+                              borderColor:
+                                  Theme.of(context).dividerColor,
+                              onTap: _discard,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Discard",
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              ),
-              ),
-              ),
+                  ),
+                ],
               ),
 
               // Saving overlay
@@ -844,6 +849,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
   }
 
   static const _newFolderSentinel = '__new_folder__';
+  static const _newProjectSentinel = '__new_project__';
 
   Future<void> _showNewFolderDialog() async {
     final controller = TextEditingController();
@@ -877,7 +883,40 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
     }
   }
 
-  /// Folder & Project selection UI for whisper mode
+  Future<void> _showNewProjectDialog() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Project'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Project name'),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name != null && name.isNotEmpty && mounted) {
+      final project = await ref
+          .read(projectDocumentsProvider.notifier)
+          .create(title: name, folderId: _selectedFolderId);
+      setState(() => _selectedProjectId = project.id);
+    }
+  }
+
+  /// Folder & Project selection UI
   Widget _buildScreenAwakeToggle(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final theme = Theme.of(context);
@@ -942,6 +981,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
 
   Widget _buildFolderSelection(BuildContext context) {
     final folders = ref.watch(foldersProvider);
+    final projects = ref.watch(projectDocumentsProvider);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1025,6 +1065,70 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
               ),
             ],
           ),
+          // Project selector
+          Divider(height: 20, color: Theme.of(context).dividerColor),
+          Row(
+            children: [
+              Icon(Icons.description_outlined,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.secondary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedProjectId,
+                    isExpanded: true,
+                    hint: Text(
+                      'No project',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                    dropdownColor: Theme.of(context).colorScheme.surface,
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('No project',
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondary)),
+                      ),
+                      ...projects.map((p) => DropdownMenuItem<String?>(
+                            value: p.id,
+                            child: Text(p.title),
+                          )),
+                      DropdownMenuItem<String?>(
+                        value: _newProjectSentinel,
+                        child: Row(
+                          children: [
+                            Icon(Icons.add,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Text('New Project',
+                                style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.primary)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == _newProjectSentinel) {
+                        _showNewProjectDialog();
+                        return;
+                      }
+                      setState(() => _selectedProjectId = value);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1037,14 +1141,19 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
       children: [
         Row(
           children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: _isPaused
-                    ? Theme.of(context).colorScheme.secondary
-                    : AppColors.lightSuccess,
-                shape: BoxShape.circle,
+            FadeTransition(
+              opacity: _isPaused
+                  ? const AlwaysStoppedAnimation(1.0)
+                  : _pulseAnimation,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: _isPaused
+                      ? Theme.of(context).colorScheme.secondary
+                      : Colors.red,
+                  shape: BoxShape.circle,
+                ),
               ),
             ),
             const SizedBox(width: 8),

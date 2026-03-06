@@ -29,6 +29,7 @@ import '../services/image_attachment_repository.dart';
 import 'image_viewer_page.dart';
 import '../widgets/share_preview_sheet.dart';
 import '../widgets/folder_picker_sheet.dart';
+import '../widgets/folder_color_picker.dart';
 import '../services/haptic_service.dart';
 import '../widgets/tag_pills.dart';
 
@@ -78,6 +79,11 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
   // Version selection mode
   bool _versionSelectionMode = false;
   final Set<String> _selectedVersionIds = {};
+  // Track new text note for empty-content check on back
+  bool _isNewTextNote = false;
+  String? _initialTemplateContent;
+  // Track content at edit start for unsaved changes detection
+  String? _editStartContent;
   // Detail tab (0=Actions, 1=Todos, 2=Reminders, 3=Photos)
   int _detailTab = 0;
 
@@ -105,6 +111,8 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadAudioForNote());
     } else if (widget.isNewTextNote) {
       // Create a new text-only note (no audio), optionally from template
+      _isNewTextNote = true;
+      _initialTemplateContent = widget.templateContent;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final note = await ref.read(notesProvider.notifier).addNote(
               audioFilePath: '',
@@ -122,12 +130,13 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           setState(() {
             _resolvedNoteId = note.id;
             _isEditingTranscription = true;
-            _isEditingTitle = widget.templateContent == null;
+            _isEditingTitle = false;
             _titleController.text = note.title;
             _quillController = QuillController(
               document: doc,
               selection: const TextSelection.collapsed(offset: 0),
             );
+            _editStartContent = doc.toPlainText().trim();
           });
         }
       });
@@ -422,6 +431,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     }
     _quillController!.addListener(_updateWordCount);
     _updateWordCount();
+    _editStartContent = _quillController!.document.toPlainText().trim();
     setState(() => _isEditingTranscription = true);
   }
 
@@ -451,9 +461,15 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
             richContentJson: deltaJson);
     }
 
+    // Apply auto-title for text notes (same logic as voice notes)
+    if (!note.isUserEditedTitle && plainText.isNotEmpty) {
+      ref.read(notesProvider.notifier).applyAutoTitleFromContent(note.id, plainText);
+    }
+
     ref.read(notesProvider.notifier).refresh();
 
     if (mounted) {
+      _editStartContent = null;
       setState(() => _isEditingTranscription = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -519,6 +535,26 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           const SnackBar(content: Text('Note moved to folder')),
         );
       }
+    }
+  }
+
+  Future<void> _showOrganizeSheet(Note note) async {
+    if (!mounted) return;
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (_) => _OrganizeSheet(
+        noteId: note.id,
+        noteFolderId: note.folderId,
+        noteProjectDocumentIds: note.projectDocumentIds,
+      ),
+    );
+    if (changed == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Note organization updated')),
+      );
     }
   }
 
@@ -1018,12 +1054,100 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     }
   }
 
-  void _goBack() {
+  void _goBack() async {
+    // Check for unsaved transcription edits
+    if (_isEditingTranscription && _quillController != null && _editStartContent != null) {
+      final currentContent = _quillController!.document.toPlainText().trim();
+      if (currentContent != _editStartContent) {
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Unsaved Changes'),
+            content: const Text('You have unsaved changes. Do you want to discard them?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Discard'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted) return;
+        if (discard != true) return;
+        _cancelEditTranscription();
+      }
+    }
+
+    // For new text notes, check if content is empty or unchanged from template
+    if (_isNewTextNote && _resolvedNoteId != null) {
+      final note = ref.read(notesProvider).firstWhere(
+            (n) => n.id == _resolvedNoteId,
+            orElse: () => Note(id: '', title: '', audioFilePath: ''),
+          );
+      if (note.id.isNotEmpty) {
+        final hasContent = _hasUserContent(note);
+        if (!hasContent) {
+          final discard = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Discard Empty Note?'),
+              content: const Text('This note has no content. Do you want to discard it?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Keep'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Discard'),
+                ),
+              ],
+            ),
+          );
+          if (!mounted) return;
+          if (discard == true) {
+            await ref.read(notesProvider.notifier).deleteNote(note.id);
+          }
+        }
+      }
+    }
+    if (!mounted) return;
     if (context.canPop()) {
       context.pop();
     } else {
       context.go(AppRoutes.home);
     }
+  }
+
+  /// Check if a text note has user-written content beyond the template.
+  bool _hasUserContent(Note note) {
+    String plainText = '';
+    if (note.contentFormat == 'quill_delta') {
+      try {
+        final json = jsonDecode(note.rawTranscription) as List;
+        plainText = Document.fromJson(json).toPlainText().trim();
+      } catch (_) {
+        plainText = note.rawTranscription.trim();
+      }
+    } else {
+      plainText = note.rawTranscription.trim();
+    }
+
+    // Blank note: no content at all
+    if (plainText.isEmpty) return false;
+
+    // Template note: content unchanged from original template
+    if (_initialTemplateContent != null &&
+        _initialTemplateContent!.isNotEmpty &&
+        plainText == _initialTemplateContent!.trim()) {
+      return false;
+    }
+
+    return true;
   }
 
   void _exitVersionSelectionMode() {
@@ -1165,7 +1289,12 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     final sortedVersions = versions.toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_isNewTextNote && !_isEditingTranscription,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goBack();
+      },
+      child: Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: _versionSelectionMode
           ? AppBar(
@@ -1825,34 +1954,6 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                     ),
                   ],
                 ),
-              )
-            else if (note.audioFilePath.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.subtitles_rounded,
-                          size: 18, color: theme.colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Live transcription note — no audio saved. '
-                          'Switch to Whisper mode to record audio with playback.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
 
             const SizedBox(height: 20),
@@ -1991,87 +2092,125 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
             }),
             const SizedBox(height: 20),
 
-            // === USAGE SECTION ===
-            if (noteFolders.isNotEmpty || noteProjects.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _SectionHeader(
-                      icon: Icons.bookmark_rounded,
-                      title: 'Usage',
-                      color: theme.colorScheme.secondary,
-                    ),
-                    Container(
+            // === ORGANIZE SECTION ===
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _SectionHeader(
+                    icon: Icons.bookmark_rounded,
+                    title: 'Organize',
+                    color: theme.colorScheme.secondary,
+                  ),
+                  InkWell(
+                    onTap: () => _showOrganizeSheet(note),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surface,
                         borderRadius: BorderRadius.circular(AppRadius.md),
                         border: Border.all(color: theme.dividerColor),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (noteFolders.isNotEmpty) ...[
-                            Row(
+                      child: noteFolders.isEmpty && noteProjects.isEmpty
+                          ? Row(
                               children: [
-                                Icon(Icons.folder_rounded,
-                                    size: 16,
-                                    color: const Color(0xFF1565C0)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Wrap(
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: noteFolders
-                                        .map((f) => _UsageChip(
-                                              label: f.name,
-                                              bgColor:
-                                                  const Color(0xFFE3F2FD),
-                                              textColor:
-                                                  const Color(0xFF1565C0),
-                                            ))
-                                        .toList(),
+                                Icon(Icons.add_circle_outline_rounded,
+                                    size: 20,
+                                    color: theme.colorScheme.primary),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Add to folder or project',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
                                   ),
+                                ),
+                                const Spacer(),
+                                Icon(Icons.chevron_right_rounded,
+                                    size: 20, color: theme.hintColor),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (noteFolders.isNotEmpty) ...[
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.folder_rounded,
+                                          size: 16,
+                                          color: Color(0xFF1565C0)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: noteFolders
+                                              .map((f) => _UsageChip(
+                                                    label: f.name,
+                                                    bgColor:
+                                                        const Color(0xFFE3F2FD),
+                                                    textColor:
+                                                        const Color(0xFF1565C0),
+                                                  ))
+                                              .toList(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                if (noteFolders.isNotEmpty &&
+                                    noteProjects.isNotEmpty)
+                                  const SizedBox(height: 10),
+                                if (noteProjects.isNotEmpty) ...[
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.article_rounded,
+                                          size: 16,
+                                          color: Color(0xFF7B1FA2)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: noteProjects
+                                              .map((p) => _UsageChip(
+                                                    label: p.title,
+                                                    bgColor:
+                                                        const Color(0xFFF3E5F5),
+                                                    textColor:
+                                                        const Color(0xFF7B1FA2),
+                                                  ))
+                                              .toList(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Icon(Icons.edit_rounded,
+                                        size: 14,
+                                        color: theme.colorScheme.primary),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Manage',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                          if (noteFolders.isNotEmpty &&
-                              noteProjects.isNotEmpty)
-                            const SizedBox(height: 10),
-                          if (noteProjects.isNotEmpty) ...[
-                            Row(
-                              children: [
-                                Icon(Icons.article_rounded,
-                                    size: 16,
-                                    color: const Color(0xFF7B1FA2)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Wrap(
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: noteProjects
-                                        .map((p) => _UsageChip(
-                                              label: p.title,
-                                              bgColor:
-                                                  const Color(0xFFF3E5F5),
-                                              textColor:
-                                                  const Color(0xFF7B1FA2),
-                                            ))
-                                        .toList(),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
 
             const SizedBox(height: 32),
 
@@ -2101,6 +2240,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           : _SwipeUpRecordFab(
               onRecord: () => context.push(AppRoutes.recording),
             ),
+    ),
     );
   }
 
@@ -2915,6 +3055,321 @@ class _VersionTag extends StatelessWidget {
               fontSize: 10,
               fontWeight: FontWeight.w600,
             ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet for organizing a note into folders and projects.
+class _OrganizeSheet extends ConsumerStatefulWidget {
+  final String noteId;
+  final String? noteFolderId;
+  final List<String> noteProjectDocumentIds;
+
+  const _OrganizeSheet({
+    required this.noteId,
+    required this.noteFolderId,
+    required this.noteProjectDocumentIds,
+  });
+
+  @override
+  ConsumerState<_OrganizeSheet> createState() => _OrganizeSheetState();
+}
+
+class _OrganizeSheetState extends ConsumerState<_OrganizeSheet> {
+  bool _changed = false;
+
+  Future<void> _addToFolder(String folderId) async {
+    await ref
+        .read(foldersProvider.notifier)
+        .addNoteToFolder(folderId, widget.noteId);
+    _changed = true;
+  }
+
+  Future<void> _removeFromFolder(String folderId) async {
+    await ref
+        .read(foldersProvider.notifier)
+        .removeNoteFromFolder(folderId, widget.noteId);
+    _changed = true;
+  }
+
+  Future<void> _addToProject(String projectId) async {
+    await ref
+        .read(projectDocumentsProvider.notifier)
+        .addNoteBlock(projectId, widget.noteId);
+    _changed = true;
+  }
+
+  Future<void> _removeFromProject(String projectId) async {
+    await ref
+        .read(projectDocumentsProvider.notifier)
+        .removeNoteFromProject(projectId, widget.noteId);
+    _changed = true;
+  }
+
+  void _tryClose() {
+    Navigator.of(context).pop(_changed);
+  }
+
+  Future<void> _createNewFolder() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Folder'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Folder name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final n = controller.text.trim();
+              if (n.isNotEmpty) Navigator.of(ctx).pop(n);
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.trim().isNotEmpty) {
+      final folder = await ref
+          .read(foldersProvider.notifier)
+          .addFolder(name: name.trim());
+      await _addToFolder(folder.id);
+    }
+  }
+
+  Future<void> _createNewProject() async {
+    final controller = TextEditingController();
+    final title = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Project'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Project title'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final t = controller.text.trim();
+              if (t.isNotEmpty) Navigator.of(ctx).pop(t);
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    if (title != null && title.trim().isNotEmpty) {
+      final project = await ref
+          .read(projectDocumentsProvider.notifier)
+          .create(title: title.trim());
+      await _addToProject(project.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final allFolders = ref.watch(foldersProvider);
+    final allProjects = ref.watch(projectDocumentsProvider);
+    final folders = allFolders.where((f) => !f.isArchived).toList();
+    final projects = allProjects.where((p) => !p.isDeleted).toList();
+
+    // Which folders contain this note
+    final assignedFolderIds = <String>{};
+    for (final f in folders) {
+      if (f.noteIds.contains(widget.noteId)) assignedFolderIds.add(f.id);
+    }
+
+    // Which projects contain this note (read live from notes provider)
+    final currentNote = ref.watch(notesProvider).where((n) => n.id == widget.noteId).firstOrNull;
+    final assignedProjectIds = (currentNote?.projectDocumentIds ?? widget.noteProjectDocumentIds).toSet();
+
+    return DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        builder: (_, scrollController) => Column(
+          children: [
+            // Drag handle
+            Container(
+              margin: const EdgeInsets.only(top: 8, bottom: 4),
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.hintColor.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  Text('Organize', style: theme.textTheme.titleMedium),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _tryClose,
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
+            ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                // --- FOLDERS ---
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.folder_rounded,
+                          size: 18, color: Color(0xFF1565C0)),
+                      const SizedBox(width: 8),
+                      Text('Folders',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                ListTile(
+                  dense: true,
+                  leading: Icon(Icons.create_new_folder_rounded,
+                      color: theme.colorScheme.primary, size: 20),
+                  title: const Text('New Folder'),
+                  onTap: _createNewFolder,
+                ),
+                if (folders.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    child: Text('No folders yet.',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.hintColor)),
+                  )
+                else
+                  ...folders.map((folder) {
+                    final isAssigned = assignedFolderIds.contains(folder.id);
+                    final fc = folderColor(folder.colorValue);
+                    return ListTile(
+                      dense: true,
+                      leading: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: fc.withValues(alpha: 0.15),
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.sm),
+                        ),
+                        child: Icon(Icons.folder_rounded,
+                            color: fc, size: 18),
+                      ),
+                      title: Text(folder.name),
+                      subtitle: Text(
+                        '${folder.noteIds.length} notes',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.hintColor),
+                      ),
+                      trailing: isAssigned
+                          ? Icon(Icons.check_circle_rounded,
+                              color: theme.colorScheme.primary, size: 22)
+                          : Icon(Icons.radio_button_unchecked_rounded,
+                              color: theme.hintColor, size: 22),
+                      onTap: (isAssigned && assignedFolderIds.length <= 1)
+                          ? null
+                          : () async {
+                              if (isAssigned) {
+                                await _removeFromFolder(folder.id);
+                              } else {
+                                await _addToFolder(folder.id);
+                              }
+                            },
+                    );
+                  }),
+
+                const Divider(height: 24),
+
+                // --- PROJECTS ---
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.article_rounded,
+                          size: 18, color: Color(0xFF7B1FA2)),
+                      const SizedBox(width: 8),
+                      Text('Projects',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                ListTile(
+                  dense: true,
+                  leading: Icon(Icons.add_circle_outline_rounded,
+                      color: theme.colorScheme.primary, size: 20),
+                  title: const Text('New Project'),
+                  onTap: _createNewProject,
+                ),
+                if (projects.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    child: Text('No projects yet.',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.hintColor)),
+                  )
+                else
+                  ...projects.map((project) {
+                    final isAssigned =
+                        assignedProjectIds.contains(project.id);
+                    return ListTile(
+                      dense: true,
+                      leading: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7B1FA2)
+                              .withValues(alpha: 0.12),
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.sm),
+                        ),
+                        child: const Icon(Icons.article_rounded,
+                            color: Color(0xFF7B1FA2), size: 18),
+                      ),
+                      title: Text(project.title),
+                      trailing: isAssigned
+                          ? Icon(Icons.check_circle_rounded,
+                              color: theme.colorScheme.primary, size: 22)
+                          : Icon(Icons.radio_button_unchecked_rounded,
+                              color: theme.hintColor, size: 22),
+                      onTap: () async {
+                        if (isAssigned) {
+                          await _removeFromProject(project.id);
+                        } else {
+                          await _addToProject(project.id);
+                        }
+                      },
+                    );
+                  }),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

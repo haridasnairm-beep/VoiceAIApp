@@ -32,6 +32,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
   bool _biometricAvailable = false;
   Timer? _lockoutTimer;
   Duration? _lockoutRemaining;
+  bool _unlockSuccess = false;
 
   String? _pinHash;
   bool _biometricEnabled = false;
@@ -61,7 +62,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
       _checkBiometricAvailability();
     } else {
       // No lock — auto-navigate after splash
-      Timer(const Duration(seconds: 5), () {
+      Timer(const Duration(seconds: 2), () {
         if (mounted) _navigateForward();
       });
     }
@@ -119,7 +120,9 @@ class _SplashPageState extends ConsumerState<SplashPage>
       print('Splash biometric: didAuth=$didAuth');
       if (didAuth && mounted) {
         AppLockService.instance.unlock();
-        _navigateForward();
+        setState(() => _unlockSuccess = true);
+        await Future.delayed(const Duration(milliseconds: 400));
+        if (mounted) _navigateForward();
       }
     } catch (e) {
       print('Splash biometric error: $e');
@@ -160,6 +163,9 @@ class _SplashPageState extends ConsumerState<SplashPage>
 
     if (isValid) {
       AppLockService.instance.unlock();
+      setState(() => _unlockSuccess = true);
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
       _navigateForward();
     } else {
       final lockoutDuration = AppLockService.instance.recordFailedAttempt();

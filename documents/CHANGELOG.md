@@ -4,6 +4,114 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-06 - Download UX & Transcription Mode Redesign
+
+### Added
+- **Download pause/resume** — Whisper model download sheet now supports pause (keeps partial file) and cancel (deletes partial file with confirmation)
+  - Back button triggers pause instead of being blocked
+  - Info tile: "Need to record urgently? Pause the download and use Live mode."
+  - Cancel shows confirmation dialog warning about losing progress
+  - `wasPaused` field added to `DownloadSheetResult`
+  - `deletePartialDownload()` added to `WhisperService`
+  - All callers updated with pause-aware snackbar messages
+
+- **Organize section in Note Detail** — replaced static "Usage" display with always-visible interactive "Organize" section
+  - Shows current folder/project assignments with colored chips
+  - Tapping opens bottom sheet to add/remove note from folders and projects
+  - Create new folder or project directly from the sheet
+  - Toggle folders on/off; add note blocks to projects
+  - "Manage" hint shown when note already has assignments
+
+- **GestureFab on Library & Folder Detail pages** — swipe-up to record, speed dial with New Folder/Project, Text Note, Search
+  - Folder Detail FAB positioned above Android navigation bar
+- **Home page statistics** — added Projects count card (Notes → Projects → Folders order); Folders card shows chevron navigation hint
+- **Folder Detail statistics** — added Projects count chip (Audio → Notes → Projects order)
+- **Folder Detail "All" view** — unified timeline merging notes and projects by date (no separate sections)
+- **Transcription model popup redesigned** — card-style tiles matching transcription mode popup style
+- **"Vaanix is Ready" page** — added "Go Back" button to return to previous screen without opening recording
+- **Splash screen** — reduced no-lock display time to 2 seconds (was 5); added 400ms success pause after app lock validation
+
+### Changed
+- **Transcription mode popup redesigned** — replaced `SimpleDialog` + `ListTile` with `AlertDialog` + card-style option tiles
+  - Icon + bold title on same row, description below spanning full width
+  - Active mode shows checkmark and highlighted border
+  - "(Recommended)" tag on Whisper option
+  - Cancel button at bottom
+- **Removed transcription info button** — the ℹ️ button next to Transcription setting removed since full details are now in the selection popup itself
+
+---
+
+## [Unreleased] - 2026-03-05 - Auto-Backup Feature
+
+### Added
+- **Auto-backup** — scheduled automatic encrypted backups with configurable frequency and retention
+  - New HiveFields 38–41: `autoBackupEnabled`, `autoBackupFrequency`, `autoBackupMaxCount`, `autoBackupLastRun`
+  - Passphrase stored securely via `flutter_secure_storage` (never in Hive)
+  - Frequency options: Daily, Every 3 days, Weekly
+  - Retention: keep last 3, 5, or 10 auto-backup files
+  - Runs silently on app launch when interval has elapsed
+  - Auto-rotates oldest backup files beyond max count
+  - Saves to app-internal `auto_backups/` directory (not shared)
+  - Change passphrase dialog accessible from Backup & Restore page
+  - Backup reminder banner auto-hides when auto-backup is enabled
+- **Auto Backup UI section** in Backup & Restore page — toggle, frequency picker, retention picker, passphrase management, next backup indicator
+- `BackupService.runAutoBackup()` — silent local backup method (no share sheet)
+- `BackupService.getAutoBackupFiles()` — list existing auto-backup files
+
+### Changed
+- Backup & Restore page reorganized: Auto Backup section at top, then manual Create Backup, then Restore
+- Create Backup section icon changed from cloud to `upload_file_rounded`
+- Backup reminder banner now hidden when auto-backup is enabled
+- Backup & Restore page sections now collapsible (ExpansionTile in Card) — Auto Backup expanded by default, Create Backup and Restore Backup collapsed
+
+---
+
+## [Unreleased] - 2026-03-05 - UX Fixes, Auto-Title Sanitization & Live Waveform
+
+### Added
+- **Empty text note discard prompt** — when navigating back from a new text note with no content (or unchanged template content), user is prompted to discard instead of auto-saving an empty note
+  - `PopScope` wrapper intercepts Android back button
+  - `_hasUserContent()` helper checks for empty or unchanged template content
+- **Text note auto-naming** — text notes now use the same auto-naming logic as voice notes (prefix + auto-title from content)
+  - `applyAutoTitleFromContent()` method in `NotesNotifier`
+  - Auto-title applied on save when content is non-empty and title hasn't been manually edited
+- **Auto-title sanitization** — `TitleGeneratorService` now strips special characters (commas, semicolons, brackets, etc.) and collapses multiple spaces
+  - `_unsafeChars` regex, `_multiSpace` regex, `_sanitize()` method
+  - Max title length reduced from 60 to 40 characters
+
+### Fixed
+- **SpeedDial FAB alignment** — overlay FAB and menu items no longer shift right when speed dial opens; root cause was Column `crossAxisAlignment` defaulting to `center`, causing FAB to shift when hint label disappeared; fixed with `CrossAxisAlignment.end`
+- **Overlay coordinate calculation** — uses `localToGlobal(ancestor: overlayBox)` with `rootOverlay: true` for accurate positioning
+- **Live recording waveform** — waveform animation now works in live STT mode; `_recorder.startWithSource()` runs alongside `speech_to_text` for real amplitude data and actual audio file capture
+- **Recording navigation** — after completing a recording from any page, user is always navigated to home page (`context.go(AppRoutes.home)`) instead of popping back
+
+### Changed
+- SpeedDial item order: New Project now appears above Text Note (bottom-up: Record Note, Text Note, New Project, New Folder, Search)
+- Preferences page naming style descriptions updated to include text note examples (e.g., `V1 — Meeting notes / T1 — Shopping list`)
+
+---
+
+## [Unreleased] - 2026-03-05 - Persistent Counters & Post-Download Ready Splash
+
+### Added
+- **Persistent note counters** — `voiceNoteCounter` (HiveField 35) and `textNoteCounter` (HiveField 36) in `UserSettings` for reliable auto-incrementing note titles (V1, V2... T1, T2...)
+- **Post-Whisper-download ready splash** — one-time "Vaanix is Ready!" popup after first Whisper model download with:
+  - Animated fade-in green check icon
+  - Option to download Enhanced model for better accuracy (shown only for base model)
+  - "Start Recording" button that navigates directly to recording page
+- **`whisperReadyShown`** flag (HiveField 37) to control one-time splash display
+- **`DownloadSheetResult`** class in `download_progress_sheet.dart` — typed result with `success` and `wantsUpgrade` fields
+
+### Changed
+- Note prefix numbering now uses persistent counters instead of scanning existing notes (eliminates duplicate/gap issues)
+- Prefixes fixed to `V` (voice) and `T` (text) — no longer user-configurable
+- Removed "Note Prefix" and "Text Prefix" settings from Preferences page
+- Updated `_applyAutoTitle` regex from `r'^[A-Za-z]+\d{3}'` to `r'^[A-Za-z]\d+'` for new V1/T1 format
+- `showDownloadSheet` now returns `DownloadSheetResult?` instead of `bool?`
+- All three `showDownloadSheet` call sites in `audio_settings_page.dart` updated for new return type
+
+---
+
 ## [Unreleased] - 2026-03-04 - Auto-Naming Preference
 
 ### Added

@@ -86,30 +86,13 @@ class NotesNotifier extends Notifier<List<Note>> {
     ref.read(foldersProvider.notifier).refresh();
   }
 
-  /// Generate the next auto-incrementing title using the given prefix.
-  /// e.g. prefix "VOICE" → VOICE001, VOICE002, ...
-  String _generateTitleWithPrefix(String prefix) {
-    int maxNum = 0;
-    for (final note in state) {
-      if (note.title.startsWith(prefix)) {
-        final suffix = note.title.substring(prefix.length);
-        final num = int.tryParse(suffix);
-        if (num != null && num > maxNum) {
-          maxNum = num;
-        }
-      }
-    }
-    final next = maxNum + 1;
-    return '$prefix${next.toString().padLeft(3, '0')}';
-  }
-
   /// Apply auto-generated title based on the user's naming style preference.
   void _applyAutoTitle(Note note, String autoTitle) {
     final style = ref.read(settingsProvider).noteNamingStyle;
     switch (style) {
       case 'prefix_auto':
-        // Extract prefix+number from current title (e.g., "V001")
-        final prefixMatch = RegExp(r'^[A-Za-z]+\d{3}').firstMatch(note.title);
+        // Extract prefix+number from current title (e.g., "V1", "T42")
+        final prefixMatch = RegExp(r'^[A-Za-z]\d+').firstMatch(note.title);
         if (prefixMatch != null) {
           note.title = '${prefixMatch.group(0)} — $autoTitle';
         } else {
@@ -126,16 +109,32 @@ class NotesNotifier extends Notifier<List<Note>> {
     }
   }
 
-  /// Generate title for voice notes using notePrefix setting.
-  String _generateTitle() {
-    final prefix = ref.read(settingsProvider).notePrefix;
-    return _generateTitleWithPrefix(prefix);
+  /// Apply auto-title for a text note from its content.
+  /// Called when the user saves text note content for the first time.
+  void applyAutoTitleFromContent(String noteId, String plainText) {
+    final repo = ref.read(notesRepositoryProvider);
+    final note = repo.getNoteById(noteId);
+    if (note == null || note.isUserEditedTitle) return;
+
+    final autoTitle = TitleGeneratorService.generate(plainText);
+    if (autoTitle != null) {
+      _applyAutoTitle(note, autoTitle);
+      note.updatedAt = DateTime.now();
+      repo.updateNote(note);
+      refresh();
+    }
   }
 
-  /// Generate title for text notes using textNotePrefix setting.
-  String _generateTextNoteTitle() {
-    final prefix = ref.read(settingsProvider).textNotePrefix;
-    return _generateTitleWithPrefix(prefix);
+  /// Generate title for voice notes: V1, V2, ... V99999
+  Future<String> _generateTitle() async {
+    final counter = await ref.read(settingsProvider.notifier).incrementVoiceNoteCounter();
+    return 'V$counter';
+  }
+
+  /// Generate title for text notes: T1, T2, ... T99999
+  Future<String> _generateTextNoteTitle() async {
+    final counter = await ref.read(settingsProvider.notifier).incrementTextNoteCounter();
+    return 'T$counter';
   }
 
   Future<Note> addNote({
@@ -151,7 +150,7 @@ class NotesNotifier extends Notifier<List<Note>> {
 
     // Use text prefix for text notes, voice prefix for voice notes
     final noteTitle = title ??
-        (isTextNote ? _generateTextNoteTitle() : _generateTitle());
+        (isTextNote ? await _generateTextNoteTitle() : await _generateTitle());
 
     // Text notes default to General folder if no folder specified
     String? effectiveFolderId = folderId;
@@ -181,6 +180,15 @@ class NotesNotifier extends Notifier<List<Note>> {
       ref
           .read(foldersProvider.notifier)
           .addNoteToFolder(effectiveFolderId, note.id);
+    }
+
+    // Auto-title from transcription if available (e.g., live STT mode)
+    if (rawTranscription.isNotEmpty && title == null) {
+      final autoTitle = TitleGeneratorService.generate(rawTranscription);
+      if (autoTitle != null) {
+        _applyAutoTitle(note, autoTitle);
+        repo.updateNote(note);
+      }
     }
 
     state = [note, ...state];

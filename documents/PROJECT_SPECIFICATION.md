@@ -82,7 +82,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 > This screen exists in the codebase but is not part of the Phase 1 flow. No authentication is required. Will be activated in Phase 2 when optional accounts are introduced.
 
 ### 4.4 Home / Dashboard
-- **Stats cards row** — 2 compact cards always visible at top: Notes count, Folders count. Each card shows icon + count in a row, label below. Tapping navigates to the respective section. Cards hidden until user has 5+ notes and 2+ folders (progressive disclosure).
+- **Stats cards row** — compact cards always visible at top showing Notes count, Projects count (conditional), and Folders count. Each card shows icon + count in a row, label below. Projects card appears only when at least one project exists. Folders card includes a chevron navigation hint icon indicating it's tappable (navigates to Library). Cards hidden until user has 5+ notes and 2+ folders (progressive disclosure). Order: Notes → Projects → Folders.
 - **Tab bar** — segmented control below stats: `[ Notes ]  [ Tasks ]`
   - **Notes tab** (default) — notes feed in reverse chronological order (default sort; additional sort options: title A-Z/Z-A, duration, date oldest)
   - **Tasks tab** — aggregated view of all unchecked todos, actions, and reminders from every note (see 4.16)
@@ -156,6 +156,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Find & Replace** — search icon in AppBar opens toolbar with match navigation, replace/replace all
 - **Audio playback** — replay original recording from this screen
 - **Pin/Unpin** — available in AppBar overflow menu; "Pin to Top" or "Unpin" based on current state
+- **Organize section** — always-visible section showing current folder/project assignments. Tapping opens bottom sheet to add/remove from folders, add to projects, or create new folders/projects. Replaces old conditional "Usage" display.
 - **Delete note** — moves to Trash (soft delete) with 30-day recovery; confirmation prompt updated
 - **Word & character count** — stats row below transcription, live updates during editing
 
@@ -164,14 +165,16 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Folder cards** — user-created folders with note count, project document count, folder color accent, last updated timestamp
 - **Folder reordering** — drag-and-drop to manually order folders; persisted in Hive
 - **Archived section** — collapsible section at bottom showing archived folders; archived folders remain searchable
-- **SpeedDialFab** — Record Note, New Folder actions
+- **Gesture FAB** — same dual-gesture interaction as Home page: swipe up to record, tap for SpeedDial with Record Note, New Folder actions
 - **Topics chips** — horizontally scrollable topic tags extracted from folders
 
 ### 4.8 Folder Detail Screen
 - **Mixed content view** — notes and project documents shown together with visual distinction (note cards vs project document cards with document icon)
-- **Toggle/filter** — option to show Notes only, Projects only, or All
+- **Toggle/filter** — segmented button to show Notes only, Projects only, or All. "All" segment uses compact fixed width; Notes and Projects share remaining space equally to prevent text wrapping.
+- **"All" unified timeline** — when "All" filter is selected, notes and projects are merged into a single timeline sorted by date (same as home page feed) instead of separate sections.
+- **Stats chips** — audio duration, notes count, and projects count (projects chip shown only when at least 1 project exists). Order: Audio → Notes → Projects.
 - **Folder management** (rename, change color, archive, delete)
-- **"New Project" button** — create a project document inside this folder
+- **Gesture FAB** — swipe up to record, tap for SpeedDial with actions: Search, New Project, Text Note (with template picker), Record Note. Positioned above Android navigation bar with safe area offset.
 - **Note and project counts** in header
 
 ### 4.9 Search Screen
@@ -214,8 +217,9 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 
 **Audio & Recording page** (`/audio_settings`):
 - Audio Quality — Standard / High Quality picker
-- Transcription Mode — Live Transcription or Record & Transcribe (Whisper) with one-line description of each mode's tradeoff
+- Transcription Mode — Live Transcription or Record & Transcribe (Whisper); card-style popup with icon + bold title on top row, full-width description below, checkmark on active mode, "(Recommended)" tag on Whisper. Whisper Model picker uses same card-style layout with icon + bold title row, description text, and download status trailing icon.
 - Whisper Model Status — download status/progress (visible only when Whisper mode selected); supports auto-scroll + flash highlight when navigated from recording popup or onboarding
+- Whisper Model Download — full-screen animated download experience with pause/resume/cancel support; pause keeps partial file for HTTP Range resume, cancel shows confirmation before deleting progress; info tile suggests Live mode for urgent recording; "Vaanix is Ready" completion page includes "Start Recording" button and "Go Back" button to return to previous screen without opening recording
 - Default Folder — picker to choose default folder for new recordings
 - Voice Commands — toggle for "Folder/Tag \<name\> Start" voice command parsing (Whisper mode only)
 - Block Offensive Words — filters profanity from transcription output
@@ -233,10 +237,19 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - "All data is stored locally" info banner
 
 **Backup & Restore page** (`/backup_restore`):
+- Three collapsible sections (Auto Backup expanded by default, others collapsed)
 - Last backup date display
+- **Auto Backup** — scheduled automatic encrypted backups stored on-device
+  - Toggle on/off with passphrase (stored in flutter_secure_storage)
+  - Frequency: Daily, Every 3 days, Weekly
+  - Retention: keep last 3, 5, or 10 backup files
+  - Runs silently on app launch when interval has elapsed
+  - Auto-rotates oldest files beyond max count
+  - Change passphrase option
+  - Next backup indicator
 - Create Backup — AES-256 encrypted, passphrase-protected, shares as .vnbak file
 - Restore from Backup — file picker, passphrase entry, manifest preview, confirm
-- Smart backup reminder banner (shown if no backup in 30+ days)
+- Smart backup reminder banner (shown if no backup in 30+ days; hidden when auto-backup enabled)
 
 **Help & Support page** (`/support`):
 - Quick Guide — re-open onboarding pages
@@ -342,7 +355,8 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **PIN setup** — 4-6 digit PIN with confirmation
 - **Biometric authentication** — fingerprint / Face ID as alternative via `local_auth`
 - **Auto-lock timeout** — immediately, 1 min, 5 min, 15 min
-- **Lock screen** — PIN entry pad + biometric trigger button
+- **Lock screen** — PIN entry pad + biometric trigger button; 400ms pause after successful unlock before navigating forward
+- **Splash screen** — animated branding splash displays for 2 seconds (no lock) before navigating to onboarding or home
 - **Widget privacy** — controls what Dashboard widget shows when locked
 
 ### 4.23 Home Screen Widgets
@@ -351,9 +365,10 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Widget Privacy** — respects App Lock settings
 
 ### 4.24 Backup & Restore
+- **Auto-backup** — scheduled automatic encrypted backups stored on-device; passphrase in flutter_secure_storage; frequency (daily/every 3 days/weekly); retention (3/5/10 files); runs silently on app launch; auto-rotates old files
 - **Create backup** — AES-256 encrypted with user passphrase; includes all data + optionally audio; shares as .vnbak file
 - **Restore** — select file → enter passphrase → preview manifest → confirm → restore
-- **Smart backup reminder** — prompts after 10 notes if no backup exists; reminds every 30 days
+- **Smart backup reminder** — prompts after 10 notes if no backup exists; reminds every 30 days; hidden when auto-backup is enabled
 
 ---
 
@@ -540,7 +555,11 @@ UserSettings
 ├── lastSeenAppVersion: String (for What's New screen)
 ├── permissionScreenShown: bool (true after post-onboarding permission screen)
 ├── fabSwipeHintShownCount: int (max 2, for idle hint animation)
-└── sessionCount: int (app launch counter for discoverability features)
+├── sessionCount: int (app launch counter for discoverability features)
+├── autoBackupEnabled: bool (default: false)
+├── autoBackupFrequency: String (daily / every3days / weekly; default: weekly)
+├── autoBackupMaxCount: int (3, 5, or 10; default: 5)
+└── autoBackupLastRun: DateTime? (last auto-backup timestamp)
 
 ProjectDocument
 ├── id: String (UUID)

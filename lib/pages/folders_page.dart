@@ -7,6 +7,8 @@ import '../providers/folders_provider.dart';
 import '../providers/notes_provider.dart';
 import '../providers/tags_provider.dart';
 import '../widgets/speed_dial_fab.dart';
+import '../widgets/gesture_fab.dart';
+import '../providers/settings_provider.dart';
 import '../widgets/empty_state_illustrated.dart';
 import '../widgets/folder_color_picker.dart';
 
@@ -258,13 +260,16 @@ class FoldersPage extends ConsumerWidget {
                     ),
                   ),
 
-            // Speed Dial FAB
+            // Gesture FAB with swipe-up to record
             Align(
               alignment: Alignment.bottomRight,
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
-                child: SpeedDialFab(
-                  items: [
+                child: GestureFab(
+                  sessionCount: ref.watch(settingsProvider).sessionCount,
+                  showSubtitleHint: ref.watch(settingsProvider).sessionCount <= 10,
+                  onRecord: () => context.push(AppRoutes.recording),
+                  speedDialItems: [
                     SpeedDialItem(
                       icon: Icons.create_new_folder_rounded,
                       label: 'New Folder',

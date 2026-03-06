@@ -3,7 +3,7 @@
 class TitleGeneratorService {
   TitleGeneratorService._();
 
-  static const int _maxLength = 60;
+  static const int _maxLength = 40;
 
   /// Filler phrases to strip from the beginning of sentences.
   static final _fillerPhrases = RegExp(
@@ -99,10 +99,26 @@ class TitleGeneratorService {
     return null;
   }
 
+  /// Characters unsafe for filenames or messy in titles.
+  static final _unsafeChars = RegExp(r'[,;:!@#$%^&*(){}[\]<>\\|/~`"' "'" r'+=]');
+
+  /// Collapse multiple spaces into one.
+  static final _multiSpace = RegExp(r'\s{2,}');
+
+  /// Sanitize title: strip special characters, collapse spaces.
+  static String _sanitize(String text) {
+    return text
+        .replaceAll(_unsafeChars, '')
+        .replaceAll(_multiSpace, ' ')
+        .trim();
+  }
+
   /// Truncate text at word boundary and add "..." if needed.
   static String _truncate(String text) {
     // Remove trailing conjunctions
     text = text.replaceFirst(_trailingConjunctions, '').trim();
+    // Strip special characters
+    text = _sanitize(text);
 
     if (text.length <= _maxLength) {
       return _capitalize(text);
@@ -111,7 +127,7 @@ class TitleGeneratorService {
     // Find last space before max length
     final sub = text.substring(0, _maxLength);
     final lastSpace = sub.lastIndexOf(' ');
-    if (lastSpace > 20) {
+    if (lastSpace > 15) {
       return '${_capitalize(sub.substring(0, lastSpace))}...';
     }
     return '${_capitalize(sub)}...';

@@ -46,6 +46,13 @@ class SettingsState {
   final int fabSwipeHintShownCount; // Idle hint shown count (max 2)
   final int sessionCount; // Incremented on each app launch
   final String noteNamingStyle; // 'prefix_only', 'prefix_auto', 'auto_only'
+  final int voiceNoteCounter; // Persistent auto-increment for voice notes
+  final int textNoteCounter; // Persistent auto-increment for text notes
+  final bool whisperReadyShown; // Post-download ready splash shown once
+  final bool autoBackupEnabled; // Auto-backup toggle
+  final String autoBackupFrequency; // 'daily', 'every3days', 'weekly'
+  final int autoBackupMaxCount; // Max auto-backup files to keep
+  final DateTime? autoBackupLastRun; // Last auto-backup timestamp
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -84,6 +91,13 @@ class SettingsState {
     this.fabSwipeHintShownCount = 0,
     this.sessionCount = 0,
     this.noteNamingStyle = 'prefix_auto',
+    this.voiceNoteCounter = 0,
+    this.textNoteCounter = 0,
+    this.whisperReadyShown = false,
+    this.autoBackupEnabled = false,
+    this.autoBackupFrequency = 'weekly',
+    this.autoBackupMaxCount = 5,
+    this.autoBackupLastRun,
   });
 
   SettingsState copyWith({
@@ -123,6 +137,13 @@ class SettingsState {
     int? fabSwipeHintShownCount,
     int? sessionCount,
     String? noteNamingStyle,
+    int? voiceNoteCounter,
+    int? textNoteCounter,
+    bool? whisperReadyShown,
+    bool? autoBackupEnabled,
+    String? autoBackupFrequency,
+    int? autoBackupMaxCount,
+    DateTime? Function()? autoBackupLastRun,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -164,6 +185,13 @@ class SettingsState {
       fabSwipeHintShownCount: fabSwipeHintShownCount ?? this.fabSwipeHintShownCount,
       sessionCount: sessionCount ?? this.sessionCount,
       noteNamingStyle: noteNamingStyle ?? this.noteNamingStyle,
+      voiceNoteCounter: voiceNoteCounter ?? this.voiceNoteCounter,
+      textNoteCounter: textNoteCounter ?? this.textNoteCounter,
+      whisperReadyShown: whisperReadyShown ?? this.whisperReadyShown,
+      autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
+      autoBackupFrequency: autoBackupFrequency ?? this.autoBackupFrequency,
+      autoBackupMaxCount: autoBackupMaxCount ?? this.autoBackupMaxCount,
+      autoBackupLastRun: autoBackupLastRun != null ? autoBackupLastRun() : this.autoBackupLastRun,
     );
   }
 
@@ -250,6 +278,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
       fabSwipeHintShownCount: settings.fabSwipeHintShownCount,
       sessionCount: settings.sessionCount,
       noteNamingStyle: settings.noteNamingStyle,
+      voiceNoteCounter: settings.voiceNoteCounter,
+      textNoteCounter: settings.textNoteCounter,
+      whisperReadyShown: settings.whisperReadyShown,
+      autoBackupEnabled: settings.autoBackupEnabled,
+      autoBackupFrequency: settings.autoBackupFrequency,
+      autoBackupMaxCount: settings.autoBackupMaxCount,
+      autoBackupLastRun: settings.autoBackupLastRun,
     );
   }
 
@@ -429,6 +464,47 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> incrementSessionCount() async {
     await ref.read(settingsRepositoryProvider).incrementSessionCount();
     state = state.copyWith(sessionCount: state.sessionCount + 1);
+  }
+
+  Future<void> setWhisperReadyShown(bool shown) async {
+    await ref.read(settingsRepositoryProvider).setWhisperReadyShown(shown);
+    state = state.copyWith(whisperReadyShown: shown);
+  }
+
+  Future<void> setAutoBackupEnabled(bool enabled) async {
+    await ref.read(settingsRepositoryProvider).setAutoBackupEnabled(enabled);
+    state = state.copyWith(autoBackupEnabled: enabled);
+  }
+
+  Future<void> setAutoBackupFrequency(String frequency) async {
+    await ref.read(settingsRepositoryProvider).setAutoBackupFrequency(frequency);
+    state = state.copyWith(autoBackupFrequency: frequency);
+  }
+
+  Future<void> setAutoBackupMaxCount(int count) async {
+    await ref.read(settingsRepositoryProvider).setAutoBackupMaxCount(count);
+    state = state.copyWith(autoBackupMaxCount: count);
+  }
+
+  Future<void> setAutoBackupLastRun(DateTime? date) async {
+    await ref.read(settingsRepositoryProvider).setAutoBackupLastRun(date);
+    state = state.copyWith(autoBackupLastRun: () => date);
+  }
+
+  /// Increment voice note counter and return the new value.
+  Future<int> incrementVoiceNoteCounter() async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final newVal = await repo.incrementVoiceNoteCounter();
+    state = state.copyWith(voiceNoteCounter: newVal);
+    return newVal;
+  }
+
+  /// Increment text note counter and return the new value.
+  Future<int> incrementTextNoteCounter() async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final newVal = await repo.incrementTextNoteCounter();
+    state = state.copyWith(textNoteCounter: newVal);
+    return newVal;
   }
 }
 

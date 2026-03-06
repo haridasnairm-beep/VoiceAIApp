@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/project_block.dart';
 import '../models/project_document.dart';
 import '../services/project_documents_repository.dart';
 import 'notes_provider.dart';
@@ -88,6 +89,22 @@ class ProjectDocumentsNotifier extends Notifier<List<ProjectDocument>> {
     await ref
         .read(projectDocumentsRepositoryProvider)
         .addNoteBlock(documentId, noteId);
+    refresh();
+    ref.read(notesProvider.notifier).refresh();
+  }
+
+  /// Remove all note-reference blocks for [noteId] from [documentId].
+  Future<void> removeNoteFromProject(String documentId, String noteId) async {
+    final repo = ref.read(projectDocumentsRepositoryProvider);
+    final doc = repo.getProjectDocument(documentId);
+    if (doc == null) return;
+    final blockIds = doc.blocks
+        .where((b) => b.type == BlockType.noteReference && b.noteId == noteId)
+        .map((b) => b.id)
+        .toList();
+    for (final blockId in blockIds) {
+      await repo.removeBlock(documentId, blockId);
+    }
     refresh();
     ref.read(notesProvider.notifier).refresh();
   }

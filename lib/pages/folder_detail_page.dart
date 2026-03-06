@@ -9,8 +9,13 @@ import '../providers/project_documents_provider.dart';
 import '../models/folder.dart';
 import '../models/note.dart';
 import '../models/project_document.dart';
+import '../providers/settings_provider.dart';
 import '../widgets/folder_picker_sheet.dart';
+import '../widgets/gesture_fab.dart';
+import '../widgets/speed_dial_fab.dart';
 import '../widgets/note_card.dart';
+import '../widgets/template_picker_sheet.dart';
+import '../constants/note_templates.dart';
 
 enum _SortOption { newest, oldest, titleAZ, titleZA }
 enum _FilterOption { all, notes, projects }
@@ -213,16 +218,9 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push(AppRoutes.recording, extra: {'folderId': widget.folderId}),
-        icon: Icon(Icons.mic_rounded,
-            color: Theme.of(context).colorScheme.onPrimary),
-        label: Text('Record Note',
-            style:
-                TextStyle(color: Theme.of(context).colorScheme.onPrimary)),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-      ),
-      body: SingleChildScrollView(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -248,6 +246,17 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                       label: 'Notes',
                     ),
                   ),
+                  if (folderProjects.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatChip(
+                        icon: Icons.article_rounded,
+                        color: const Color(0xFF7B1FA2),
+                        value: '${folderProjects.length}',
+                        label: 'Projects',
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -257,10 +266,13 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: SegmentedButton<_FilterOption>(
-                  segments: const [
-                    ButtonSegment(value: _FilterOption.all, label: Text('All')),
-                    ButtonSegment(value: _FilterOption.notes, label: Text('Notes')),
-                    ButtonSegment(value: _FilterOption.projects, label: Text('Projects')),
+                  segments: [
+                    ButtonSegment(
+                      value: _FilterOption.all,
+                      label: const SizedBox(width: 32, child: Center(child: Text('All'))),
+                    ),
+                    const ButtonSegment(value: _FilterOption.notes, label: Text('Notes')),
+                    const ButtonSegment(value: _FilterOption.projects, label: Text('Projects')),
                   ],
                   selected: {_filterOption},
                   onSelectionChanged: (selected) =>
@@ -276,74 +288,155 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                 ),
               ),
 
-            // Notes section (show when filter is All or Notes)
-            if (_filterOption != _FilterOption.projects) ...[
-              // Notes Header
-              Padding(
-                padding:
-                    const EdgeInsets.only(left: 24, right: 24, top: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Notes',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color:
-                                Theme.of(context).colorScheme.onSurface,
-                          ),
+            // Sort header
+            Padding(
+              padding: const EdgeInsets.only(left: 24, right: 24, top: 24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _filterOption == _FilterOption.projects ? 'Projects' :
+                    _filterOption == _FilterOption.notes ? 'Notes' : 'All Items',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                  ),
+                  PopupMenuButton<_SortOption>(
+                    onSelected: (option) {
+                      setState(() => _sortOption = option);
+                    },
+                    itemBuilder: (ctx) => _SortOption.values.map((option) {
+                      return PopupMenuItem(
+                        value: option,
+                        child: Row(
+                          children: [
+                            if (option == _sortOption)
+                              Icon(Icons.check_rounded,
+                                  size: 18,
+                                  color: Theme.of(context).colorScheme.primary)
+                            else
+                              const SizedBox(width: 18),
+                            const SizedBox(width: 8),
+                            Text(_sortLabel(option)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    child: Row(
+                      children: [
+                        Icon(Icons.sort_rounded,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.secondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          _sortLabel(_sortOption),
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
+                        ),
+                      ],
                     ),
-                    PopupMenuButton<_SortOption>(
-                      onSelected: (option) {
-                        setState(() => _sortOption = option);
-                      },
-                      itemBuilder: (ctx) => _SortOption.values.map((option) {
-                        return PopupMenuItem(
-                          value: option,
-                          child: Row(
-                            children: [
-                              if (option == _sortOption)
-                                Icon(Icons.check_rounded,
-                                    size: 18,
-                                    color: Theme.of(context).colorScheme.primary)
-                              else
-                                const SizedBox(width: 18),
-                              const SizedBox(width: 8),
-                              Text(_sortLabel(option)),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      child: Row(
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // === Unified timeline (All) or filtered view ===
+            if (_filterOption == _FilterOption.all) ...[
+              // Merge notes and projects into single timeline sorted by date
+              Builder(builder: (context) {
+                final items = <_TimelineItem>[
+                  ...folderNotes.map((n) => _TimelineItem(
+                        date: n.updatedAt,
+                        note: n,
+                      )),
+                  ...folderProjects.map((p) => _TimelineItem(
+                        date: p.updatedAt,
+                        project: p,
+                      )),
+                ];
+                items.sort((a, b) {
+                  switch (_sortOption) {
+                    case _SortOption.newest:
+                      return b.date.compareTo(a.date);
+                    case _SortOption.oldest:
+                      return a.date.compareTo(b.date);
+                    case _SortOption.titleAZ:
+                      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+                    case _SortOption.titleZA:
+                      return b.title.toLowerCase().compareTo(a.title.toLowerCase());
+                  }
+                });
+                if (items.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.sort_rounded,
-                              size: 20,
-                              color:
-                                  Theme.of(context).colorScheme.secondary),
-                          const SizedBox(width: 4),
+                          Icon(Icons.folder_open_rounded,
+                              size: 48, color: Theme.of(context).hintColor),
+                          const SizedBox(height: 12),
                           Text(
-                            _sortLabel(_sortOption),
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelLarge
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary,
+                            'This folder is empty',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.secondary,
                                 ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
+                  );
+                }
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: items.map((item) {
+                      if (item.note != null) {
+                        final note = item.note!;
+                        final noteFolderNames = folders
+                            .where((f) => f.noteIds.contains(note.id))
+                            .map((f) => f.name)
+                            .toList();
+                        return NoteCard(
+                          note: note,
+                          timestamp: _formatDate(note.createdAt),
+                          folderNames: noteFolderNames,
+                          projectNames: const [],
+                          onTap: () => context.push(
+                            AppRoutes.noteDetail,
+                            extra: {'noteId': note.id},
+                          ),
+                          onDelete: () {},
+                          onLongPress: () {},
+                        );
+                      } else {
+                        final project = item.project!;
+                        return _FolderProjectCard(
+                          project: project,
+                          onTap: () => context.push(
+                            AppRoutes.projectDocumentDetail,
+                            extra: {'documentId': project.id},
+                          ),
+                          onLongPress: () => _showProjectMoveMenu(context, project),
+                        );
+                      }
+                    }).toList(),
+                  ),
+                );
+              }),
+            ],
 
-              // Notes List
+            // === Notes only ===
+            if (_filterOption == _FilterOption.notes) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: folderNotes.isEmpty
@@ -373,56 +466,30 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                         ),
                       )
                     : Column(
-                        children: [
-                          ...folderNotes.map((note) {
-                            final noteFolderNames = folders
-                                .where((f) => f.noteIds.contains(note.id))
-                                .map((f) => f.name)
-                                .toList();
-                            return NoteCard(
-                              note: note,
-                              timestamp: _formatDate(note.createdAt),
-                              folderNames: noteFolderNames,
-                              projectNames: const [],
-                              onTap: () => context.push(
-                                AppRoutes.noteDetail,
-                                extra: {'noteId': note.id},
-                              ),
-                              onDelete: () {},
-                              onLongPress: () {},
-                            );
-                          }),
-                        ],
+                        children: folderNotes.map((note) {
+                          final noteFolderNames = folders
+                              .where((f) => f.noteIds.contains(note.id))
+                              .map((f) => f.name)
+                              .toList();
+                          return NoteCard(
+                            note: note,
+                            timestamp: _formatDate(note.createdAt),
+                            folderNames: noteFolderNames,
+                            projectNames: const [],
+                            onTap: () => context.push(
+                              AppRoutes.noteDetail,
+                              extra: {'noteId': note.id},
+                            ),
+                            onDelete: () {},
+                            onLongPress: () {},
+                          );
+                        }).toList(),
                       ),
               ),
             ],
 
-            // === Projects Section (show when filter is All or Projects) ===
-            if (_filterOption != _FilterOption.notes) ...[
-              Padding(
-                padding: const EdgeInsets.only(left: 24, right: 24, top: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Projects',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _showNewProjectDialog(context, ref),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('New'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
+            // === Projects only ===
+            if (_filterOption == _FilterOption.projects) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: folderProjects.isEmpty
@@ -466,10 +533,69 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
               ),
             ],
 
-              const SizedBox(height: 80),
+              const SizedBox(height: 100),
             ],
           ),
         ),
+          // Gesture FAB
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: 24,
+                bottom: 24 + MediaQuery.of(context).padding.bottom,
+              ),
+              child: GestureFab(
+                sessionCount: ref.watch(settingsProvider).sessionCount,
+                showSubtitleHint: ref.watch(settingsProvider).sessionCount <= 10,
+                onRecord: () => context.push(AppRoutes.recording,
+                    extra: {'folderId': widget.folderId}),
+                speedDialItems: [
+                  SpeedDialItem(
+                    icon: Icons.search_rounded,
+                    label: 'Search',
+                    onTap: () => context.push(AppRoutes.search,
+                        extra: {'folderId': widget.folderId}),
+                  ),
+                  SpeedDialItem(
+                    icon: Icons.article_outlined,
+                    label: 'New Project',
+                    onTap: () => _showNewProjectDialog(context, ref),
+                  ),
+                  SpeedDialItem(
+                    icon: Icons.edit_note_rounded,
+                    label: 'Text Note',
+                    onTap: () async {
+                      final template = await showModalBottomSheet<dynamic>(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => const TemplatePickerSheet(),
+                      );
+                      if (!mounted) return;
+                      if (template == null) return;
+                      final extras = <String, dynamic>{
+                        'isNewTextNote': true,
+                        'folderId': widget.folderId,
+                      };
+                      if (template is NoteTemplate) {
+                        extras['templateContent'] = template.content;
+                        extras['templateTitle'] = template.name;
+                      }
+                      context.push(AppRoutes.noteDetail, extra: extras);
+                    },
+                  ),
+                  SpeedDialItem(
+                    icon: Icons.mic_rounded,
+                    label: 'Record Note',
+                    onTap: () => context.push(AppRoutes.recording,
+                        extra: {'folderId': widget.folderId}),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -642,6 +768,16 @@ class _StatChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TimelineItem {
+  final DateTime date;
+  final Note? note;
+  final ProjectDocument? project;
+
+  _TimelineItem({required this.date, this.note, this.project});
+
+  String get title => note?.title ?? project?.title ?? '';
 }
 
 class _FolderProjectCard extends StatelessWidget {

@@ -42,6 +42,10 @@ class TranscriptionService {
   /// Optional text filter applied to transcription output (e.g., profanity filter).
   String Function(String text)? textFilter;
 
+  /// Current sound level from STT (for waveform visualization).
+  /// Normalized to 0.0–1.0 range.
+  final ValueNotifier<double> soundLevel = ValueNotifier<double>(0.0);
+
   bool get isAvailable => _isInitialized;
   bool get isListening => _isListening;
 
@@ -107,6 +111,7 @@ class TranscriptionService {
       await _speech.stop();
       _isListening = false;
     }
+    soundLevel.value = 0.0;
     // Commit current session text so it's not lost
     _commitCurrentSession();
     onStatusChanged?.call('paused');
@@ -124,6 +129,7 @@ class TranscriptionService {
     _finalizedText = '';
     _currentSessionText = '';
     _detectedLanguage = '';
+    soundLevel.value = 0.0;
     if (_isListening) {
       _speech.stop();
       _isListening = false;
@@ -137,6 +143,7 @@ class TranscriptionService {
       _isListening = true;
       await _speech.listen(
         onResult: _handleResult,
+        onSoundLevelChange: _handleSoundLevel,
         localeId: _localeId,
         listenFor: const Duration(seconds: 59),
         pauseFor: const Duration(seconds: 10),
@@ -151,6 +158,12 @@ class TranscriptionService {
       debugPrint('TranscriptionService: listen failed: $e');
       _isListening = false;
     }
+  }
+
+  void _handleSoundLevel(double level) {
+    // speech_to_text reports dB values roughly -2 to 10+.
+    // Normalize to 0.0–1.0 for waveform visualization.
+    soundLevel.value = ((level + 2) / 12).clamp(0.0, 1.0);
   }
 
   void _handleResult(SpeechRecognitionResult result) {

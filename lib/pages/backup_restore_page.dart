@@ -9,6 +9,14 @@ import '../providers/settings_provider.dart';
 import '../services/backup_service.dart';
 import '../theme.dart';
 
+const _frequencyLabels = {
+  'daily': 'Daily',
+  'every3days': 'Every 3 days',
+  'weekly': 'Weekly',
+};
+
+const _maxCountOptions = [3, 5, 10];
+
 String _fmtDate(DateTime dt) {
   final d = dt.toLocal();
   const months = [
@@ -31,6 +39,16 @@ class BackupRestorePage extends ConsumerStatefulWidget {
 }
 
 class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
+  // Section expansion state
+  bool _autoBackupExpanded = true;
+  bool _createBackupExpanded = false;
+  bool _restoreBackupExpanded = false;
+
+  // Auto-backup state
+  final _autoPassCtrl = TextEditingController();
+  bool _autoPassVisible = false;
+  bool _isAutoPassSet = false;
+
   // Create backup state
   final _createPassCtrl = TextEditingController();
   final _createConfirmCtrl = TextEditingController();
@@ -54,21 +72,167 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
   @override
   void initState() {
     super.initState();
+    _checkAutoPassphrase();
     if (widget.restoreFilePath != null) {
       _restoreFilePath = widget.restoreFilePath;
-      // Auto-preview the file after build
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _previewBackup();
       });
     }
   }
 
+  Future<void> _checkAutoPassphrase() async {
+    final pass = await BackupService.getAutoBackupPassphrase();
+    if (mounted) {
+      setState(() => _isAutoPassSet = pass != null && pass.isNotEmpty);
+    }
+  }
+
   @override
   void dispose() {
+    _autoPassCtrl.dispose();
     _createPassCtrl.dispose();
     _createConfirmCtrl.dispose();
     _restorePassCtrl.dispose();
     super.dispose();
+  }
+
+  String _nextAutoBackupLabel(String frequency, DateTime? lastRun) {
+    if (lastRun == null) return 'first backup on next launch';
+    final Duration interval;
+    switch (frequency) {
+      case 'daily':
+        interval = const Duration(hours: 24);
+        break;
+      case 'every3days':
+        interval = const Duration(hours: 72);
+        break;
+      case 'weekly':
+      default:
+        interval = const Duration(days: 7);
+    }
+    final next = lastRun.add(interval);
+    final now = DateTime.now();
+    if (next.isBefore(now)) return 'next launch';
+    final diff = next.difference(now);
+    if (diff.inDays > 0) return 'in ${diff.inDays}d';
+    if (diff.inHours > 0) return 'in ${diff.inHours}h';
+    return 'soon';
+  }
+
+  // ─── Auto-Backup ───────────────────────────────────────────────────────────
+
+  Future<void> _enableAutoBackup() async {
+    final pass = _autoPassCtrl.text.trim();
+    if (pass.isEmpty) {
+      _showError('Please enter a passphrase for auto-backup.');
+      return;
+    }
+    if (pass.length < 6) {
+      _showError('Passphrase must be at least 6 characters.');
+      return;
+    }
+    await BackupService.setAutoBackupPassphrase(pass);
+    await ref.read(settingsProvider.notifier).setAutoBackupEnabled(true);
+    setState(() {
+      _isAutoPassSet = true;
+      _autoPassCtrl.clear();
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Auto-backup enabled.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _disableAutoBackup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Disable Auto-Backup?'),
+        content: const Text(
+          'Your existing auto-backup files will be kept, but no new ones will be created automatically.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Disable'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await BackupService.clearAutoBackupPassphrase();
+    await ref.read(settingsProvider.notifier).setAutoBackupEnabled(false);
+    setState(() => _isAutoPassSet = false);
+  }
+
+  Future<void> _changeAutoPassphrase() async {
+    final ctrl = TextEditingController();
+    bool visible = false;
+    final newPass = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Change Passphrase'),
+          content: TextField(
+            controller: ctrl,
+            obscureText: !visible,
+            decoration: InputDecoration(
+              labelText: 'New passphrase',
+              hintText: 'Min. 6 characters',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(visible ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setDialogState(() => visible = !visible),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final p = ctrl.text.trim();
+                if (p.length < 6) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text('Passphrase must be at least 6 characters.'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx, p);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+    if (newPass != null) {
+      await BackupService.setAutoBackupPassphrase(newPass);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Auto-backup passphrase updated.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   // ─── Create Backup ─────────────────────────────────────────────────────────
@@ -310,221 +474,359 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Last backup info
               if (settings.lastBackupDate != null) ...[
-                _InfoCard(
-                  icon: Icons.check_circle_outline,
-                  iconColor: Colors.green,
-                  message:
-                      'Last backup: ${_fmtDate(settings.lastBackupDate!)}',
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: _InfoCard(
+                    icon: Icons.check_circle_outline,
+                    iconColor: Colors.green,
+                    message:
+                        'Last backup: ${_fmtDate(settings.lastBackupDate!)}',
+                  ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
               ],
+
+              // ── AUTO BACKUP ───────────────────────────────────────────────
+              _CollapsibleSection(
+                icon: Icons.schedule_rounded,
+                label: 'Auto Backup',
+                color: scheme.tertiary,
+                initiallyExpanded: _autoBackupExpanded,
+                onExpansionChanged: (v) => _autoBackupExpanded = v,
+                children: [
+                  const _InfoCard(
+                    icon: Icons.info_outline,
+                    message:
+                        'Automatically backs up your data on a schedule. Backups are encrypted and stored on your device.',
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (!settings.autoBackupEnabled) ...[
+                    // Setup: passphrase entry + enable
+                    if (!_isAutoPassSet) ...[
+                      TextField(
+                        controller: _autoPassCtrl,
+                        obscureText: !_autoPassVisible,
+                        decoration: InputDecoration(
+                          labelText: 'Auto-backup passphrase',
+                          hintText: 'Min. 6 characters',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _autoPassVisible ? Icons.visibility_off : Icons.visibility,
+                            ),
+                            onPressed: () => setState(
+                              () => _autoPassVisible = !_autoPassVisible,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    FilledButton.tonal(
+                      onPressed: _isAutoPassSet
+                          ? () async {
+                              await ref.read(settingsProvider.notifier).setAutoBackupEnabled(true);
+                            }
+                          : _enableAutoBackup,
+                      child: const Text('Enable Auto Backup'),
+                    ),
+                  ] else ...[
+                    // Active: show settings
+                    _ToggleRow(
+                      icon: Icons.schedule_rounded,
+                      label: 'Auto Backup',
+                      sublabel: 'Next: ${_nextAutoBackupLabel(settings.autoBackupFrequency, settings.autoBackupLastRun)}',
+                      value: true,
+                      onChanged: (_) => _disableAutoBackup(),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Frequency picker
+                    Container(
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(color: Theme.of(context).dividerColor),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.repeat_rounded, size: 22),
+                        title: const Text('Frequency'),
+                        trailing: DropdownButton<String>(
+                          value: settings.autoBackupFrequency,
+                          underline: const SizedBox.shrink(),
+                          items: _frequencyLabels.entries
+                              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) {
+                              ref.read(settingsProvider.notifier).setAutoBackupFrequency(v);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Max count picker
+                    Container(
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(color: Theme.of(context).dividerColor),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.inventory_2_outlined, size: 22),
+                        title: const Text('Keep last'),
+                        trailing: DropdownButton<int>(
+                          value: settings.autoBackupMaxCount,
+                          underline: const SizedBox.shrink(),
+                          items: _maxCountOptions
+                              .map((n) => DropdownMenuItem(value: n, child: Text('$n backups')))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) {
+                              ref.read(settingsProvider.notifier).setAutoBackupMaxCount(v);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Change passphrase
+                    TextButton.icon(
+                      onPressed: _changeAutoPassphrase,
+                      icon: const Icon(Icons.key_rounded, size: 18),
+                      label: const Text('Change passphrase'),
+                    ),
+
+                    if (settings.autoBackupLastRun != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Last auto-backup: ${_fmtDate(settings.autoBackupLastRun!)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+
+              const SizedBox(height: 8),
 
               // ── CREATE BACKUP ──────────────────────────────────────────────
-              _SectionHeader(
-                icon: Icons.cloud_upload_outlined,
+              _CollapsibleSection(
+                icon: Icons.upload_file_rounded,
                 label: 'Create Backup',
                 color: scheme.primary,
-              ),
-              const SizedBox(height: 12),
-              const _InfoCard(
-                icon: Icons.info_outline,
-                message:
-                    'Creates an encrypted .vnbak file containing all your notes, folders, settings, and images. Store it in a safe place — you will need your passphrase to restore.',
-              ),
-              const SizedBox(height: 16),
-
-              // Passphrase
-              TextField(
-                controller: _createPassCtrl,
-                obscureText: !_createPassVisible,
-                decoration: InputDecoration(
-                  labelText: 'Backup passphrase',
-                  hintText: 'Min. 6 characters',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _createPassVisible ? Icons.visibility_off : Icons.visibility,
-                    ),
-                    onPressed: () => setState(
-                      () => _createPassVisible = !_createPassVisible,
-                    ),
+                initiallyExpanded: _createBackupExpanded,
+                onExpansionChanged: (v) => _createBackupExpanded = v,
+                children: [
+                  const _InfoCard(
+                    icon: Icons.info_outline,
+                    message:
+                        'Creates an encrypted .vnbak file containing all your notes, folders, settings, and images. Store it in a safe place — you will need your passphrase to restore.',
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
+                  const SizedBox(height: 16),
 
-              // Confirm passphrase
-              TextField(
-                controller: _createConfirmCtrl,
-                obscureText: !_createConfirmVisible,
-                decoration: InputDecoration(
-                  labelText: 'Confirm passphrase',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _createConfirmVisible
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                    ),
-                    onPressed: () => setState(
-                      () => _createConfirmVisible = !_createConfirmVisible,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Include audio toggle
-              _ToggleRow(
-                icon: Icons.music_note_outlined,
-                label: 'Include audio recordings',
-                sublabel: 'Backup may be significantly larger',
-                value: _includeAudio,
-                onChanged: (v) => setState(() => _includeAudio = v),
-              ),
-              const SizedBox(height: 16),
-
-              // Progress
-              if (_isCreating) ...[
-                LinearProgressIndicator(value: _createProgress),
-                const SizedBox(height: 8),
-                Text(
-                  _createStatus,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              FilledButton.icon(
-                onPressed: _isCreating ? null : _createBackup,
-                icon: _isCreating
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                  // Passphrase
+                  TextField(
+                    controller: _createPassCtrl,
+                    obscureText: !_createPassVisible,
+                    decoration: InputDecoration(
+                      labelText: 'Backup passphrase',
+                      hintText: 'Min. 6 characters',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _createPassVisible ? Icons.visibility_off : Icons.visibility,
                         ),
-                      )
-                    : const Icon(Icons.backup),
-                label: Text(_isCreating ? 'Creating…' : 'Create Backup'),
+                        onPressed: () => setState(
+                          () => _createPassVisible = !_createPassVisible,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Confirm passphrase
+                  TextField(
+                    controller: _createConfirmCtrl,
+                    obscureText: !_createConfirmVisible,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm passphrase',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _createConfirmVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () => setState(
+                          () => _createConfirmVisible = !_createConfirmVisible,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Include audio toggle
+                  _ToggleRow(
+                    icon: Icons.music_note_outlined,
+                    label: 'Include audio recordings',
+                    sublabel: 'Backup may be significantly larger',
+                    value: _includeAudio,
+                    onChanged: (v) => setState(() => _includeAudio = v),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Progress
+                  if (_isCreating) ...[
+                    LinearProgressIndicator(value: _createProgress),
+                    const SizedBox(height: 8),
+                    Text(
+                      _createStatus,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  FilledButton.icon(
+                    onPressed: _isCreating ? null : _createBackup,
+                    icon: _isCreating
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.backup),
+                    label: Text(_isCreating ? 'Creating…' : 'Create Backup'),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 40),
-              const Divider(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
 
               // ── RESTORE BACKUP ─────────────────────────────────────────────
-              _SectionHeader(
+              _CollapsibleSection(
                 icon: Icons.cloud_download_outlined,
                 label: 'Restore Backup',
                 color: scheme.secondary,
-              ),
-              const SizedBox(height: 12),
-              const _InfoCard(
-                icon: Icons.warning_amber_outlined,
-                iconColor: Colors.orange,
-                message:
-                    'Restoring will replace ALL current data. Make sure you have selected the correct backup file and remember your passphrase.',
-              ),
-              const SizedBox(height: 16),
+                initiallyExpanded: _restoreBackupExpanded,
+                onExpansionChanged: (v) => _restoreBackupExpanded = v,
+                children: [
+                  const _InfoCard(
+                    icon: Icons.warning_amber_outlined,
+                    iconColor: Colors.orange,
+                    message:
+                        'Restoring will replace ALL current data. Make sure you have selected the correct backup file and remember your passphrase.',
+                  ),
+                  const SizedBox(height: 16),
 
-              // File picker
-              OutlinedButton.icon(
-                onPressed: (_isRestoring || _isPreviewLoading) ? null : _pickFile,
-                icon: const Icon(Icons.folder_open_outlined),
-                label: Text(
-                  _restoreFilePath != null
-                      ? _restoreFilePath!.split(Platform.pathSeparator).last
-                      : 'Select .vnbak file',
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-
-              if (_restoreFilePath != null) ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _restorePassCtrl,
-                  obscureText: !_restorePassVisible,
-                  decoration: InputDecoration(
-                    labelText: 'Backup passphrase',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _restorePassVisible
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () => setState(
-                        () => _restorePassVisible = !_restorePassVisible,
-                      ),
+                  // File picker
+                  OutlinedButton.icon(
+                    onPressed: (_isRestoring || _isPreviewLoading) ? null : _pickFile,
+                    icon: const Icon(Icons.folder_open_outlined),
+                    label: Text(
+                      _restoreFilePath != null
+                          ? _restoreFilePath!.split(Platform.pathSeparator).last
+                          : 'Select .vnbak file',
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
 
-                // Preview button
-                OutlinedButton.icon(
-                  onPressed:
-                      (_isPreviewLoading || _isRestoring) ? null : _previewBackup,
-                  icon: _isPreviewLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.preview_outlined),
-                  label: Text(
-                    _isPreviewLoading ? 'Verifying…' : 'Verify & Preview',
-                  ),
-                ),
-              ],
-
-              // Manifest preview card
-              if (_previewManifest != null) ...[
-                const SizedBox(height: 16),
-                _ManifestCard(manifest: _previewManifest!),
-                const SizedBox(height: 16),
-
-                // Progress
-                if (_isRestoring) ...[
-                  LinearProgressIndicator(value: _restoreProgress),
-                  const SizedBox(height: 8),
-                  Text(
-                    _restoreStatus,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                FilledButton.icon(
-                  onPressed: _isRestoring ? null : _confirmAndRestore,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: scheme.error,
-                  ),
-                  icon: _isRestoring
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                  if (_restoreFilePath != null) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _restorePassCtrl,
+                      obscureText: !_restorePassVisible,
+                      decoration: InputDecoration(
+                        labelText: 'Backup passphrase',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _restorePassVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                           ),
-                        )
-                      : const Icon(Icons.restore),
-                  label: Text(_isRestoring ? 'Restoring…' : 'Restore Backup'),
-                ),
-              ],
+                          onPressed: () => setState(
+                            () => _restorePassVisible = !_restorePassVisible,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
-              const SizedBox(height: 40),
+                    // Preview button
+                    OutlinedButton.icon(
+                      onPressed:
+                          (_isPreviewLoading || _isRestoring) ? null : _previewBackup,
+                      icon: _isPreviewLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.preview_outlined),
+                      label: Text(
+                        _isPreviewLoading ? 'Verifying…' : 'Verify & Preview',
+                      ),
+                    ),
+                  ],
+
+                  // Manifest preview card
+                  if (_previewManifest != null) ...[
+                    const SizedBox(height: 16),
+                    _ManifestCard(manifest: _previewManifest!),
+                    const SizedBox(height: 16),
+
+                    // Progress
+                    if (_isRestoring) ...[
+                      LinearProgressIndicator(value: _restoreProgress),
+                      const SizedBox(height: 8),
+                      Text(
+                        _restoreStatus,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    FilledButton.icon(
+                      onPressed: _isRestoring ? null : _confirmAndRestore,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: scheme.error,
+                      ),
+                      icon: _isRestoring
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.restore),
+                      label: Text(_isRestoring ? 'Restoring…' : 'Restore Backup'),
+                    ),
+                  ],
+                ],
+              ),
+
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -535,31 +837,43 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
 
 // ─── Helper widgets ───────────────────────────────────────────────────────────
 
-class _SectionHeader extends StatelessWidget {
+class _CollapsibleSection extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final bool initiallyExpanded;
+  final ValueChanged<bool>? onExpansionChanged;
+  final List<Widget> children;
 
-  const _SectionHeader({
+  const _CollapsibleSection({
     required this.icon,
     required this.label,
     required this.color,
+    this.initiallyExpanded = false,
+    this.onExpansionChanged,
+    required this.children,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(width: 8),
-        Text(
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
+        onExpansionChanged: onExpansionChanged,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+        leading: Icon(icon, color: color, size: 22),
+        title: Text(
           label,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
         ),
-      ],
+        children: children,
+      ),
     );
   }
 }
@@ -583,7 +897,7 @@ class _InfoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: scheme.outlineVariant),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

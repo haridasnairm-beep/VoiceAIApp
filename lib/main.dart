@@ -12,6 +12,7 @@ import 'services/project_documents_repository.dart';
 import 'services/sharing_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/settings_repository.dart';
+import 'services/backup_service.dart';
 import 'theme.dart';
 import 'nav.dart';
 import 'providers/settings_provider.dart';
@@ -50,7 +51,31 @@ void main() async {
   NotesRepository().purgeExpiredTrash();
   FoldersRepository().purgeExpiredTrash();
   ProjectDocumentsRepository().purgeExpiredTrash();
+  // Auto-backup if enabled and due
+  _runAutoBackupIfDue(settings);
   runApp(const ProviderScope(child: VaanixApp()));
+}
+
+/// Fire-and-forget auto-backup check on app launch.
+void _runAutoBackupIfDue(dynamic settings) {
+  if (settings == null) return;
+  if (!settings.autoBackupEnabled) return;
+  if (!BackupService.isAutoBackupDue(
+    frequency: settings.autoBackupFrequency,
+    lastRun: settings.autoBackupLastRun,
+  )) return;
+
+  // Run in background — don't block startup
+  Future(() async {
+    final success = await BackupService.runAutoBackup(
+      maxCount: settings.autoBackupMaxCount,
+    );
+    if (success) {
+      await SettingsRepository().setAutoBackupLastRun(DateTime.now());
+      // Also update lastBackupDate so the reminder banner stays hidden
+      await SettingsRepository().setLastBackupDate(DateTime.now());
+    }
+  });
 }
 
 class VaanixApp extends ConsumerStatefulWidget {

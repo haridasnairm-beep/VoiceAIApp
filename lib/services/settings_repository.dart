@@ -201,4 +201,48 @@ class SettingsRepository {
     settings.sessionCount += 1;
     await saveSettings(settings);
   }
+
+  Future<void> setWhisperReadyShown(bool shown) async {
+    final settings = getSettings();
+    settings.whisperReadyShown = shown;
+    await saveSettings(settings);
+  }
+
+  Future<int> incrementVoiceNoteCounter() async {
+    final settings = getSettings();
+    settings.voiceNoteCounter += 1;
+    await saveSettings(settings);
+    return settings.voiceNoteCounter;
+  }
+
+  Future<int> incrementTextNoteCounter() async {
+    final settings = getSettings();
+    settings.textNoteCounter += 1;
+    await saveSettings(settings);
+    return settings.textNoteCounter;
+  }
+
+  Future<void> setAutoBackupEnabled(bool enabled) async {
+    final settings = getSettings();
+    settings.autoBackupEnabled = enabled;
+    await saveSettings(settings);
+  }
+
+  Future<void> setAutoBackupFrequency(String frequency) async {
+    final settings = getSettings();
+    settings.autoBackupFrequency = frequency;
+    await saveSettings(settings);
+  }
+
+  Future<void> setAutoBackupMaxCount(int count) async {
+    final settings = getSettings();
+    settings.autoBackupMaxCount = count;
+    await saveSettings(settings);
+  }
+
+  Future<void> setAutoBackupLastRun(DateTime? date) async {
+    final settings = getSettings();
+    settings.autoBackupLastRun = date;
+    await saveSettings(settings);
+  }
 }

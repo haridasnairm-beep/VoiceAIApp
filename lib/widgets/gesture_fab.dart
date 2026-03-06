@@ -14,20 +14,22 @@ class GestureFab extends StatefulWidget {
   final List<SpeedDialItem> speedDialItems;
   final int sessionCount;
   final bool showSubtitleHint;
+  final ValueChanged<bool>? onDialToggled;
 
   const GestureFab({
     required this.onRecord,
     required this.speedDialItems,
     this.sessionCount = 0,
     this.showSubtitleHint = false,
+    this.onDialToggled,
     super.key,
   });
 
   @override
-  State<GestureFab> createState() => _GestureFabState();
+  State<GestureFab> createState() => GestureFabState();
 }
 
-class _GestureFabState extends State<GestureFab>
+class GestureFabState extends State<GestureFab>
     with TickerProviderStateMixin {
   static const double _swipeThreshold = 40.0;
   static const double _maxHorizontalDrift = 20.0;
@@ -155,6 +157,7 @@ class _GestureFabState extends State<GestureFab>
     _insertOverlay();
     _dialController.forward();
     setState(() => _isDialOpen = true);
+    widget.onDialToggled?.call(true);
   }
 
   void _closeDial() {
@@ -162,6 +165,7 @@ class _GestureFabState extends State<GestureFab>
       _removeOverlay();
     });
     setState(() => _isDialOpen = false);
+    widget.onDialToggled?.call(false);
   }
 
   /// Close immediately without animation (for navigation).
@@ -169,29 +173,36 @@ class _GestureFabState extends State<GestureFab>
     _dialController.reset();
     _removeOverlay();
     setState(() => _isDialOpen = false);
+    widget.onDialToggled?.call(false);
   }
 
-  Offset _getFabPosition() {
-    final renderBox =
-        _fabKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null) return Offset.zero;
-    return renderBox.localToGlobal(Offset.zero);
-  }
-
-  Size _getFabSize() {
-    final renderBox =
-        _fabKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null) return const Size(56, 56);
-    return renderBox.size;
+  /// Close the dial programmatically (e.g. from back button).
+  void closeDial() {
+    if (_isDialOpen) _closeDial();
   }
 
   void _insertOverlay() {
-    final fabPos = _getFabPosition();
-    final fabSize = _getFabSize();
-    final screenSize = MediaQuery.of(context).size;
+    final fabRenderBox =
+        _fabKey.currentContext?.findRenderObject() as RenderBox?;
+    if (fabRenderBox == null) return;
+    final fabSize = fabRenderBox.size;
 
-    final right = screenSize.width - fabPos.dx - fabSize.width;
-    final bottom = screenSize.height - fabPos.dy + 12;
+    // Get the overlay's RenderBox to convert coordinates into its space
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlayBox =
+        overlay.context.findRenderObject() as RenderBox?;
+    if (overlayBox == null) return;
+    final overlaySize = overlayBox.size;
+
+    // Convert FAB position from global to overlay-local coordinates
+    final fabPosInOverlay = fabRenderBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+
+    final right = overlaySize.width - fabPosInOverlay.dx - fabSize.width;
+    final fabBottom = overlaySize.height - fabPosInOverlay.dy - fabSize.height;
+    final menuBottom = overlaySize.height - fabPosInOverlay.dy + 12;
 
     _overlayEntry = OverlayEntry(
       builder: (context) => _SpeedDialOverlay(
@@ -200,13 +211,13 @@ class _GestureFabState extends State<GestureFab>
         onClose: _closeDial,
         onItemTap: _closeDialImmediate,
         right: right,
-        bottom: bottom,
+        bottom: menuBottom,
         fabRight: right,
-        fabBottom: screenSize.height - fabPos.dy - fabSize.height,
+        fabBottom: fabBottom,
         onFabTap: _handleTap,
       ),
     );
-    Overlay.of(context).insert(_overlayEntry!);
+    overlay.insert(_overlayEntry!);
   }
 
   void _removeOverlay() {
@@ -223,6 +234,7 @@ class _GestureFabState extends State<GestureFab>
 
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         // Subtitle hint label
         if (showLabel)

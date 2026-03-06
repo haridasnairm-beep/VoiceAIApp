@@ -1,7 +1,7 @@
 # Vaanix - Implementation Plan
 
 **Version:** 4.0
-**Last Updated:** 2026-03-03
+**Last Updated:** 2026-03-05
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Specification](PROJECT_SPECIFICATION.md) | [UX Audit](UX_PRODUCT_AUDIT.md)
 
@@ -726,12 +726,60 @@ PHASE 1.5 — UX & Launch Readiness
 │   │   ├── Discoverability (subtitle label for first 10 sessions)
 │   │   ├── Session count tracking (HiveField 32, 33)
 │   │   └── See FEATURE_GESTURE_FAB.md
-│   └── 18P.3 Auto-Naming Preference ─────────── ✅
-│       ├── noteNamingStyle setting (HiveField 34)
-│       ├── 3 styles: Prefix+Auto, Prefix Only, Auto Only
-│       ├── Default prefixes changed: VOICE→V, TXT→T
-│       ├── One-time migration for existing users
-│       └── Preferences UI with radio dialog
+│   ├── 18P.3 Auto-Naming Preference ─────────── ✅
+│   │   ├── noteNamingStyle setting (HiveField 34)
+│   │   ├── 3 styles: Prefix+Auto, Prefix Only, Auto Only
+│   │   ├── Default prefixes changed: VOICE→V, TXT→T
+│   │   ├── One-time migration for existing users
+│   │   └── Preferences UI with radio dialog
+│   ├── 18P.4 Persistent Counters ────────────── ✅
+│   │   ├── voiceNoteCounter (HiveField 35) + textNoteCounter (HiveField 36)
+│   │   ├── Eliminates duplicate/gap issues from scan-based counting
+│   │   └── DownloadSheetResult typed return from Whisper download
+│   ├── 18P.5 UX Fixes & Polish ─────────────── ✅
+│   │   ├── SpeedDial FAB alignment fix (CrossAxisAlignment.end)
+│   │   ├── Recording → home navigation (always go to home after save)
+│   │   ├── SpeedDial item reorder (New Project above Text Note)
+│   │   ├── Empty text note discard prompt (PopScope + content check)
+│   │   ├── Auto-title sanitization (strip special chars, 40-char limit)
+│   │   ├── Text note auto-naming (same logic as voice notes)
+│   │   └── Live recording waveform fix (recorder + STT simultaneous)
+│   └── 18P.6 Auto-Backup ──────────────────── ✅
+│       ├── HiveFields 38–41 (autoBackupEnabled, frequency, maxCount, lastRun)
+│       ├── Passphrase in flutter_secure_storage (not Hive)
+│       ├── Silent backup on app launch when interval elapsed
+│       ├── Auto-rotate oldest files beyond max count
+│       ├── Auto Backup UI section in Backup & Restore page
+│       ├── Backup reminder banner hidden when auto-backup enabled
+│       └── Collapsible sections (Auto Backup open by default)
+│   └── 18P.7 Download UX & Transcription Mode ── ✅
+│       ├── Download pause/resume (partial file kept, HTTP Range resume)
+│       ├── Cancel with confirmation (deletes partial .tmp file)
+│       ├── Back button triggers pause (not blocked)
+│       ├── Info tile: "Need to record urgently? Pause and use Live mode"
+│       ├── wasPaused field in DownloadSheetResult
+│       ├── deletePartialDownload() in WhisperService
+│       ├── Transcription mode popup redesigned (card-style tiles)
+│       ├── Removed info button from Transcription setting
+│       └── Pause-aware snackbar messages in all callers
+│   └── 18P.8 Note Organize Section ── ✅
+│       ├── Always-visible "Organize" section in Note Detail (replaces conditional "Usage")
+│       ├── Bottom sheet with folder/project lists and toggle assignment
+│       ├── Create new folder or project directly from sheet
+│       ├── Colored folder chips + project chips in inline display
+│       └── "Manage" hint when note has existing assignments
+│   └── 18P.9 UX Polish Batch ── ✅
+│       ├── GestureFab on Library page (swipe-up to record)
+│       ├── GestureFab on Folder Detail page (swipe-up + speed dial: Search, New Project, Text Note, Record)
+│       ├── Folder Detail FAB positioned above Android nav bar
+│       ├── Home stats: Projects count card (Notes → Projects → Folders), Folders chevron hint
+│       ├── Folder Detail stats: Projects count chip (Audio → Notes → Projects)
+│       ├── Folder Detail "All" view: unified timeline (notes + projects sorted by date)
+│       ├── Segmented button: "All" compact width, Notes/Projects equal space
+│       ├── Transcription model popup: card-style tiles matching mode popup
+│       ├── "Vaanix is Ready" page: Go Back button (returns without opening recording)
+│       ├── Splash no-lock: 2s display (was 5s)
+│       └── App lock unlock: 400ms success pause before navigation
                                              │
                                       PHASE 1.5 COMPLETE
 

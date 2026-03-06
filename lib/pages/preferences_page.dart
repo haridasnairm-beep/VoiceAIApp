@@ -100,102 +100,6 @@ class PreferencesPage extends ConsumerWidget {
                   ),
                   const Divider(height: 1, indent: 56),
                   SettingsItem(
-                    icon: Icons.text_fields_rounded,
-                    iconBg: const Color(0xFFE8F5E9),
-                    iconColor: const Color(0xFF2E7D32),
-                    label: "Note Prefix",
-                    sublabel: "${settings.notePrefix}001, ${settings.notePrefix}002...",
-                    type: SettingsType.value,
-                    valueText: settings.notePrefix,
-                    hasSublabel: true,
-                    onTap: () async {
-                      final controller = TextEditingController(
-                          text: settings.notePrefix);
-                      final result = await showDialog<String>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Note Prefix'),
-                          content: TextField(
-                            controller: controller,
-                            autofocus: true,
-                            maxLength: 10,
-                            textCapitalization: TextCapitalization.characters,
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. VOICE, NOTE, REC',
-                              border: OutlineInputBorder(),
-                              counterText: 'Max 10 characters',
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
-                            ),
-                            FilledButton(
-                              onPressed: () =>
-                                  Navigator.pop(ctx, controller.text.trim()),
-                              child: const Text('Save'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (result != null && result.isNotEmpty) {
-                        ref
-                            .read(settingsProvider.notifier)
-                            .setNotePrefix(result);
-                      }
-                    },
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  SettingsItem(
-                    icon: Icons.edit_note_rounded,
-                    iconBg: const Color(0xFFFFF3E0),
-                    iconColor: const Color(0xFFE65100),
-                    label: "Text Prefix",
-                    sublabel: "${settings.textNotePrefix}001, ${settings.textNotePrefix}002...",
-                    type: SettingsType.value,
-                    valueText: settings.textNotePrefix,
-                    hasSublabel: true,
-                    onTap: () async {
-                      final controller = TextEditingController(
-                          text: settings.textNotePrefix);
-                      final result = await showDialog<String>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Text Note Prefix'),
-                          content: TextField(
-                            controller: controller,
-                            autofocus: true,
-                            maxLength: 10,
-                            textCapitalization: TextCapitalization.characters,
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. TXT, NOTE, MEMO',
-                              border: OutlineInputBorder(),
-                              counterText: 'Max 10 characters',
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
-                            ),
-                            FilledButton(
-                              onPressed: () =>
-                                  Navigator.pop(ctx, controller.text.trim()),
-                              child: const Text('Save'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (result != null && result.isNotEmpty) {
-                        ref
-                            .read(settingsProvider.notifier)
-                            .setTextNotePrefix(result);
-                      }
-                    },
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  SettingsItem(
                     icon: Icons.auto_fix_high_rounded,
                     iconBg: const Color(0xFFE8EAF6),
                     iconColor: const Color(0xFF3949AB),
@@ -209,8 +113,6 @@ class PreferencesPage extends ConsumerWidget {
                         context: context,
                         builder: (ctx) => _NamingStyleDialog(
                           current: settings.noteNamingStyle,
-                          voicePrefix: settings.notePrefix,
-                          textPrefix: settings.textNotePrefix,
                         ),
                       );
                       if (result != null) {
@@ -407,25 +309,21 @@ class PreferencesPage extends ConsumerWidget {
   String _namingStyleDescription(String style) {
     switch (style) {
       case 'prefix_only':
-        return 'Keep prefix title (e.g. V001)';
+        return 'Keep prefix title (e.g. V1, T1)';
       case 'auto_only':
-        return 'Auto-rename from transcription';
+        return 'Auto-rename from content';
       case 'prefix_auto':
       default:
-        return 'Prefix + auto title (e.g. V001 — Meeting notes)';
+        return 'Prefix + auto title from content';
     }
   }
 }
 
 class _NamingStyleDialog extends StatefulWidget {
   final String current;
-  final String voicePrefix;
-  final String textPrefix;
 
   const _NamingStyleDialog({
     required this.current,
-    required this.voicePrefix,
-    required this.textPrefix,
   });
 
   @override
@@ -443,7 +341,6 @@ class _NamingStyleDialogState extends State<_NamingStyleDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final vp = widget.voicePrefix;
     return AlertDialog(
       title: const Text('Auto Naming Style'),
       content: Column(
@@ -452,17 +349,17 @@ class _NamingStyleDialogState extends State<_NamingStyleDialog> {
           _buildOption(
             'prefix_auto',
             'Prefix + Auto (Recommended)',
-            '${vp}001 — Meeting notes about...',
+            'V1 — Meeting notes / T1 — Shopping list',
           ),
           _buildOption(
             'prefix_only',
             'Prefix Only',
-            '${vp}001, ${vp}002, ${vp}003...',
+            'V1, V2, V3... / T1, T2, T3...',
           ),
           _buildOption(
             'auto_only',
             'Auto Only',
-            'Meeting notes about budget...',
+            'Meeting notes... / Shopping list...',
           ),
         ],
       ),
