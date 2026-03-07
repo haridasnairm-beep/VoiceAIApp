@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - 2026-03-07 - Session Enhancements
+
+### Added
+- **Note card project & label capsules** — home page and folder detail note tiles now show project and label tag capsules; tapping project capsule opens project assignment picker, tapping label capsule opens label manager
+- **GestureFab on project detail page** — replaced static FAB with swipe-up-to-record GestureFab with speed dial items for voice notes and text notes
+- **Note picker type filtering** — voice note picker shows only V-prefix notes, text note picker shows only T-prefix notes via `filterType` parameter
+- **Return to project after recording** — when recording is initiated from a project, user returns to project detail page instead of home
+
+### Fixed
+- **Live mode V prefix** — live mode voice notes now correctly get V prefix (was incorrectly using T prefix) via `isVoiceNote` flag
+- **Live transcription duplication** — fixed doubled text when speaking multiple sentences by removing premature `_commitCurrentSession()` from `_handleStatus` (Android fires `notListening` before final result)
+- **Version history original text** — Version 1 now correctly preserves the original transcription before any edits; previously the original was overwritten before being captured as a version
+- **Version history rich text** — rich text formatting (highlights, colors, bold) is properly stored and rendered in version history previews via Quill delta JSON
+
+### Changed
+- `note_detail_page.dart` — `_saveTranscription` now calls `ensureTranscriptVersion` before overwriting content, guaranteeing the original text is preserved as Version 1
+- `notes_provider.dart` — exposed `ensureTranscriptVersion` method for per-note original snapshot creation
+- `transcription_service.dart` — `_handleStatus` no longer commits session text (only `_handleResult(final=true)` commits)
+- `recording_page.dart` — accepts `projectId` parameter, uses `context.pop()` for project-initiated recordings
+- `note_picker_page.dart` — added `filterType` parameter for voice/text filtering
+- `note_card.dart` — added `onTagTap` callback, project/label capsules with tap-to-edit
+- `home_page.dart` / `folder_detail_page.dart` — project/label capsule tap handlers with bottom sheets
+
+---
+
+## [Unreleased] - 2026-03-07 - Media Resume After Recording
+
+### Added
+- **Auto-resume other media after recording** — when a user is playing music (Spotify, YouTube Music, etc.) and records a voice note, media playback now automatically resumes after recording completes
+  - **Live mode (speech_to_text):** abandons Android audio focus via native platform channel so media apps receive `AUDIOFOCUS_GAIN` and auto-resume
+  - **Whisper mode (record package):** dispatches `KEYCODE_MEDIA_PLAY` key event via `AudioManager` because Android's mic policy pauses media independently of audio focus
+  - Works for both save and discard flows
+  - Native Kotlin: `requestAudioFocus()`, `abandonAudioFocus()`, `resumeMedia()` methods on `MainActivity` via `com.vaanix.app/audio_focus` MethodChannel
+  - `SoundService` AudioPlayer now uses `handleAudioSessionActivation: false` to prevent brief UI sound cues from re-grabbing audio focus
+
+### Changed
+- `SoundService` — disabled audio session activation on `just_audio` AudioPlayer to avoid stealing focus from other media apps
+- `recording_page.dart` — added audio focus request on recording start, abandon + media resume on save/discard
+- `MainActivity.kt` — added `audio_focus` MethodChannel with `requestAudioFocus`, `abandonAudioFocus`, `resumeMedia` handlers
+
+---
+
 ## [Unreleased] - 2026-03-06 - Download UX & Transcription Mode Redesign
 
 ### Added

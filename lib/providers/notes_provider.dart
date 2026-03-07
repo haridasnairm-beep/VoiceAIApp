@@ -145,8 +145,9 @@ class NotesNotifier extends Notifier<List<Note>> {
     String detectedLanguage = 'en',
     String? folderId,
     bool isProcessed = true,
+    bool isVoiceNote = false,
   }) async {
-    final isTextNote = audioFilePath.isEmpty;
+    final isTextNote = audioFilePath.isEmpty && !isVoiceNote;
 
     // Use text prefix for text notes, voice prefix for voice notes
     final noteTitle = title ??
@@ -613,6 +614,11 @@ class NotesNotifier extends Notifier<List<Note>> {
         .read(notesRepositoryProvider)
         .restoreTranscriptVersion(noteId, versionId);
     refresh();
+  }
+
+  /// Ensure a note has at least one transcript version (original snapshot).
+  Future<void> ensureTranscriptVersion(Note note) async {
+    await ref.read(notesRepositoryProvider).ensureTranscriptVersion(note);
   }
 
   /// Migrate existing notes to have at least one transcript version.

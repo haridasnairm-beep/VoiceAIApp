@@ -19,6 +19,7 @@ class NoteCard extends StatelessWidget {
   final bool selectionMode;
   final void Function(String name)? onFolderTap;
   final void Function(String name)? onProjectTap;
+  final void Function(String tag)? onTagTap;
 
   const NoteCard({
     super.key,
@@ -33,6 +34,7 @@ class NoteCard extends StatelessWidget {
     this.selectionMode = false,
     this.onFolderTap,
     this.onProjectTap,
+    this.onTagTap,
   });
 
   int get _overdueCount {
@@ -239,11 +241,14 @@ class NoteCard extends StatelessWidget {
                         textColor: const Color(0xFF7B1FA2),
                       ),
                     )),
-                ...note.tags.map((tag) => _LabelChip(
-                      icon: Icons.label_rounded,
-                      label: '#$tag',
-                      bgColor: theme.colorScheme.secondaryContainer,
-                      textColor: theme.colorScheme.onSecondaryContainer,
+                ...note.tags.map((tag) => GestureDetector(
+                      onTap: onTagTap != null ? () => onTagTap!(tag) : null,
+                      child: _LabelChip(
+                        icon: Icons.label_rounded,
+                        label: '#$tag',
+                        bgColor: theme.colorScheme.secondaryContainer,
+                        textColor: theme.colorScheme.onSecondaryContainer,
+                      ),
                     )),
               ],
             ),

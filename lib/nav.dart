@@ -67,12 +67,15 @@ class AppRouter {
         pageBuilder: (context, state) {
           final extra = state.extra;
           String? folderId;
+          String? projectId;
           if (extra is Map) {
             final f = extra['folderId'];
             if (f is String && f.isNotEmpty) folderId = f;
+            final p = extra['projectId'];
+            if (p is String && p.isNotEmpty) projectId = p;
           }
           return NoTransitionPage(
-            child: RecordingPage(folderId: folderId),
+            child: RecordingPage(folderId: folderId, projectId: projectId),
           );
         },
       ),
@@ -106,6 +109,7 @@ class AppRouter {
           bool isNewTextNote = false;
           String? templateContent;
           String? templateTitle;
+          String? projectId;
           if (extra is Map) {
             final txt = extra['isNewTextNote'];
             if (txt == true) isNewTextNote = true;
@@ -113,6 +117,8 @@ class AppRouter {
             if (tc is String) templateContent = tc;
             final tt = extra['templateTitle'];
             if (tt is String) templateTitle = tt;
+            final p = extra['projectId'];
+            if (p is String && p.isNotEmpty) projectId = p;
           }
           return NoTransitionPage(
               child: NoteDetailPage(
@@ -125,6 +131,7 @@ class AppRouter {
             isNewTextNote: isNewTextNote,
             templateContent: templateContent,
             templateTitle: templateTitle,
+            projectId: projectId,
           ));
         },
       ),
@@ -246,12 +253,15 @@ class AppRouter {
         pageBuilder: (context, state) {
           final extra = state.extra;
           String? documentId;
+          String? filterType;
           if (extra is Map) {
             final d = extra['documentId'];
             if (d is String && d.isNotEmpty) documentId = d;
+            final ft = extra['filterType'];
+            if (ft is String && ft.isNotEmpty) filterType = ft;
           }
           return NoTransitionPage(
-            child: NotePickerPage(documentId: documentId),
+            child: NotePickerPage(documentId: documentId, filterType: filterType),
           );
         },
       ),

@@ -21,18 +21,9 @@ class VersionHistoryPage extends ConsumerWidget {
       return AbsorbPointer(
         child: quill.QuillEditor.basic(
           controller: controller,
-          config: quill.QuillEditorConfig(
+          config: const quill.QuillEditorConfig(
             showCursor: false,
-            maxHeight: 120,
-            customStyles: quill.DefaultStyles(
-              paragraph: quill.DefaultTextBlockStyle(
-                Theme.of(context).textTheme.bodyMedium!,
-                const quill.HorizontalSpacing(0, 0),
-                const quill.VerticalSpacing(2, 2),
-                const quill.VerticalSpacing(0, 0),
-                null,
-              ),
-            ),
+            enableInteractiveSelection: false,
           ),
         ),
       );

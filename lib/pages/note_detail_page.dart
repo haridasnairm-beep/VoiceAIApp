@@ -43,6 +43,7 @@ class NoteDetailPage extends ConsumerStatefulWidget {
   final bool isNewTextNote;
   final String? templateContent;
   final String? templateTitle;
+  final String? projectId;
 
   const NoteDetailPage({
     super.key,
@@ -55,6 +56,7 @@ class NoteDetailPage extends ConsumerStatefulWidget {
     this.isNewTextNote = false,
     this.templateContent,
     this.templateTitle,
+    this.projectId,
   });
 
   @override
@@ -120,7 +122,18 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
               rawTranscription: widget.templateContent ?? '',
               detectedLanguage: 'text',
               title: widget.templateTitle,
+              folderId: widget.folderId,
             );
+        // Auto-link to project if created from project detail
+        if (widget.projectId != null) {
+          ref.read(projectDocumentsProvider.notifier)
+              .addNoteBlock(widget.projectId!, note.id);
+        }
+        // Add to folder if specified
+        if (widget.folderId != null) {
+          ref.read(foldersProvider.notifier)
+              .addNoteToFolder(widget.folderId!, note.id);
+        }
         if (mounted) {
           final doc = Document();
           if (widget.templateContent != null &&
@@ -443,6 +456,9 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     _quillController?.removeListener(_updateWordCount);
     _quillController?.dispose();
     _quillController = null;
+
+    // Ensure the original content is saved as Version 1 BEFORE overwriting
+    await ref.read(notesProvider.notifier).ensureTranscriptVersion(note);
 
     note.rawTranscription = deltaJson;
     note.contentFormat = 'quill_delta';

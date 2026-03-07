@@ -14,7 +14,11 @@ class SoundService {
   SoundService._();
   static final SoundService instance = SoundService._();
 
-  final AudioPlayer _player = AudioPlayer();
+  final AudioPlayer _player = AudioPlayer(
+    // Don't take audio focus for brief UI cues — prevents stealing focus
+    // from other media apps (Spotify, etc.) after recording ends.
+    handleAudioSessionActivation: false,
+  );
 
   String? _startPath;
   String? _stopPath;

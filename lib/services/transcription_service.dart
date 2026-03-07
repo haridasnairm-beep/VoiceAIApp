@@ -187,8 +187,11 @@ class TranscriptionService {
 
     if (status == 'notListening' || status == 'done') {
       _isListening = false;
-      // Commit any remaining text from this session
-      _commitCurrentSession();
+      // Do NOT commit here — _handleResult(final=true) commits the
+      // authoritative text. notListening fires BEFORE the final result
+      // on Android, so committing here would double-commit partial text.
+      // For edge cases (timeout with no final result), stopListening()
+      // and pauseListening() handle the commit.
 
       // Auto-restart for long recordings
       if (_shouldAutoRestart) {

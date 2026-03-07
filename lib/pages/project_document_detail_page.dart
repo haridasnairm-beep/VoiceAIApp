@@ -14,6 +14,12 @@ import '../services/sharing_service.dart';
 import '../services/image_attachment_repository.dart';
 import '../widgets/image_block_widget.dart';
 import '../widgets/share_preview_sheet.dart';
+import '../widgets/gesture_fab.dart';
+import '../widgets/speed_dial_fab.dart';
+import '../widgets/template_picker_sheet.dart';
+import '../constants/note_templates.dart';
+import '../providers/settings_provider.dart';
+import '../providers/folders_provider.dart';
 import 'dart:convert';
 import 'package:flutter_quill/flutter_quill.dart';
 
@@ -387,58 +393,91 @@ class _ProjectDocumentDetailPageState
           ),
         ],
       ),
-      body: sortedBlocks.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.widgets_outlined,
-                      size: 64, color: Theme.of(context).hintColor),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No blocks yet',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
+      body: Stack(
+        children: [
+          sortedBlocks.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.widgets_outlined,
+                          size: 64, color: Theme.of(context).hintColor),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No blocks yet',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Add your first block',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add your first block',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
-                  ),
-                ],
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 80),
+                  itemCount: sortedBlocks.length,
+                  itemBuilder: (context, index) {
+                    final block = sortedBlocks[index];
+                    return _buildBlockCard(
+                      context,
+                      doc,
+                      block,
+                      allNotes,
+                      index: index,
+                      total: sortedBlocks.length,
+                      sortedBlocks: sortedBlocks,
+                    );
+                  },
+                ),
+          if (MediaQuery.of(context).viewInsets.bottom == 0)
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: 24,
+                  bottom: 24 + MediaQuery.of(context).padding.bottom,
+                ),
+                child: GestureFab(
+                  sessionCount: ref.watch(settingsProvider).sessionCount,
+                  showSubtitleHint: ref.watch(settingsProvider).sessionCount <= 10,
+                  onRecord: () => context.push(AppRoutes.recording,
+                      extra: {'projectId': doc.id}),
+                  speedDialItems: [
+                    SpeedDialItem(
+                      icon: Icons.mic_rounded,
+                      label: 'Add Voice Note',
+                      onTap: () => _showAddVoiceNoteSheet(context, doc.id),
+                    ),
+                    SpeedDialItem(
+                      icon: Icons.edit_note_rounded,
+                      label: 'Add Text Note',
+                      onTap: () => _showAddTextNoteSheet(context, doc.id),
+                    ),
+                    SpeedDialItem(
+                      icon: Icons.title_rounded,
+                      label: 'Section Header',
+                      onTap: () => ref
+                          .read(projectDocumentsProvider.notifier)
+                          .addSectionHeaderBlock(doc.id, 'New Section'),
+                    ),
+                    SpeedDialItem(
+                      icon: Icons.image_rounded,
+                      label: 'Add Image',
+                      onTap: () => _pickAndAddImage(doc.id),
+                    ),
+                  ],
+                ),
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 80),
-              itemCount: sortedBlocks.length,
-              itemBuilder: (context, index) {
-                final block = sortedBlocks[index];
-                return _buildBlockCard(
-                  context,
-                  doc,
-                  block,
-                  allNotes,
-                  index: index,
-                  total: sortedBlocks.length,
-                  sortedBlocks: sortedBlocks,
-                );
-              },
             ),
-      floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _showAddBlockSheet(context, doc.id),
-              icon: Icon(Icons.add_rounded,
-                  color: Theme.of(context).colorScheme.onPrimary),
-              label: Text('Add Block',
-                  style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary)),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
+        ],
+      ),
     );
   }
 
@@ -613,7 +652,8 @@ class _ProjectDocumentDetailPageState
     );
   }
 
-  void _showAddBlockSheet(BuildContext context, String documentId) {
+  /// Bottom sheet: Record new voice note or pick existing ones for the project.
+  void _showAddVoiceNoteSheet(BuildContext context, String documentId) {
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
@@ -621,44 +661,81 @@ class _ProjectDocumentDetailPageState
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.mic_rounded),
-              title: const Text('Add Voice Note'),
-              subtitle: const Text('Select from existing notes'),
+              leading: const Icon(Icons.fiber_manual_record_rounded,
+                  color: Colors.red),
+              title: const Text('Record New Voice Note'),
+              subtitle: const Text('Record and auto-add to this project'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                context.push(AppRoutes.recording,
+                    extra: {'projectId': documentId});
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.playlist_add_rounded),
+              title: const Text('Add Existing Voice Notes'),
+              subtitle: const Text('Select from your voice notes'),
               onTap: () {
                 Navigator.of(ctx).pop();
                 context.push(AppRoutes.notePickerRoute,
-                    extra: {'documentId': documentId});
+                    extra: {'documentId': documentId, 'filterType': 'voice'});
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Bottom sheet: Create new text note or pick existing text notes for the project.
+  void _showAddTextNoteSheet(BuildContext context, String documentId) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.add_circle_outline_rounded,
+                  color: Theme.of(context).colorScheme.primary),
+              title: const Text('Create New Text Note'),
+              subtitle: const Text('Create and auto-add to this project'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                // Show template picker, then navigate to note detail
+                final template = await showModalBottomSheet<dynamic>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => const TemplatePickerSheet(),
+                );
+                if (!mounted) return;
+                if (template == null) return;
+                final extras = <String, dynamic>{
+                  'isNewTextNote': true,
+                  'projectId': documentId,
+                };
+                if (template is NoteTemplate) {
+                  extras['templateContent'] = template.content;
+                  extras['templateTitle'] = template.name;
+                }
+                // Find folder for this project to auto-assign
+                final projects = ref.read(projectDocumentsProvider);
+                final project =
+                    projects.where((p) => p.id == documentId).firstOrNull;
+                if (project?.folderId != null) {
+                  extras['folderId'] = project!.folderId;
+                }
+                context.push(AppRoutes.noteDetail, extra: extras);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.edit_note_rounded),
-              title: const Text('Add Free Text'),
-              subtitle: const Text('Type your own content'),
+              leading: const Icon(Icons.playlist_add_rounded),
+              title: const Text('Add Existing Text Notes'),
+              subtitle: const Text('Select from your text notes'),
               onTap: () {
                 Navigator.of(ctx).pop();
-                ref
-                    .read(projectDocumentsProvider.notifier)
-                    .addFreeTextBlock(documentId, '');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.title_rounded),
-              title: const Text('Add Section Header'),
-              subtitle: const Text('Organize with headings'),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                ref
-                    .read(projectDocumentsProvider.notifier)
-                    .addSectionHeaderBlock(documentId, 'New Section');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.image_rounded),
-              title: const Text('Add Image'),
-              subtitle: const Text('Photo from gallery or camera'),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _pickAndAddImage(documentId);
+                context.push(AppRoutes.notePickerRoute,
+                    extra: {'documentId': documentId, 'filterType': 'text'});
               },
             ),
           ],

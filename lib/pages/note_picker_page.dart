@@ -7,8 +7,10 @@ import '../models/project_block.dart';
 
 class NotePickerPage extends ConsumerStatefulWidget {
   final String? documentId;
+  /// Filter: 'voice' = only voice notes (V prefix), 'text' = only text notes (T prefix), null = all
+  final String? filterType;
 
-  const NotePickerPage({super.key, this.documentId});
+  const NotePickerPage({super.key, this.documentId, this.filterType});
 
   @override
   ConsumerState<NotePickerPage> createState() => _NotePickerPageState();
@@ -35,10 +37,17 @@ class _NotePickerPageState extends ConsumerState<NotePickerPage> {
       }
     }
 
-    // Filter notes by search
+    // Filter by type first
+    final typeFiltered = widget.filterType == 'voice'
+        ? allNotes.where((n) => n.audioFilePath.isNotEmpty).toList()
+        : widget.filterType == 'text'
+            ? allNotes.where((n) => n.audioFilePath.isEmpty).toList()
+            : allNotes;
+
+    // Then filter by search
     final filteredNotes = _searchQuery.isEmpty
-        ? allNotes
-        : allNotes.where((n) {
+        ? typeFiltered
+        : typeFiltered.where((n) {
             final lower = _searchQuery.toLowerCase();
             return n.title.toLowerCase().contains(lower) ||
                 n.rawTranscription.toLowerCase().contains(lower);
@@ -52,7 +61,11 @@ class _NotePickerPageState extends ConsumerState<NotePickerPage> {
             if (context.canPop()) context.pop();
           },
         ),
-        title: const Text('Add Voice Notes'),
+        title: Text(widget.filterType == 'text'
+            ? 'Add Text Notes'
+            : widget.filterType == 'voice'
+                ? 'Add Voice Notes'
+                : 'Add Notes'),
         actions: [
           TextButton(
             onPressed: _selectedNoteIds.isEmpty
@@ -160,7 +173,9 @@ class _NotePickerPageState extends ConsumerState<NotePickerPage> {
                             ],
                           ],
                         ),
-                        secondary: const Icon(Icons.mic_rounded),
+                        secondary: Icon(note.audioFilePath.isEmpty
+                            ? Icons.edit_note_rounded
+                            : Icons.mic_rounded),
                       );
                     },
                   ),

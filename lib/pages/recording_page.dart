@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vaanix/nav.dart';
@@ -17,10 +18,41 @@ import 'package:vaanix/utils/profanity_filter.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
 
+const _audioFocusChannel = MethodChannel('com.vaanix.app/audio_focus');
+
+/// Request transient exclusive audio focus (pauses other media apps).
+Future<void> _requestAudioFocus() async {
+  try {
+    await _audioFocusChannel.invokeMethod('requestAudioFocus');
+  } catch (e) {
+    debugPrint('requestAudioFocus failed: $e');
+  }
+}
+
+/// Abandon audio focus so other media apps resume playback.
+Future<void> _abandonAudioFocus() async {
+  try {
+    await _audioFocusChannel.invokeMethod('abandonAudioFocus');
+  } catch (e) {
+    debugPrint('abandonAudioFocus failed: $e');
+  }
+}
+
+/// Send a media "play" key event to resume previous media app.
+/// Used for whisper mode where mic policy pauses media independently of audio focus.
+Future<void> _resumeMedia() async {
+  try {
+    await _audioFocusChannel.invokeMethod('resumeMedia');
+  } catch (e) {
+    debugPrint('resumeMedia failed: $e');
+  }
+}
+
 class RecordingPage extends ConsumerStatefulWidget {
   final String? folderId;
+  final String? projectId;
 
-  const RecordingPage({super.key, this.folderId});
+  const RecordingPage({super.key, this.folderId, this.projectId});
 
   @override
   ConsumerState<RecordingPage> createState() => _RecordingPageState();
@@ -62,6 +94,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
     super.initState();
     _selectedFolderId =
         widget.folderId ?? ref.read(settingsProvider).defaultFolderId;
+    _selectedProjectId = widget.projectId;
     // Ensure WhisperService uses the user's selected model
     final selectedModel = ref.read(settingsProvider).whisperModel;
     WhisperService.instance.switchModel(selectedModel);
@@ -214,6 +247,10 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         await Future.delayed(const Duration(milliseconds: 150));
       }
 
+      // Request transient audio focus so other media apps pause properly
+      // and auto-resume when we abandon focus after recording ends.
+      await _requestAudioFocus();
+
       // Record-then-transcribe: use audio recorder with WAV format
       final path = await _recorder.startWav();
       if (!mounted) return;
@@ -353,6 +390,13 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
     } else {
       await _recorder.cancelAndDelete();
     }
+    // Abandon audio focus so other media apps (Spotify, etc.) resume.
+    // For whisper mode, also send a media-play key event because Android's
+    // mic policy pauses media independently of audio focus.
+    await _abandonAudioFocus();
+    if (_useWhisperMode) {
+      await _resumeMedia();
+    }
     if (!mounted) return;
     if (context.canPop()) {
       context.pop();
@@ -374,7 +418,14 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
       final path = await _recorder.stop();
       if (ref.read(settingsProvider).soundCuesEnabled) {
         SoundService.instance.playStop();
+        // Wait for sound cue to finish before abandoning focus
+        await Future.delayed(const Duration(milliseconds: 300));
       }
+      // Abandon audio focus and simulate media-play key so other media apps
+      // (Spotify, etc.) resume — whisper mode pauses media via Android mic
+      // policy, not audio focus, so we need the key event too.
+      await _abandonAudioFocus();
+      await _resumeMedia();
       if (!mounted || path == null) return;
 
       // Use selected folder or the one passed via constructor
@@ -411,8 +462,12 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
           );
 
       if (!mounted) return;
-      // Always navigate to home after saving
-      context.go(AppRoutes.home);
+      // Return to project detail if initiated from a project, otherwise home
+      if (widget.projectId != null && context.canPop()) {
+        context.pop();
+      } else {
+        context.go(AppRoutes.home);
+      }
     } else {
       // Live mode
       String transcription = '';
@@ -427,7 +482,10 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
       // Play stop cue after recording/transcription has stopped
       if (ref.read(settingsProvider).soundCuesEnabled) {
         SoundService.instance.playStop();
+        await Future.delayed(const Duration(milliseconds: 300));
       }
+      // Abandon audio focus so other media apps (Spotify, etc.) resume
+      await _abandonAudioFocus();
       if (!mounted) return;
 
       // Default to General folder if no folder selected
@@ -452,6 +510,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
                 ? _transcription.detectedLanguage
                 : (ref.read(settingsProvider).defaultLanguage ?? 'en'),
             folderId: folderId,
+            isVoiceNote: true,
           );
 
       // Add note to selected folder if chosen
@@ -465,8 +524,12 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
       }
 
       if (!mounted) return;
-      // Always navigate to home after saving
-      context.go(AppRoutes.home);
+      // Return to project detail if initiated from a project, otherwise home
+      if (widget.projectId != null && context.canPop()) {
+        context.pop();
+      } else {
+        context.go(AppRoutes.home);
+      }
     }
   }
 

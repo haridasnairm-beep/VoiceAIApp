@@ -956,11 +956,17 @@ class _HomePageState extends ConsumerState<HomePage> {
         .map((f) => f.name as String)
         .toList();
 
+    final projects = ref.read(projectDocumentsProvider);
+    final noteProjectNames = projects
+        .where((p) => note.projectDocumentIds.contains(p.id))
+        .map((p) => p.title)
+        .toList();
+
     final card = NoteCard(
       note: note,
       timestamp: _formatDate(note.createdAt),
       folderNames: noteFolderNames,
-      projectNames: const [],
+      projectNames: noteProjectNames,
       isSelected: _selectedNoteIds.contains(note.id),
       selectionMode: _selectionMode,
       onTap: _selectionMode
@@ -976,6 +982,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       onFolderTap: _selectionMode
           ? null
           : (_) => _showFolderChangePicker(context, ref, note),
+      onProjectTap: _selectionMode
+          ? null
+          : (_) => _showProjectChangePicker(context, ref, note),
+      onTagTap: _selectionMode
+          ? null
+          : (_) => _showTagManager(context, ref, note),
     );
 
     if (_selectionMode) return card;
@@ -1261,6 +1273,347 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // --- Single-note project change picker ---
+
+  void _showProjectChangePicker(
+      BuildContext context, WidgetRef ref, Note note) {
+    var projects = ref.read(projectDocumentsProvider);
+    final currentProjectIds = Set<String>.from(note.projectDocumentIds);
+    final selected = Set<String>.from(currentProjectIds);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.8,
+          builder: (_, scrollController) => Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 8, bottom: 4),
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color:
+                      Theme.of(context).hintColor.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Row(
+                  children: [
+                    Text('Change Project',
+                        style:
+                            Theme.of(context).textTheme.titleMedium),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 4),
+                    FilledButton(
+                      onPressed: () async {
+                        // Remove from old projects
+                        for (final pid in currentProjectIds) {
+                          if (!selected.contains(pid)) {
+                            await ref
+                                .read(projectDocumentsProvider.notifier)
+                                .removeNoteFromProject(pid, note.id);
+                          }
+                        }
+                        // Add to new projects
+                        for (final pid in selected) {
+                          if (!currentProjectIds.contains(pid)) {
+                            await ref
+                                .read(projectDocumentsProvider.notifier)
+                                .addNoteBlock(pid, note.id);
+                          }
+                        }
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                      },
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Icon(Icons.add_circle_outline_rounded,
+                    color: Theme.of(context).colorScheme.primary),
+                title: const Text('New Project'),
+                onTap: () async {
+                  final name = await _showNewNameDialog(
+                      context, 'New Project', 'Project name');
+                  if (name != null && name.trim().isNotEmpty) {
+                    final allFolders = ref.read(foldersProvider);
+                    final general =
+                        allFolders.where((f) => f.name == 'General').toList();
+                    final folderId =
+                        general.isNotEmpty ? general.first.id : null;
+                    final doc = await ref
+                        .read(projectDocumentsProvider.notifier)
+                        .create(title: name.trim(), folderId: folderId);
+                    setSheetState(() {
+                      projects = ref.read(projectDocumentsProvider);
+                      selected.add(doc.id);
+                    });
+                  }
+                },
+              ),
+              const Divider(height: 1),
+              if (projects.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Text(
+                    'No projects yet.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).hintColor,
+                        ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: projects.length,
+                    itemBuilder: (_, index) {
+                      final project = projects[index];
+                      final isChecked = selected.contains(project.id);
+                      return CheckboxListTile(
+                        value: isChecked,
+                        onChanged: (val) {
+                          setSheetState(() {
+                            if (val == true) {
+                              selected.add(project.id);
+                            } else {
+                              selected.remove(project.id);
+                            }
+                          });
+                        },
+                        secondary: Icon(
+                          Icons.article_rounded,
+                          color: isChecked
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
+                        title: Text(project.title),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Single-note label/tag manager ---
+
+  void _showTagManager(BuildContext context, WidgetRef ref, Note note) {
+    final controller = TextEditingController();
+    final currentTags = List<String>.from(note.tags);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.8,
+          builder: (_, scrollController) {
+            // Gather all existing tags from other notes for suggestions
+            final allTagCounts = ref.read(notesRepositoryProvider).getAllTagsWithCounts();
+            final suggestions = allTagCounts.keys
+                .where((t) => !currentTags.contains(t))
+                .toList()
+              ..sort();
+
+            return Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 8, bottom: 4),
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color:
+                        Theme.of(context).hintColor.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Row(
+                    children: [
+                      Text('Manage Labels',
+                          style:
+                              Theme.of(context).textTheme.titleMedium),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Done'),
+                      ),
+                    ],
+                  ),
+                ),
+                // Add new label input
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          decoration: const InputDecoration(
+                            hintText: 'Add label...',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                          ),
+                          onSubmitted: (val) {
+                            final tag = val.trim().toLowerCase();
+                            if (tag.isNotEmpty && !currentTags.contains(tag)) {
+                              ref.read(notesProvider.notifier).addTag(
+                                  noteId: note.id, tag: tag);
+                              setSheetState(() {
+                                currentTags.add(tag);
+                                controller.clear();
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        onPressed: () {
+                          final tag =
+                              controller.text.trim().toLowerCase();
+                          if (tag.isNotEmpty &&
+                              !currentTags.contains(tag)) {
+                            ref.read(notesProvider.notifier).addTag(
+                                noteId: note.id, tag: tag);
+                            setSheetState(() {
+                              currentTags.add(tag);
+                              controller.clear();
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.add, size: 20),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Current labels
+                if (currentTags.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: currentTags
+                            .map((tag) => Chip(
+                                  label: Text('#$tag',
+                                      style: const TextStyle(fontSize: 12)),
+                                  deleteIcon:
+                                      const Icon(Icons.close, size: 16),
+                                  onDeleted: () {
+                                    ref
+                                        .read(notesProvider.notifier)
+                                        .removeTag(
+                                            noteId: note.id, tag: tag);
+                                    setSheetState(() {
+                                      currentTags.remove(tag);
+                                    });
+                                  },
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                  ),
+                const Divider(height: 16),
+                // Suggestions from existing labels
+                if (suggestions.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Existing labels',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
+                                  color: Theme.of(context).hintColor)),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      itemCount: suggestions.length,
+                      itemBuilder: (_, index) {
+                        final tag = suggestions[index];
+                        final count = allTagCounts[tag] ?? 0;
+                        return ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.label_rounded,
+                              size: 20),
+                          title: Text('#$tag'),
+                          subtitle: Text(
+                            '$count note${count == 1 ? '' : 's'}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                    color: Theme.of(context).hintColor),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.add_circle_outline,
+                                size: 20),
+                            onPressed: () {
+                              ref.read(notesProvider.notifier).addTag(
+                                  noteId: note.id, tag: tag);
+                              setSheetState(() {
+                                currentTags.add(tag);
+                              });
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ] else
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'Type a label name above to create one.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(
+                                color: Theme.of(context).hintColor),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
