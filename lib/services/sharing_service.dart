@@ -133,6 +133,10 @@ class SharingService {
           buffer.writeln('🖼️ [$caption]');
           buffer.writeln();
           break;
+        case BlockType.taskBlock:
+          _writeTaskBlock(buffer, block, allNotes);
+          buffer.writeln();
+          break;
       }
     }
 
@@ -196,6 +200,10 @@ class SharingService {
           buffer.writeln('*[Image: $caption]*');
           buffer.writeln();
           break;
+        case BlockType.taskBlock:
+          _writeTaskBlock(buffer, block, allNotes, markdown: true);
+          buffer.writeln();
+          break;
       }
     }
 
@@ -242,7 +250,7 @@ class SharingService {
         final widgets = <pw.Widget>[];
 
         if (options.includeTitle) {
-          widgets.add(pw.Text(note.title,
+          widgets.add(pw.Text(_pdfSafe(note.title),
               style: pw.TextStyle(
                   fontSize: 22, fontWeight: pw.FontWeight.bold)));
           widgets.add(pw.Divider());
@@ -266,7 +274,7 @@ class SharingService {
                 ? _stripQuillDelta(note.rawTranscription)
                 : note.rawTranscription;
             widgets.add(
-                pw.Text(plain, style: const pw.TextStyle(fontSize: 12)));
+                pw.Text(_pdfSafe(plain), style: const pw.TextStyle(fontSize: 12)));
           }
           widgets.add(pw.SizedBox(height: 12));
         }
@@ -309,12 +317,12 @@ class SharingService {
         final widgets = <pw.Widget>[];
 
         if (options.includeTitle) {
-          widgets.add(pw.Text(doc.title,
+          widgets.add(pw.Text(_pdfSafe(doc.title),
               style: pw.TextStyle(
                   fontSize: 24, fontWeight: pw.FontWeight.bold)));
           if (doc.description != null && doc.description!.isNotEmpty) {
             widgets.add(pw.SizedBox(height: 4));
-            widgets.add(pw.Text(doc.description!,
+            widgets.add(pw.Text(_pdfSafe(doc.description!),
                 style: pw.TextStyle(
                     fontSize: 12,
                     color: PdfColors.grey700,
@@ -341,7 +349,7 @@ class SharingService {
               widgets.add(pw.SizedBox(height: 8));
               final text = _getPlainContent(
                   block.content ?? '', block.contentFormat);
-              widgets.add(pw.Text(text,
+              widgets.add(pw.Text(_pdfSafe(text),
                   style: pw.TextStyle(
                       fontSize: 16, fontWeight: pw.FontWeight.bold)));
               widgets.add(pw.SizedBox(height: 6));
@@ -353,7 +361,7 @@ class SharingService {
                 widgets.addAll(_deltaToPdfWidgets(content));
               } else {
                 widgets.add(pw.Text(
-                    _getPlainContent(content, block.contentFormat),
+                    _pdfSafe(_getPlainContent(content, block.contentFormat)),
                     style: const pw.TextStyle(fontSize: 12)));
               }
               widgets.add(pw.SizedBox(height: 8));
@@ -379,7 +387,7 @@ class SharingService {
                           pw.CrossAxisAlignment.start,
                       children: [
                         if (options.includeNoteTitles) ...[
-                          pw.Text(note.title,
+                          pw.Text(_pdfSafe(note.title),
                               style: pw.TextStyle(
                                   fontSize: 13,
                                   fontWeight:
@@ -393,9 +401,9 @@ class SharingService {
                               note.rawTranscription)
                         else
                           pw.Text(
-                              _getPlainContent(
+                              _pdfSafe(_getPlainContent(
                                   note.rawTranscription,
-                                  note.contentFormat),
+                                  note.contentFormat)),
                               style: const pw.TextStyle(
                                   fontSize: 11)),
                       ],
@@ -417,6 +425,11 @@ class SharingService {
                       fontSize: 11,
                       color: PdfColors.grey600,
                       fontStyle: pw.FontStyle.italic)));
+              widgets.add(pw.SizedBox(height: 8));
+              break;
+            case BlockType.taskBlock:
+              widgets.addAll(
+                  _buildTaskBlockPdfWidgets(block, allNotes));
               widgets.add(pw.SizedBox(height: 8));
               break;
           }
@@ -524,10 +537,10 @@ class SharingService {
               pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
       widgets.add(pw.SizedBox(height: 4));
       for (final a in note.actions) {
-        final check = a.isCompleted ? '☑' : '☐';
+        final check = a.isCompleted ? '[x]' : '[ ]';
         widgets.add(pw.Padding(
           padding: const pw.EdgeInsets.only(left: 8, bottom: 2),
-          child: pw.Text('$check ${a.text}',
+          child: pw.Text('$check ${_pdfSafe(a.text)}',
               style: pw.TextStyle(
                 fontSize: 11,
                 decoration:
@@ -544,12 +557,12 @@ class SharingService {
               pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
       widgets.add(pw.SizedBox(height: 4));
       for (final t in note.todos) {
-        final check = t.isCompleted ? '☑' : '☐';
+        final check = t.isCompleted ? '[x]' : '[ ]';
         final due =
             t.dueDate != null ? ' (due: ${_formatDate(t.dueDate!)})' : '';
         widgets.add(pw.Padding(
           padding: const pw.EdgeInsets.only(left: 8, bottom: 2),
-          child: pw.Text('$check ${t.text}$due',
+          child: pw.Text('$check ${_pdfSafe(t.text)}$due',
               style: pw.TextStyle(
                 fontSize: 11,
                 decoration:
@@ -566,13 +579,13 @@ class SharingService {
               pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
       widgets.add(pw.SizedBox(height: 4));
       for (final r in note.reminders) {
-        final check = r.isCompleted ? '☑' : '☐';
+        final check = r.isCompleted ? '[x]' : '[ ]';
         final time = r.reminderTime != null
             ? ' (${_formatDateTime(r.reminderTime!)})'
             : '';
         widgets.add(pw.Padding(
           padding: const pw.EdgeInsets.only(left: 8, bottom: 2),
-          child: pw.Text('$check ${r.text}$time',
+          child: pw.Text('$check ${_pdfSafe(r.text)}$time',
               style: const pw.TextStyle(fontSize: 11)),
         ));
       }
@@ -636,17 +649,9 @@ class SharingService {
 
           // Apply inline formatting to non-empty segments
           if (segment.isNotEmpty) {
-            String formatted = segment;
-            final hasBold = attrs.containsKey('bold');
-            final hasItalic = attrs.containsKey('italic');
-            if (hasBold && hasItalic) {
-              formatted = '***$formatted***';
-            } else if (hasBold) {
-              formatted = '**$formatted**';
-            } else if (hasItalic) {
-              formatted = '*$formatted*';
-            }
-            lineSegments.add(formatted);
+            // Bold, italic, and color are ignored — not renderable in
+            // plain text or messaging apps (WhatsApp shows markers literally)
+            lineSegments.add(segment);
           }
 
           // If not the last part, we hit a \n — flush the line
@@ -735,7 +740,7 @@ class SharingService {
             }
 
             lineSpans.add(pw.TextSpan(
-              text: segment,
+              text: _pdfSafe(segment),
               style: pw.TextStyle(
                 fontSize: fontSize,
                 fontWeight: fontWeight,
@@ -812,7 +817,7 @@ class SharingService {
 
       if (resultWidgets.isEmpty) {
         return [
-          pw.Text(_stripQuillDelta(deltaJson),
+          pw.Text(_pdfSafe(_stripQuillDelta(deltaJson)),
               style: const pw.TextStyle(fontSize: 12))
         ];
       }
@@ -820,7 +825,7 @@ class SharingService {
       return resultWidgets;
     } catch (_) {
       return [
-        pw.Text(_stripQuillDelta(deltaJson),
+        pw.Text(_pdfSafe(_stripQuillDelta(deltaJson)),
             style: const pw.TextStyle(fontSize: 12))
       ];
     }
@@ -841,6 +846,128 @@ class SharingService {
       }
     }
     return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Task Block helpers (shared text + PDF)
+  // ---------------------------------------------------------------------------
+
+  /// Parse JSON task refs from a task block's content field.
+  List<Map<String, dynamic>> _parseTaskRefs(String? raw) {
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      return (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Write task block content into a StringBuffer (plain text or markdown).
+  void _writeTaskBlock(StringBuffer buffer, ProjectBlock block,
+      List<Note> allNotes, {bool markdown = false}) {
+    final refs = _parseTaskRefs(block.content);
+    if (refs.isEmpty) return;
+    buffer.writeln(markdown ? '### Tasks' : 'Tasks:');
+    for (final ref in refs) {
+      final noteId = ref['noteId'] as String?;
+      final taskId = ref['taskId'] as String?;
+      final taskType = ref['taskType'] as String?;
+      if (noteId == null || taskId == null) continue;
+
+      final note = allNotes.where((n) => n.id == noteId).firstOrNull;
+      String text = '(deleted)';
+      bool completed = false;
+      DateTime? dueDate;
+
+      if (note != null && taskType == 'action') {
+        final action = note.actions.where((a) => a.id == taskId).firstOrNull;
+        if (action != null) {
+          text = action.text;
+          completed = action.isCompleted;
+        }
+      } else if (note != null) {
+        final todo = note.todos.where((t) => t.id == taskId).firstOrNull;
+        if (todo != null) {
+          text = todo.text;
+          completed = todo.isCompleted;
+          dueDate = todo.dueDate;
+        }
+      }
+
+      final check = completed ? '[x]' : '[ ]';
+      final due = dueDate != null ? ' (${dueDate.month}/${dueDate.day})' : '';
+      buffer.writeln(markdown ? '- $check $text$due' : '  $check $text$due');
+    }
+  }
+
+  /// Build PDF widgets for a task block.
+  List<pw.Widget> _buildTaskBlockPdfWidgets(
+      ProjectBlock block, List<Note> allNotes) {
+    final refs = _parseTaskRefs(block.content);
+    if (refs.isEmpty) return [];
+    final widgets = <pw.Widget>[
+      pw.Text('Tasks',
+          style: pw.TextStyle(
+              fontSize: 13, fontWeight: pw.FontWeight.bold)),
+      pw.SizedBox(height: 4),
+    ];
+
+    for (final ref in refs) {
+      final noteId = ref['noteId'] as String?;
+      final taskId = ref['taskId'] as String?;
+      final taskType = ref['taskType'] as String?;
+      if (noteId == null || taskId == null) continue;
+
+      final note = allNotes.where((n) => n.id == noteId).firstOrNull;
+      String text = '(deleted)';
+      bool completed = false;
+      DateTime? dueDate;
+
+      if (note != null && taskType == 'action') {
+        final action = note.actions.where((a) => a.id == taskId).firstOrNull;
+        if (action != null) {
+          text = action.text;
+          completed = action.isCompleted;
+        }
+      } else if (note != null) {
+        final todo = note.todos.where((t) => t.id == taskId).firstOrNull;
+        if (todo != null) {
+          text = todo.text;
+          completed = todo.isCompleted;
+          dueDate = todo.dueDate;
+        }
+      }
+
+      final check = completed ? '[x]' : '[ ]';
+      final due = dueDate != null ? ' (${dueDate.month}/${dueDate.day})' : '';
+      widgets.add(pw.Padding(
+        padding: const pw.EdgeInsets.only(left: 8, bottom: 2),
+        child: pw.Text('$check ${_pdfSafe(text)}$due',
+            style: pw.TextStyle(
+              fontSize: 11,
+              decoration:
+                  completed ? pw.TextDecoration.lineThrough : null,
+            )),
+      ));
+    }
+    return widgets;
+  }
+
+  // ---------------------------------------------------------------------------
+  // PDF text sanitiser — replace chars unsupported by built-in Helvetica font
+  // ---------------------------------------------------------------------------
+
+  static String _pdfSafe(String text) {
+    return text
+        .replaceAll('\u2014', '--')  // em dash —
+        .replaceAll('\u2013', '-')   // en dash –
+        .replaceAll('\u2018', "'")   // left single quote '
+        .replaceAll('\u2019', "'")   // right single quote '
+        .replaceAll('\u201C', '"')   // left double quote "
+        .replaceAll('\u201D', '"')   // right double quote "
+        .replaceAll('\u2026', '...') // ellipsis …
+        .replaceAll('\u00A0', ' ')   // non-breaking space
+        .replaceAll('\u2022', '-');  // bullet •
   }
 
   // ---------------------------------------------------------------------------

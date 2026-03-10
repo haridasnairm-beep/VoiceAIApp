@@ -32,6 +32,12 @@ class ProjectDocument extends HiveObject {
   @HiveField(8)
   String? folderId;
 
+  @HiveField(9, defaultValue: false)
+  bool isPinned;
+
+  @HiveField(10)
+  DateTime? pinnedAt;
+
   ProjectDocument({
     required this.id,
     required this.title,
@@ -42,6 +48,8 @@ class ProjectDocument extends HiveObject {
     DateTime? updatedAt,
     this.isDeleted = false,
     this.deletedAt,
+    this.isPinned = false,
+    this.pinnedAt,
   })  : blocks = blocks ?? [],
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
@@ -56,6 +64,8 @@ class ProjectDocument extends HiveObject {
         'updatedAt': updatedAt.toIso8601String(),
         'isDeleted': isDeleted,
         'deletedAt': deletedAt?.toIso8601String(),
+        'isPinned': isPinned,
+        'pinnedAt': pinnedAt?.toIso8601String(),
       };
 
   factory ProjectDocument.fromMap(Map<String, dynamic> m) => ProjectDocument(
@@ -70,5 +80,7 @@ class ProjectDocument extends HiveObject {
         updatedAt: DateTime.parse(m['updatedAt'] as String),
         isDeleted: m['isDeleted'] as bool? ?? false,
         deletedAt: m['deletedAt'] != null ? DateTime.parse(m['deletedAt'] as String) : null,
+        isPinned: m['isPinned'] as bool? ?? false,
+        pinnedAt: m['pinnedAt'] != null ? DateTime.parse(m['pinnedAt'] as String) : null,
       );
 }

@@ -85,8 +85,8 @@ class UserSettings extends HiveObject {
   @HiveField(26, defaultValue: false)
   bool guidedRecordingCompleted; // True once first-recording coaching is dismissed or completed
 
-  @HiveField(27, defaultValue: false)
-  bool crashReportingEnabled; // Opt-in anonymous crash reporting via Sentry
+  @HiveField(27, defaultValue: true)
+  bool crashReportingEnabled; // Anonymous crash reporting via Sentry (on by default)
 
   @HiveField(28)
   List<String> dismissedTips; // IDs of contextual tips the user has dismissed
@@ -130,6 +130,21 @@ class UserSettings extends HiveObject {
   @HiveField(41)
   DateTime? autoBackupLastRun; // When the last auto-backup was performed
 
+  @HiveField(42, defaultValue: 0)
+  int currentTipIndex; // Index of the currently displayed home tip (0-based)
+
+  @HiveField(43, defaultValue: false)
+  bool tipTileDismissed; // Whether the user has dismissed the home tip tile
+
+  @HiveField(44, defaultValue: 0)
+  int failedPinAttempts; // Persistent failed PIN attempt counter (survives app restart)
+
+  @HiveField(45)
+  DateTime? pinLockoutUntil; // Persistent lockout deadline (survives app restart)
+
+  @HiveField(46, defaultValue: 4)
+  int pinLength; // Length of the PIN (4-6 digits) — needed for auto-verify
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -158,7 +173,7 @@ class UserSettings extends HiveObject {
     this.lastBackupDate,
     this.soundCuesEnabled = true,
     this.guidedRecordingCompleted = false,
-    this.crashReportingEnabled = false,
+    this.crashReportingEnabled = true,
     List<String>? dismissedTips,
     this.lastSeenAppVersion,
     this.noteSortOrder = 'newest',
@@ -173,6 +188,11 @@ class UserSettings extends HiveObject {
     this.autoBackupFrequency = 'weekly',
     this.autoBackupMaxCount = 5,
     this.autoBackupLastRun,
+    this.currentTipIndex = 0,
+    this.tipTileDismissed = false,
+    this.failedPinAttempts = 0,
+    this.pinLockoutUntil,
+    this.pinLength = 4,
   })  : dismissedTips = dismissedTips ?? [];
 
   Map<String, dynamic> toMap() => {
@@ -218,6 +238,11 @@ class UserSettings extends HiveObject {
         'autoBackupFrequency': autoBackupFrequency,
         'autoBackupMaxCount': autoBackupMaxCount,
         'autoBackupLastRun': autoBackupLastRun?.toIso8601String(),
+        'currentTipIndex': currentTipIndex,
+        'tipTileDismissed': tipTileDismissed,
+        'failedPinAttempts': failedPinAttempts,
+        'pinLockoutUntil': pinLockoutUntil?.toIso8601String(),
+        'pinLength': pinLength,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -250,7 +275,7 @@ class UserSettings extends HiveObject {
             : null,
         soundCuesEnabled: m['soundCuesEnabled'] as bool? ?? true,
         guidedRecordingCompleted: m['guidedRecordingCompleted'] as bool? ?? false,
-        crashReportingEnabled: m['crashReportingEnabled'] as bool? ?? false,
+        crashReportingEnabled: m['crashReportingEnabled'] as bool? ?? true,
         dismissedTips: List<String>.from(m['dismissedTips'] as List? ?? []),
         lastSeenAppVersion: m['lastSeenAppVersion'] as String?,
         noteSortOrder: m['noteSortOrder'] as String? ?? 'newest',
@@ -267,5 +292,12 @@ class UserSettings extends HiveObject {
         autoBackupLastRun: m['autoBackupLastRun'] != null
             ? DateTime.parse(m['autoBackupLastRun'] as String)
             : null,
+        currentTipIndex: m['currentTipIndex'] as int? ?? 0,
+        tipTileDismissed: m['tipTileDismissed'] as bool? ?? false,
+        failedPinAttempts: m['failedPinAttempts'] as int? ?? 0,
+        pinLockoutUntil: m['pinLockoutUntil'] != null
+            ? DateTime.parse(m['pinLockoutUntil'] as String)
+            : null,
+        pinLength: m['pinLength'] as int? ?? 4,
       );
 }

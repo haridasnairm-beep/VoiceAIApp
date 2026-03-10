@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vaanix/main.dart';
 import 'package:vaanix/nav.dart';
 import 'package:vaanix/providers/settings_provider.dart';
 import 'package:vaanix/services/audio_recorder_service.dart';
@@ -15,6 +16,7 @@ import 'package:vaanix/providers/notes_provider.dart';
 import 'package:vaanix/providers/folders_provider.dart';
 import 'package:vaanix/providers/project_documents_provider.dart';
 import 'package:vaanix/utils/profanity_filter.dart';
+import '../services/app_lock_service.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
 
@@ -35,6 +37,17 @@ Future<void> _abandonAudioFocus() async {
     await _audioFocusChannel.invokeMethod('abandonAudioFocus');
   } catch (e) {
     debugPrint('abandonAudioFocus failed: $e');
+  }
+}
+
+/// Snapshot whether any media is currently playing, before sound cues or
+/// audio focus changes can alter the state. Must be called at the very start
+/// of a recording flow.
+Future<void> _checkMediaActive() async {
+  try {
+    await _audioFocusChannel.invokeMethod('checkMediaActive');
+  } catch (e) {
+    debugPrint('checkMediaActive failed: $e');
   }
 }
 
@@ -74,6 +87,22 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
   // Mode: true = whisper (record then transcribe), false = live STT
   bool _useWhisperMode = false;
 
+  /// Navigate away from recording. If in a widget recording session (app lock
+  /// bypassed), route to splash/lock screen instead of home.
+  void _exitRecording() {
+    if (AppLockService.instance.isInWidgetRecordingSession) {
+      AppLockService.instance.endWidgetRecordingSession();
+      AppLockService.instance.lock();
+      // Clear stale deep-link so splash doesn't bounce back to recording
+      VaanixApp.pendingDeepLink = null;
+      context.go(AppRoutes.splash);
+    } else if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.home);
+    }
+  }
+
   // Live transcription state (only used in live mode)
   String _finalizedText = '';
   String _interimText = '';
@@ -86,6 +115,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
 
   // UI feedback state
   bool _isSaving = false;
+  bool _showLiveBanner = false;
+  Timer? _liveBannerTimer;
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
 
@@ -114,6 +145,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
   @override
   void dispose() {
     _timer?.cancel();
+    _liveBannerTimer?.cancel();
     _pulseController.dispose();
     _scrollController.dispose();
     WakelockPlus.disable(); // Safety net — always release wakelock
@@ -129,6 +161,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
 
   Future<void> _goBack() async {
     _timer?.cancel();
+    WakelockPlus.disable();
     if (_useWhisperMode) {
       await _recorder.cancelAndDelete();
     } else if (_speechAvailable) {
@@ -136,8 +169,11 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
     } else {
       await _recorder.cancelAndDelete();
     }
+    // Abandon audio focus and resume other media apps
+    await _abandonAudioFocus();
+    await _resumeMedia();
     if (!mounted) return;
-    context.go(AppRoutes.home);
+    _exitRecording();
   }
 
   void _startTimer() {
@@ -169,6 +205,9 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
   }
 
   Future<void> _startRecording() async {
+    // Snapshot media state BEFORE any sound cues or focus changes
+    await _checkMediaActive();
+
     final settings = ref.read(settingsProvider);
     _useWhisperMode = settings.transcriptionMode == 'whisper';
 
@@ -218,7 +257,12 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         );
         if (!mounted) return;
         if (choice == 'download') {
-          context.pushReplacement(AppRoutes.audioSettings, extra: {'highlightWhisper': true});
+          // Don't allow navigating to settings during widget recording session
+          if (AppLockService.instance.isInWidgetRecordingSession) {
+            _exitRecording();
+          } else {
+            context.pushReplacement(AppRoutes.audioSettings, extra: {'highlightWhisper': true});
+          }
           return;
         } else if (choice == 'live') {
           // Switch to live mode for this session only
@@ -226,11 +270,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
           // Continue below to start live transcription
         } else {
           // Cancel — go back
-          if (context.canPop()) {
-            context.pop();
-          } else {
-            context.go(AppRoutes.home);
-          }
+          _exitRecording();
           return;
         }
       }
@@ -260,7 +300,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
           const SnackBar(
               content: Text('Microphone permission is required to record.')),
         );
-        context.go(AppRoutes.home);
+        _exitRecording();
         return;
       }
 
@@ -292,8 +332,13 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         if (!mounted) return;
         setState(() {
           _isStarting = false;
+          _showLiveBanner = true;
         });
         _startTimer();
+        // Auto-dismiss the info banner after 8 seconds
+        _liveBannerTimer = Timer(const Duration(seconds: 8), () {
+          if (mounted) setState(() => _showLiveBanner = false);
+        });
 
         // Haptic + sound cue: live recording started
         HapticService.medium();
@@ -311,11 +356,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
                 content:
                     Text('Microphone permission is required to record.')),
           );
-          if (context.canPop()) {
-            context.pop();
-          } else {
-            context.go(AppRoutes.home);
-          }
+          _exitRecording();
           return;
         }
 
@@ -347,6 +388,15 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
   void _onStatusChanged(String status) {
     if (!mounted) return;
     debugPrint('STT status: $status');
+
+    // speech_to_text's SpeechRecognizer releases its own audio session on
+    // silence timeout, which can briefly let media apps resume. Re-request
+    // our focus immediately to suppress that. Safe because Kotlin uses a
+    // single focusRequest object — no orphaned requests.
+    if ((status == 'notListening' || status == 'done') &&
+        !_isPaused && !_isStarting && !_isSaving) {
+      _requestAudioFocus();
+    }
   }
 
   Future<void> _togglePause() async {
@@ -390,19 +440,11 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
     } else {
       await _recorder.cancelAndDelete();
     }
-    // Abandon audio focus so other media apps (Spotify, etc.) resume.
-    // For whisper mode, also send a media-play key event because Android's
-    // mic policy pauses media independently of audio focus.
+    // Abandon audio focus and send media-play key so other media apps resume.
     await _abandonAudioFocus();
-    if (_useWhisperMode) {
-      await _resumeMedia();
-    }
+    await _resumeMedia();
     if (!mounted) return;
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go(AppRoutes.home);
-    }
+    _exitRecording();
   }
 
   Future<void> _saveAndProcess() async {
@@ -462,8 +504,10 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
           );
 
       if (!mounted) return;
-      // Return to project detail if initiated from a project, otherwise home
-      if (widget.projectId != null && context.canPop()) {
+      // Return to lock screen if widget recording session, otherwise home/project
+      if (AppLockService.instance.isInWidgetRecordingSession) {
+        _exitRecording();
+      } else if (widget.projectId != null && context.canPop()) {
         context.pop();
       } else {
         context.go(AppRoutes.home);
@@ -484,8 +528,11 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         SoundService.instance.playStop();
         await Future.delayed(const Duration(milliseconds: 300));
       }
-      // Abandon audio focus so other media apps (Spotify, etc.) resume
+      // Abandon audio focus so other media apps (Spotify, etc.) resume.
+      // Also send media-play key event because speech_to_text may have
+      // independently managed audio focus during the session.
       await _abandonAudioFocus();
+      await _resumeMedia();
       if (!mounted) return;
 
       // Default to General folder if no folder selected
@@ -523,9 +570,20 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
         ref.read(projectDocumentsProvider.notifier).addNoteBlock(_selectedProjectId!, note.id);
       }
 
+      // Process voice commands (folder/project/tag/task auto-assignment)
+      if (transcription.isNotEmpty) {
+        await ref.read(notesProvider.notifier).processVoiceCommands(
+              noteId: note.id,
+              hasManualFolder: folderId != null,
+              hasManualProject: _selectedProjectId != null,
+            );
+      }
+
       if (!mounted) return;
-      // Return to project detail if initiated from a project, otherwise home
-      if (widget.projectId != null && context.canPop()) {
+      // Return to lock screen if widget recording session, otherwise home/project
+      if (AppLockService.instance.isInWidgetRecordingSession) {
+        _exitRecording();
+      } else if (widget.projectId != null && context.canPop()) {
         context.pop();
       } else {
         context.go(AppRoutes.home);
@@ -876,6 +934,126 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
                   ),
                 ],
               ),
+
+              // Widget recording session indicator — floating lock icon with tap hint
+              if (AppLockService.instance.isInWidgetRecordingSession)
+                Positioned(
+                  right: 16,
+                  top: 80,
+                  child: Tooltip(
+                    message: 'Quick record. Authenticate for full app access after recording completed.',
+                    triggerMode: TooltipTriggerMode.tap,
+                    showDuration: const Duration(seconds: 4),
+                    preferBelow: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.inverseSurface,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onInverseSurface,
+                    ),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.85),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.lock_outline_rounded,
+                        size: 22,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Live STT info banner
+              if (_showLiveBanner && !_useWhisperMode)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  top: 80,
+                  child: AnimatedOpacity(
+                    opacity: 1.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(12),
+                      color: const Color(0xDD1B1B1B),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline_rounded,
+                                color: Colors.amber, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    height: 1.4,
+                                    color: Colors.white,
+                                  ),
+                                  children: [
+                                    const TextSpan(
+                                        text: 'Verify all spoken text appears in '),
+                                    const TextSpan(
+                                      text: 'white',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const TextSpan(text: ' ('),
+                                    TextSpan(
+                                      text: 'green = still processing',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade400,
+                                      ),
+                                    ),
+                                    const TextSpan(
+                                        text: ') before saving. For better accuracy, use '),
+                                    const TextSpan(
+                                      text: 'Whisper mode',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.amber,
+                                      ),
+                                    ),
+                                    const TextSpan(text: '.'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close,
+                                  color: Colors.white70, size: 18),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                  minWidth: 32, minHeight: 32),
+                              onPressed: () {
+                                _liveBannerTimer?.cancel();
+                                setState(() => _showLiveBanner = false);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
 
               // Saving overlay
               if (_isSaving)

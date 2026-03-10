@@ -8,7 +8,10 @@ import '../theme.dart';
 import '../providers/notes_provider.dart';
 import '../providers/folders_provider.dart';
 import '../providers/tags_provider.dart';
+import '../providers/project_documents_provider.dart';
 import '../models/note.dart';
+import '../models/project_document.dart';
+import '../models/project_block.dart';
 import '../widgets/settings_widgets.dart' show friendlyLanguageName;
 import '../widgets/empty_state_illustrated.dart';
 
@@ -92,6 +95,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final allNotes = ref.watch(notesProvider);
     final folders = ref.watch(foldersProvider);
     final tags = ref.watch(tagNamesProvider);
+    final projects = ref.watch(projectDocumentsProvider);
     final results = _getFilteredResults();
 
     return Scaffold(
@@ -102,7 +106,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Search Notes',
+          'Search',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: Theme.of(context).colorScheme.onSurface,
@@ -219,7 +223,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
             // Results
             Expanded(
-              child: _buildResultsBody(context, allNotes, results),
+              child: _buildResultsBody(context, allNotes, results, projects),
             ),
           ],
         ),
@@ -291,9 +295,41 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     return rawText;
   }
 
+  /// Extract plain text from a project block's content (handles quill_delta).
+  String _blockPlainText(ProjectBlock block) {
+    final content = block.content ?? '';
+    if (content.isEmpty) return '';
+    if (block.contentFormat == 'quill_delta') {
+      try {
+        final json = jsonDecode(content) as List;
+        return Document.fromJson(json).toPlainText().trim();
+      } catch (_) {}
+    }
+    return content;
+  }
+
+  /// Search projects by title, description, section headers, and free text blocks.
+  List<ProjectDocument> _searchProjects(List<ProjectDocument> projects) {
+    if (_query.isEmpty) return projects;
+    final lower = _query.toLowerCase();
+    return projects.where((p) {
+      if (p.title.toLowerCase().contains(lower)) return true;
+      if (p.description != null &&
+          p.description!.toLowerCase().contains(lower)) return true;
+      for (final block in p.blocks) {
+        if (block.type == BlockType.sectionHeader ||
+            block.type == BlockType.freeText) {
+          if (_blockPlainText(block).toLowerCase().contains(lower)) return true;
+        }
+      }
+      return false;
+    }).toList();
+  }
+
   Widget _buildResultsBody(
-      BuildContext context, List<Note> allNotes, List<Note> results) {
-    if (allNotes.isEmpty) {
+      BuildContext context, List<Note> allNotes, List<Note> results,
+      List<ProjectDocument> projects) {
+    if (allNotes.isEmpty && projects.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(48.0),
@@ -304,7 +340,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                   color: Theme.of(context).hintColor, size: 48),
               const SizedBox(height: 16),
               Text(
-                "No notes yet. Record your first voice note!",
+                "No notes or projects yet. Record your first voice note!",
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Theme.of(context).hintColor,
@@ -316,7 +352,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       );
     }
 
-    if (results.isEmpty) {
+    // Check if there are any project matches too before showing empty state
+    final projectResults = _searchProjects(projects);
+    if (results.isEmpty && projectResults.isEmpty) {
       return Center(
         child: EmptyStateIllustrated(
           icon: Icons.search_off_rounded,
@@ -324,19 +362,19 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               ? "No results for '$_query'"
               : 'No notes in this filter',
           subtitle:
-              'Try different keywords or search across\nnotes, tasks, and reminders',
+              'Try different keywords or search across\nnotes, projects, tasks, and reminders',
           iconColor: Theme.of(context).colorScheme.secondary,
         ),
       );
     }
 
-    // When no query, show flat note list (no sectioning needed)
+    // When no query, show flat note + project list (no sectioning needed)
     if (_query.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(20),
         children: [
           Text(
-            "${results.length} notes",
+            "${results.length} notes · ${projects.length} projects",
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: Theme.of(context).colorScheme.secondary,
                 ),
@@ -359,6 +397,33 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                   extra: {'noteId': note.id}),
             );
           }),
+          ...projects.map((project) {
+            final blockTexts = project.blocks
+                .where((b) =>
+                    b.type == BlockType.sectionHeader ||
+                    b.type == BlockType.freeText)
+                .map((b) => _blockPlainText(b))
+                .where((t) => t.isNotEmpty)
+                .take(2)
+                .join(' · ');
+            final preview = project.description?.isNotEmpty == true
+                ? project.description!
+                : blockTexts;
+            return _SearchResultCard(
+              title: project.title,
+              lang: '${project.blocks.length} blocks',
+              preview: preview.length > 100
+                  ? preview.substring(0, 100)
+                  : preview,
+              catLabel: "PROJECT",
+              catIcon: Icons.article_rounded,
+              catBg: const Color(0xFFF3E5F5),
+              catColor: const Color(0xFF7B1FA2),
+              date: _formatDate(project.createdAt),
+              onTap: () => context.push(AppRoutes.projectDocumentDetail,
+                  extra: {'documentId': project.id}),
+            );
+          }),
         ],
       );
     }
@@ -371,6 +436,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         n.title.toLowerCase().contains(lower) ||
         _plainText(n).toLowerCase().contains(lower) ||
         n.topics.any((t) => t.toLowerCase().contains(lower)));
+
+    // Projects section: reuse pre-computed results
+    final projectMatches = projectResults;
 
     // Action items section
     final actionMatches = <({Note note, String text})>[];
@@ -405,6 +473,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     }
 
     final totalCount = noteMatches.length +
+        projectMatches.length +
         actionMatches.length +
         todoMatches.length +
         reminderMatches.length;
@@ -444,6 +513,48 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               date: _formatDate(note.createdAt),
               onTap: () => context.push(AppRoutes.noteDetail,
                   extra: {'noteId': note.id}),
+            );
+          }),
+          const SizedBox(height: 8),
+        ],
+
+        // Projects section
+        if (projectMatches.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.article_rounded,
+            label: 'Projects',
+            count: projectMatches.length,
+            color: const Color(0xFF7B1FA2),
+          ),
+          const SizedBox(height: 8),
+          ...projectMatches.map((project) {
+            // Build preview from matching blocks
+            final matchingBlocks = project.blocks
+                .where((b) =>
+                    b.type == BlockType.sectionHeader ||
+                    b.type == BlockType.freeText)
+                .map((b) => _blockPlainText(b))
+                .where((t) => t.toLowerCase().contains(lower))
+                .take(2)
+                .join(' · ');
+            final preview = matchingBlocks.isNotEmpty
+                ? matchingBlocks
+                : (project.description?.isNotEmpty == true
+                    ? project.description!
+                    : '${project.blocks.length} blocks');
+            return _SearchResultCard(
+              title: project.title,
+              lang: '${project.blocks.length} blocks',
+              preview: preview.length > 100
+                  ? preview.substring(0, 100)
+                  : preview,
+              catLabel: "PROJECT",
+              catIcon: Icons.article_rounded,
+              catBg: const Color(0xFFF3E5F5),
+              catColor: const Color(0xFF7B1FA2),
+              date: _formatDate(project.createdAt),
+              onTap: () => context.push(AppRoutes.projectDocumentDetail,
+                  extra: {'documentId': project.id}),
             );
           }),
           const SizedBox(height: 8),

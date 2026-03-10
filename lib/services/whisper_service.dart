@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:whisper_flutter_new/whisper_flutter_new.dart';
@@ -277,7 +278,35 @@ class WhisperService {
     }
   }
 
-  /// Transcribe a WAV audio file and return the text.
+  static const _fileChannel = MethodChannel('com.vaanix.app/file_intent');
+
+  /// Convert a non-WAV audio file to 16kHz mono WAV using Android's MediaCodec.
+  /// Returns the path to the converted WAV file, or null on failure.
+  Future<String?> _convertToWav(String inputPath) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final outputPath = '${dir.path}/recordings/converted_$ts.wav';
+      debugPrint('WhisperService: converting $inputPath → $outputPath');
+      final result = await _fileChannel.invokeMethod<String>('convertToWav', {
+        'inputPath': inputPath,
+        'outputPath': outputPath,
+      });
+      if (result != null && File(result).existsSync()) {
+        final size = File(result).lengthSync();
+        debugPrint('WhisperService: conversion OK (${(size / 1024).toStringAsFixed(1)} KB)');
+        return result;
+      }
+      debugPrint('WhisperService: conversion returned null or file missing');
+      return null;
+    } catch (e) {
+      debugPrint('WhisperService: conversion failed: $e');
+      return null;
+    }
+  }
+
+  /// Transcribe an audio file and return the text.
+  /// Non-WAV files are automatically converted to WAV before transcription.
   /// Returns empty string on failure.
   Future<String> transcribe(String wavPath, {String language = 'en', bool isTranslate = false}) async {
     // Validate input file
@@ -287,7 +316,21 @@ class WhisperService {
       return '';
     }
     final fileSize = await file.length();
-    debugPrint('WhisperService: file size: ${(fileSize / 1024).toStringAsFixed(1)} KB');
+    final ext = wavPath.split('.').last.toLowerCase();
+    debugPrint('WhisperService: file size: ${(fileSize / 1024).toStringAsFixed(1)} KB, format: .$ext');
+
+    // Convert non-WAV files to WAV before transcription
+    String transcribePath = wavPath;
+    if (ext != 'wav') {
+      debugPrint('WhisperService: non-WAV file detected ($ext), converting to WAV...');
+      final converted = await _convertToWav(wavPath);
+      if (converted != null) {
+        transcribePath = converted;
+      } else {
+        debugPrint('WhisperService: conversion failed, cannot transcribe $ext file');
+        return '';
+      }
+    }
 
     if (fileSize < 1024) {
       debugPrint('WhisperService: file too small ($fileSize bytes), likely empty recording');
@@ -310,11 +353,11 @@ class WhisperService {
     }
 
     try {
-      debugPrint('WhisperService: transcribing $wavPath (model: $_currentModelName, language: $language, translate: $isTranslate)');
+      debugPrint('WhisperService: transcribing $transcribePath (model: $_currentModelName, language: $language, translate: $isTranslate)');
       // Timeout: 3 minutes max — prevents hanging when app is backgrounded
       final result = await _whisper!.transcribe(
         transcribeRequest: TranscribeRequest(
-          audio: wavPath,
+          audio: transcribePath,
           language: language,
           isTranslate: isTranslate,
           isNoTimestamps: true,

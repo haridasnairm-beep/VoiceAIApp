@@ -26,13 +26,15 @@ class ProjectDocumentAdapter extends TypeAdapter<ProjectDocument> {
       updatedAt: fields[5] as DateTime?,
       isDeleted: fields[6] == null ? false : fields[6] as bool,
       deletedAt: fields[7] as DateTime?,
+      isPinned: fields[9] == null ? false : fields[9] as bool,
+      pinnedAt: fields[10] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ProjectDocument obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -50,7 +52,11 @@ class ProjectDocumentAdapter extends TypeAdapter<ProjectDocument> {
       ..writeByte(7)
       ..write(obj.deletedAt)
       ..writeByte(8)
-      ..write(obj.folderId);
+      ..write(obj.folderId)
+      ..writeByte(9)
+      ..write(obj.isPinned)
+      ..writeByte(10)
+      ..write(obj.pinnedAt);
   }
 
   @override

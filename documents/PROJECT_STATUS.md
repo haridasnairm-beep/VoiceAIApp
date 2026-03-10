@@ -1,8 +1,8 @@
 # Vaanix - Project Status
 
-**Last Updated:** 2026-03-07
-**Current Version:** 1.0.0 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). **All 7 Phase 1.5 waves complete** (Steps 11–17). Post-wave: Permission Management (Issue #13) + Gesture FAB (Issue #14) + Auto-Naming Preference + Persistent Counters + UX Fixes + Auto-Backup + Collapsible Backup Sections + Download Pause/Resume + Transcription Mode Redesign + Note Organize Section + GestureFab Library/Folder + Stats Projects Card + Folder Unified Timeline + Splash Timing + Ready Page Go Back + Media Resume After Recording + Note Card Capsules + Project GestureFab + Note Picker Filtering + Live V-Prefix Fix + Transcription Duplication Fix + Version History Fix done. **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
+**Last Updated:** 2026-03-10
+**Current Version:** 1.0.5 (Phase 1 — Release)
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). **All 7 Phase 1.5 waves complete** (Steps 11–17). Post-wave: Permission Management (Issue #13) + Gesture FAB (Issue #14) + Auto-Naming Preference + Persistent Counters + UX Fixes + Auto-Backup + Collapsible Backup Sections + Download Pause/Resume + Transcription Mode Redesign + Note Organize Section + GestureFab Library/Folder + Stats Projects Card + Folder Unified Timeline + Splash Timing + Ready Page Go Back + Media Resume After Recording + Note Card Capsules + Project GestureFab + Note Picker Filtering + Live V-Prefix Fix + Transcription Duplication Fix + Version History Fix + Calendar Page Redesign (Issue #15) + Audio Focus Hardening + Version History Deletion + Live Recording Info Banner + Pinned Projects + Project Swipe/Long Press Actions + Smart Filters Functional + Project Search + Voice Commands in Live Mode + Calendar New Project Dialog + Support Page Legal Section + Find & Replace in Project Documents + Task Capsule Layout (Issue #16) + Reminder Delete Fix (Issue #17) + Photo Upload Fix (Issue #18) + Backup Restore UX (Issue #19) + Reminder Reschedule Fix (Issue #20) + Share-to-Vaanix (Step 19P) + User Guide & Home Tip Tile (Step 20P) + Native Audio Conversion + Re-transcribe Page + Tip Tile Session Behavior + Widget UX Redesign + App Lock Widget Bypass Fix + PIN Length Storage + Widget Live Updates + Widget Deep Link Pre-check + Tips User Guide Navigation + Support Page Highlight done. **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
 ---
@@ -180,13 +180,18 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - Lock screen page with PIN entry + biometric trigger
 - SHA-256 PIN hashing (never store raw PIN) via `crypto` package
 - `AppLockService` for hash verification and biometric auth
+- Variable-length PIN (4-6 digits) with stored `pinLength` (HiveField 46) for exact auto-verify
+- Widget deep links route through lock screen when app is locked (except recording)
 
 ### Step 10.6: Home Screen Widget ✅
-- Quick Record widget (2×1): tap anywhere to open Recording screen directly
-- Dashboard widget (4×2): shows note count, open task count, latest note preview
+- Quick Record widget (2×1): REC button at right-center; tap to open Recording screen directly
+- Dashboard widget (4×2): background image with scrim; tappable Notes/Tasks cells linking to Home tabs; note count, task count, latest note preview; minimal mode with centered REC
 - Widget Privacy setting (Security page): Full / Record-Only (default) / Minimal — controls what data is shown when App Lock is enabled
-- `HomeWidgetService` pushes data to widgets on foreground resume
+- `HomeWidgetService` pushes data on foreground resume + on note/task CRUD + on privacy/lock setting changes
 - Android `VaanixWidgetSmall.kt` + `VaanixWidgetDashboard.kt` (AppWidgetProvider)
+- Widget picker shows live preview layout (API 31+)
+- `singleTask` launch mode prevents multiple app windows from widget taps
+- Quick capture mode: floating lock icon on recording page when accessed via widget bypass
 
 ### Step 15 (Wave 5): Discoverability & Polish ✅
 - **Overdue task badge** on NoteCard — red badge with overdue count next to pin icon
@@ -309,6 +314,21 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 ---
 
+## Security Hardening (v1.0.4) ✅ COMPLETED
+
+Comprehensive security audit and fix wave addressing 6 security issues, 2 privacy policy gaps, and 3 code quality items:
+
+- **A1:** PIN salt hardened — `Random.secure()` replaces timestamp-based salt
+- **A2:** PIN lockout persists across app restarts (HiveFields 44-45)
+- **A3:** Backup KDF iterations increased 10x (10k → 100k) with backward-compatible fallback
+- **A4:** Backup HMAC-SHA256 integrity verification (schema v2) detects corruption/tampering
+- **A5:** File intent validation — extension, existence, and size checks before restore
+- **A6:** PIN hash removed from Riverpod state — reads/writes via `AppLockService` only
+- **B1-B2:** Privacy policy and Terms updated — Sentry disclosure, biometric/widget sections, encryption clarification, audio/image OS sandboxing
+- **C1:** 14 bare `print()` calls replaced with `debugPrint()` (stripped in release builds)
+
+---
+
 ## Component Status
 
 ### Infrastructure & Setup
@@ -316,7 +336,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 |---|---|---|
 | Project Setup | ✅ Done | Flutter project, branding aligned |
 | Theme System | ✅ Done | Light/dark mode, Material 3, Google Fonts |
-| Navigation | ✅ Done | 26 routes via go_router with extras, onboarding redirect |
+| Navigation | ✅ Done | 31 routes via go_router with extras, onboarding redirect |
 | Audio Recording Service | ✅ Done | Record, pause, resume, stop, cancel |
 | Audio Player Service | ✅ Done | Play, pause, seek via just_audio |
 | Transcription Service | ✅ Done | On-device STT via speech_to_text |
@@ -462,6 +482,12 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 97. Restore: select .vnbak file → enter passphrase → verify & preview manifest → confirm → restore
 98. Backup manifest preview shows creation date, app version, note/folder/image counts before restoring
 99. Last backup date displayed on Backup & Restore page header
+100. Share-to-Vaanix: share audio from any app into Vaanix for transcription; sender field, folder picker, Whisper check
+101. Native audio format conversion: shared .opus/.ogg/.mp3/.aac files auto-converted to WAV via Android MediaCodec before Whisper transcription
+102. User Guide: 14 collapsible sections covering all features; accessible from Help & Support; deep-link support via `openSectionIndex`
+103. Home tip tile: shuffled tips per session, auto-hide after 1 minute, session-only dismiss, snackbar with permanent disable link
+104. Re-transcribe page: multi-select bulk re-transcription with progress, confirmation dialog, rich text warnings, version history preservation
+105. Share receive sheet: default folder pre-selected from user preferences; nav bar safe button sizing
 
 ---
 

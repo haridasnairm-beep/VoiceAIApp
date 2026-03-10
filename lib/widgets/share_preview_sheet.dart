@@ -233,11 +233,12 @@ class _SharePreviewSheetState extends State<SharePreviewSheet> {
     );
   }
 
-  /// Parses a single line for **bold** and *italic* markdown markers.
+  /// Parses a single line for **bold**, *italic*, and {{color:...}} markers.
   List<TextSpan> _parseMarkdownSpans(String text, TextStyle? baseStyle) {
     final spans = <TextSpan>[];
-    // Match **bold** and *italic* patterns
-    final regex = RegExp(r'\*\*(.+?)\*\*|\*(.+?)\*');
+    // Match color markers, **bold**, and *italic* patterns
+    final regex = RegExp(
+        r'\{\{color:(#[0-9a-fA-F]{6,8})\}\}(.*?)\{\{/color\}\}|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*');
     int lastEnd = 0;
 
     for (final match in regex.allMatches(text)) {
@@ -247,15 +248,30 @@ class _SharePreviewSheetState extends State<SharePreviewSheet> {
       }
 
       if (match.group(1) != null) {
+        // {{color:#hex}}content{{/color}}
+        final colorHex = match.group(1)!;
+        final content = match.group(2) ?? '';
+        final color = _parseColor(colorHex);
+        // Recursively parse inner content for bold/italic within colored text
+        final innerSpans = _parseInnerFormatting(content, baseStyle, color);
+        spans.addAll(innerSpans);
+      } else if (match.group(3) != null) {
+        // ***bold italic***
+        spans.add(TextSpan(
+          text: match.group(3),
+          style: baseStyle?.copyWith(
+              fontWeight: FontWeight.bold, fontStyle: FontStyle.italic),
+        ));
+      } else if (match.group(4) != null) {
         // **bold**
         spans.add(TextSpan(
-          text: match.group(1),
+          text: match.group(4),
           style: baseStyle?.copyWith(fontWeight: FontWeight.bold),
         ));
-      } else if (match.group(2) != null) {
+      } else if (match.group(5) != null) {
         // *italic*
         spans.add(TextSpan(
-          text: match.group(2),
+          text: match.group(5),
           style: baseStyle?.copyWith(fontStyle: FontStyle.italic),
         ));
       }
@@ -273,6 +289,68 @@ class _SharePreviewSheetState extends State<SharePreviewSheet> {
     }
 
     return spans;
+  }
+
+  /// Parse inner bold/italic formatting within a colored span.
+  List<TextSpan> _parseInnerFormatting(
+      String text, TextStyle? baseStyle, Color color) {
+    final spans = <TextSpan>[];
+    final regex = RegExp(r'\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*');
+    int lastEnd = 0;
+
+    for (final match in regex.allMatches(text)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(
+          text: text.substring(lastEnd, match.start),
+          style: baseStyle?.copyWith(color: color),
+        ));
+      }
+      if (match.group(1) != null) {
+        spans.add(TextSpan(
+          text: match.group(1),
+          style: baseStyle?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic),
+        ));
+      } else if (match.group(2) != null) {
+        spans.add(TextSpan(
+          text: match.group(2),
+          style: baseStyle?.copyWith(
+              color: color, fontWeight: FontWeight.bold),
+        ));
+      } else if (match.group(3) != null) {
+        spans.add(TextSpan(
+          text: match.group(3),
+          style: baseStyle?.copyWith(
+              color: color, fontStyle: FontStyle.italic),
+        ));
+      }
+      lastEnd = match.end;
+    }
+
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastEnd),
+        style: baseStyle?.copyWith(color: color),
+      ));
+    }
+
+    if (spans.isEmpty) {
+      spans.add(TextSpan(
+        text: text,
+        style: baseStyle?.copyWith(color: color),
+      ));
+    }
+
+    return spans;
+  }
+
+  /// Parse a hex color string like #FF0000 or #ffFF0000.
+  Color _parseColor(String hex) {
+    var h = hex.replaceFirst('#', '');
+    if (h.length == 6) h = 'FF$h'; // add full opacity
+    return Color(int.parse(h, radix: 16));
   }
 
   Future<void> _exportPdf() async {

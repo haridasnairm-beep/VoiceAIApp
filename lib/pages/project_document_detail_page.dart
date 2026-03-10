@@ -14,12 +14,13 @@ import '../services/sharing_service.dart';
 import '../services/image_attachment_repository.dart';
 import '../widgets/image_block_widget.dart';
 import '../widgets/share_preview_sheet.dart';
+import '../widgets/find_replace_bar.dart';
 import '../widgets/gesture_fab.dart';
 import '../widgets/speed_dial_fab.dart';
 import '../widgets/template_picker_sheet.dart';
 import '../constants/note_templates.dart';
 import '../providers/settings_provider.dart';
-import '../providers/folders_provider.dart';
+
 import 'dart:convert';
 import 'package:flutter_quill/flutter_quill.dart';
 
@@ -319,6 +320,217 @@ class ProjectDocumentDetailPage extends ConsumerStatefulWidget {
 
 class _ProjectDocumentDetailPageState
     extends ConsumerState<ProjectDocumentDetailPage> {
+  // Inline title editing
+  bool _isEditingTitle = false;
+  final TextEditingController _titleController = TextEditingController();
+
+  // Find & Replace state
+  bool _showFindBar = false;
+  String _searchQuery = '';
+  List<({String blockId, String? noteId, BlockType blockType, int start, int end})> _findMatches = [];
+  int _currentMatchIndex = 0;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _startEditTitle(dynamic doc) {
+    _titleController.text = doc.title;
+    setState(() => _isEditingTitle = true);
+  }
+
+  void _saveTitle(dynamic doc) {
+    final newTitle = _titleController.text.trim();
+    if (newTitle.isNotEmpty && newTitle != doc.title) {
+      doc.title = newTitle;
+      ref.read(projectDocumentsProvider.notifier).updateDocument(doc);
+    }
+    setState(() => _isEditingTitle = false);
+  }
+
+  String _blockPlainText(ProjectBlock block) {
+    final content = block.content ?? '';
+    if (block.contentFormat == 'quill_delta' && content.isNotEmpty) {
+      try {
+        final json = jsonDecode(content) as List;
+        return Document.fromJson(json).toPlainText().trim();
+      } catch (_) {}
+    }
+    return content;
+  }
+
+  String _notePlainText(Note note) {
+    if (note.contentFormat == 'quill_delta' && note.rawTranscription.isNotEmpty) {
+      try {
+        final json = jsonDecode(note.rawTranscription) as List;
+        return Document.fromJson(json).toPlainText().trim();
+      } catch (_) {}
+    }
+    return note.rawTranscription;
+  }
+
+  void _performSearch(String query) {
+    final doc = ref.read(projectDocumentsProvider)
+        .where((d) => d.id == widget.documentId).firstOrNull;
+    if (doc == null) {
+      setState(() { _searchQuery = query; _findMatches = []; });
+      return;
+    }
+    final allNotes = ref.read(notesProvider);
+    final sortedBlocks = List.of(doc.blocks)
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final matches = <({String blockId, String? noteId, BlockType blockType, int start, int end})>[];
+
+    if (query.isNotEmpty) {
+      final lowerQuery = query.toLowerCase();
+      for (final block in sortedBlocks) {
+        String plainText = '';
+        String? noteId;
+        if (block.type == BlockType.noteReference) {
+          noteId = block.noteId;
+          final note = allNotes.where((n) => n.id == block.noteId).firstOrNull;
+          if (note != null) plainText = _notePlainText(note);
+        } else if (block.type == BlockType.sectionHeader || block.type == BlockType.freeText) {
+          plainText = _blockPlainText(block);
+        } else {
+          continue;
+        }
+        final lowerText = plainText.toLowerCase();
+        int searchFrom = 0;
+        while (true) {
+          final idx = lowerText.indexOf(lowerQuery, searchFrom);
+          if (idx == -1) break;
+          matches.add((
+            blockId: block.id, noteId: noteId,
+            blockType: block.type, start: idx, end: idx + query.length,
+          ));
+          searchFrom = idx + 1;
+        }
+      }
+    }
+    setState(() {
+      _searchQuery = query;
+      _findMatches = matches;
+      _currentMatchIndex = 0;
+    });
+  }
+
+  void _navigateMatch(int delta) {
+    if (_findMatches.isEmpty) return;
+    setState(() {
+      _currentMatchIndex = (_currentMatchIndex + delta) % _findMatches.length;
+      if (_currentMatchIndex < 0) _currentMatchIndex = _findMatches.length - 1;
+    });
+    _scrollToCurrentMatch();
+  }
+
+  void _scrollToCurrentMatch() {
+    if (_findMatches.isEmpty || !_scrollController.hasClients) return;
+    final match = _findMatches[_currentMatchIndex];
+    final doc = ref.read(projectDocumentsProvider)
+        .where((d) => d.id == widget.documentId).firstOrNull;
+    if (doc == null) return;
+    final sortedBlocks = List.of(doc.blocks)
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final blockIndex = sortedBlocks.indexWhere((b) => b.id == match.blockId);
+    if (blockIndex >= 0) {
+      final targetOffset = (blockIndex * 80.0)
+          .clamp(0.0, _scrollController.position.maxScrollExtent);
+      _scrollController.animateTo(targetOffset,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    }
+  }
+
+  void _replaceCurrentMatch(String replacement) {
+    if (_findMatches.isEmpty) return;
+    final match = _findMatches[_currentMatchIndex];
+    _replaceMatch(match, replacement);
+    Future.microtask(() => _performSearch(_searchQuery));
+  }
+
+  void _replaceAllMatches(String replacement) {
+    if (_findMatches.isEmpty) return;
+    // Group by block, replace in reverse order to preserve positions
+    final grouped = <String, List<({String blockId, String? noteId, BlockType blockType, int start, int end})>>{};
+    for (final m in _findMatches) {
+      grouped.putIfAbsent(m.blockId, () => []).add(m);
+    }
+    for (final blockMatches in grouped.values) {
+      final sorted = List.of(blockMatches)
+        ..sort((a, b) => b.start.compareTo(a.start));
+      for (final match in sorted) {
+        _replaceMatch(match, replacement);
+      }
+    }
+    Future.microtask(() => _performSearch(_searchQuery));
+  }
+
+  void _replaceMatch(
+    ({String blockId, String? noteId, BlockType blockType, int start, int end}) match,
+    String replacement,
+  ) {
+    final doc = ref.read(projectDocumentsProvider)
+        .where((d) => d.id == widget.documentId).firstOrNull;
+    if (doc == null) return;
+
+    if (match.blockType == BlockType.noteReference && match.noteId != null) {
+      final allNotes = ref.read(notesProvider);
+      final note = allNotes.where((n) => n.id == match.noteId).firstOrNull;
+      if (note == null) return;
+      if (note.contentFormat == 'quill_delta') {
+        try {
+          final json = jsonDecode(note.rawTranscription) as List;
+          final quillDoc = Document.fromJson(json);
+          quillDoc.delete(match.start, match.end - match.start);
+          quillDoc.insert(match.start, replacement);
+          ref.read(projectDocumentsProvider.notifier).editNoteTranscriptRich(
+            documentId: doc.id, noteId: match.noteId!,
+            newContent: jsonEncode(quillDoc.toDelta().toJson()),
+            contentFormat: 'quill_delta', documentTitle: doc.title,
+          );
+          return;
+        } catch (_) {}
+      }
+      final text = note.rawTranscription;
+      final newText = text.substring(0, match.start) + replacement + text.substring(match.end);
+      ref.read(projectDocumentsProvider.notifier).editNoteTranscript(
+        documentId: doc.id, noteId: match.noteId!,
+        newText: newText, documentTitle: doc.title,
+      );
+    } else {
+      final block = doc.blocks.where((b) => b.id == match.blockId).firstOrNull;
+      if (block == null) return;
+      if (block.contentFormat == 'quill_delta') {
+        try {
+          final json = jsonDecode(block.content!) as List;
+          final quillDoc = Document.fromJson(json);
+          quillDoc.delete(match.start, match.end - match.start);
+          quillDoc.insert(match.start, replacement);
+          ref.read(projectDocumentsProvider.notifier).updateBlockContentFormat(
+            doc.id, block.id,
+            jsonEncode(quillDoc.toDelta().toJson()), 'quill_delta',
+          );
+          return;
+        } catch (_) {}
+      }
+      final text = block.content ?? '';
+      final newText = text.substring(0, match.start) + replacement + text.substring(match.end);
+      ref.read(projectDocumentsProvider.notifier).updateBlockContent(doc.id, block.id, newText);
+    }
+  }
+
+  /// Get the active match range for a block, or null.
+  ({int start, int end})? _activeMatchForBlock(String blockId) {
+    if (_findMatches.isEmpty) return null;
+    final current = _findMatches[_currentMatchIndex];
+    if (current.blockId != blockId) return null;
+    return (start: current.start, end: current.end);
+  }
+
   @override
   Widget build(BuildContext context) {
     final documents = ref.watch(projectDocumentsProvider);
@@ -354,46 +566,116 @@ class _ProjectDocumentDetailPageState
             else context.go(AppRoutes.projectDocuments);
           },
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              doc.title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-            ),
-            if (doc.description != null && doc.description!.isNotEmpty)
-              Text(
-                doc.description!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.secondary,
+        title: _isEditingTitle
+            ? TextField(
+                controller: _titleController,
+                autofocus: true,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                onSubmitted: (_) => _saveTitle(doc),
+              )
+            : GestureDetector(
+                onTap: () => _startEditTitle(doc),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            doc.title,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(Icons.edit_rounded,
+                            size: 16, color: Theme.of(context).hintColor),
+                      ],
+                    ),
+                    if (doc.description != null && doc.description!.isNotEmpty)
+                      Text(
+                        doc.description!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
               ),
-          ],
-        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: 'Share',
-            onPressed: () => _shareDocument(doc, allNotes),
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'rename') _showRenameDialog(context, doc);
-              if (value == 'delete') _showDeleteDialog(context, doc);
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'rename', child: Text('Rename')),
-              const PopupMenuItem(value: 'delete', child: Text('Delete')),
-            ],
-          ),
+          if (_isEditingTitle)
+            IconButton(
+              icon: Icon(Icons.check_rounded,
+                  color: Theme.of(context).colorScheme.primary),
+              onPressed: () => _saveTitle(doc),
+            )
+          else ...[
+            IconButton(
+              icon: Icon(_showFindBar ? Icons.search_off_rounded : Icons.find_replace_rounded),
+              tooltip: 'Find & Replace',
+              onPressed: () => setState(() {
+                _showFindBar = !_showFindBar;
+                if (!_showFindBar) {
+                  _searchQuery = '';
+                  _findMatches = [];
+                }
+              }),
+            ),
+            IconButton(
+              icon: const Icon(Icons.share_rounded),
+              tooltip: 'Share',
+              onPressed: () => _shareDocument(doc, allNotes),
+            ),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'rename') _showRenameDialog(context, doc);
+                if (value == 'delete') _showDeleteDialog(context, doc);
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'rename', child: Text('Rename')),
+                const PopupMenuItem(value: 'delete', child: Text('Delete')),
+              ],
+            ),
+          ],
         ],
       ),
-      body: Stack(
+      body: Column(
+        children: [
+          if (_showFindBar)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+              child: FindReplaceBar(
+                onSearch: _performSearch,
+                onReplace: _replaceCurrentMatch,
+                onReplaceAll: _replaceAllMatches,
+                onNext: () => _navigateMatch(1),
+                onPrevious: () => _navigateMatch(-1),
+                onClose: () => setState(() {
+                  _showFindBar = false;
+                  _searchQuery = '';
+                  _findMatches = [];
+                }),
+                currentMatch: _currentMatchIndex,
+                totalMatches: _findMatches.length,
+              ),
+            ),
+          Expanded(
+            child: Stack(
         children: [
           sortedBlocks.isEmpty
               ? Center(
@@ -421,6 +703,7 @@ class _ProjectDocumentDetailPageState
                   ),
                 )
               : ListView.builder(
+                  controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 80),
                   itemCount: sortedBlocks.length,
                   itemBuilder: (context, index) {
@@ -451,14 +734,14 @@ class _ProjectDocumentDetailPageState
                       extra: {'projectId': doc.id}),
                   speedDialItems: [
                     SpeedDialItem(
-                      icon: Icons.mic_rounded,
-                      label: 'Add Voice Note',
-                      onTap: () => _showAddVoiceNoteSheet(context, doc.id),
+                      icon: Icons.image_rounded,
+                      label: 'Add Image',
+                      onTap: () => _pickAndAddImage(doc.id),
                     ),
                     SpeedDialItem(
-                      icon: Icons.edit_note_rounded,
-                      label: 'Add Text Note',
-                      onTap: () => _showAddTextNoteSheet(context, doc.id),
+                      icon: Icons.checklist_rounded,
+                      label: 'Tasks',
+                      onTap: () => _showAddTaskSheet(context, doc.id),
                     ),
                     SpeedDialItem(
                       icon: Icons.title_rounded,
@@ -468,15 +751,23 @@ class _ProjectDocumentDetailPageState
                           .addSectionHeaderBlock(doc.id, 'New Section'),
                     ),
                     SpeedDialItem(
-                      icon: Icons.image_rounded,
-                      label: 'Add Image',
-                      onTap: () => _pickAndAddImage(doc.id),
+                      icon: Icons.edit_note_rounded,
+                      label: 'Add Text Note',
+                      onTap: () => _showAddTextNoteSheet(context, doc.id),
+                    ),
+                    SpeedDialItem(
+                      icon: Icons.mic_rounded,
+                      label: 'Add Voice Note',
+                      onTap: () => _showAddVoiceNoteSheet(context, doc.id),
                     ),
                   ],
                 ),
               ),
             ),
         ],
+      ),
+          ), // Expanded
+        ], // Column
       ),
     );
   }
@@ -520,6 +811,8 @@ class _ProjectDocumentDetailPageState
           allNotes: allNotes,
           isFirst: isFirst,
           isLast: isLast,
+          searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
+          activeMatchRange: _activeMatchForBlock(block.id),
           onMoveUp: onMoveUp,
           onMoveDown: onMoveDown,
           onRemove: () => ref
@@ -566,6 +859,8 @@ class _ProjectDocumentDetailPageState
           block: block,
           isFirst: isFirst,
           isLast: isLast,
+          searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
+          activeMatchRange: _activeMatchForBlock(block.id),
           onMoveUp: onMoveUp,
           onMoveDown: onMoveDown,
           onRemove: () => ref
@@ -584,6 +879,8 @@ class _ProjectDocumentDetailPageState
           block: block,
           isFirst: isFirst,
           isLast: isLast,
+          searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
+          activeMatchRange: _activeMatchForBlock(block.id),
           onMoveUp: onMoveUp,
           onMoveDown: onMoveDown,
           onRemove: () => ref
@@ -624,6 +921,23 @@ class _ProjectDocumentDetailPageState
           onEditCaption: (newCaption) => ref
               .read(projectDocumentsProvider.notifier)
               .updateBlockContent(doc.id, block.id, newCaption),
+        );
+      case BlockType.taskBlock:
+        return _TaskBlockCard(
+          block: block,
+          allNotes: allNotes,
+          isFirst: isFirst,
+          isLast: isLast,
+          onMoveUp: onMoveUp,
+          onMoveDown: onMoveDown,
+          onRemove: () => ref
+              .read(projectDocumentsProvider.notifier)
+              .removeBlock(doc.id, block.id),
+          onUpdate: (newContent) => ref
+              .read(projectDocumentsProvider.notifier)
+              .updateBlockContent(doc.id, block.id, newContent),
+          onViewNote: (noteId) => context.push(
+              AppRoutes.noteDetail, extra: {'noteId': noteId}),
         );
     }
   }
@@ -744,6 +1058,302 @@ class _ProjectDocumentDetailPageState
     );
   }
 
+  /// Bottom sheet: Create new task or select existing tasks for a Task Block.
+  void _showAddTaskSheet(BuildContext context, String documentId) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.checklist_rounded,
+                      color: Colors.orange, size: 22),
+                  const SizedBox(width: 8),
+                  Text('Add Tasks',
+                      style: Theme.of(context).textTheme.titleMedium),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.add_task_rounded,
+                  color: Theme.of(context).colorScheme.primary),
+              title: const Text('Create New Task'),
+              subtitle:
+                  const Text('A new text note will be created for this task'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showNewTaskDialog(context, documentId);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.playlist_add_check_rounded),
+              title: const Text('Select Existing Tasks'),
+              subtitle: const Text('Pick tasks from your notes'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showExistingTaskPicker(context, documentId);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Dialog to create a new task (creates a text note + adds task to it + adds task block).
+  void _showNewTaskDialog(BuildContext context, String documentId) {
+    final textCtrl = TextEditingController();
+    String taskType = 'todo'; // default
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('New Task'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'A new text note will be created and linked to this task.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: textCtrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Task description',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text('Type: ',
+                      style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('To-Do'),
+                    selected: taskType == 'todo',
+                    onSelected: (_) =>
+                        setDialogState(() => taskType = 'todo'),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Action'),
+                    selected: taskType == 'action',
+                    onSelected: (_) =>
+                        setDialogState(() => taskType = 'action'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final taskText = textCtrl.text.trim();
+                if (taskText.isEmpty) return;
+                Navigator.of(ctx).pop();
+
+                // 1. Create a text note
+                final note = await ref.read(notesProvider.notifier).addNote(
+                      audioFilePath: '',
+                      rawTranscription: taskText,
+                      isProcessed: true,
+                    );
+
+                // 2. Add the task to the note
+                String? taskId;
+                if (taskType == 'todo') {
+                  await ref.read(notesProvider.notifier).addTodoItem(
+                        noteId: note.id,
+                        text: taskText,
+                      );
+                  // Get the newly created todo's id
+                  final updated = ref.read(notesProvider)
+                      .where((n) => n.id == note.id)
+                      .firstOrNull;
+                  taskId = updated?.todos.lastOrNull?.id;
+                } else {
+                  await ref.read(notesProvider.notifier).addActionItem(
+                        noteId: note.id,
+                        text: taskText,
+                      );
+                  final updated = ref.read(notesProvider)
+                      .where((n) => n.id == note.id)
+                      .firstOrNull;
+                  taskId = updated?.actions.lastOrNull?.id;
+                }
+
+                if (taskId == null) return;
+
+                // 3. Create task block with this reference
+                final taskRef = jsonEncode([
+                  {
+                    'noteId': note.id,
+                    'taskId': taskId,
+                    'taskType': taskType,
+                  }
+                ]);
+                ref
+                    .read(projectDocumentsProvider.notifier)
+                    .addTaskBlock(documentId, taskRef);
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Picker sheet showing all existing tasks from all notes.
+  void _showExistingTaskPicker(BuildContext context, String documentId) {
+    final allNotes = ref.read(notesProvider);
+
+    // Collect all tasks across all notes
+    final taskEntries = <_TaskEntry>[];
+    for (final note in allNotes) {
+      if (note.isDeleted) continue;
+      for (final action in note.actions) {
+        taskEntries.add(_TaskEntry(
+          noteId: note.id,
+          taskId: action.id,
+          taskType: 'action',
+          text: action.text,
+          isCompleted: action.isCompleted,
+          noteTitle: note.title,
+        ));
+      }
+      for (final todo in note.todos) {
+        taskEntries.add(_TaskEntry(
+          noteId: note.id,
+          taskId: todo.id,
+          taskType: 'todo',
+          text: todo.text,
+          isCompleted: todo.isCompleted,
+          noteTitle: note.title,
+          dueDate: todo.dueDate,
+        ));
+      }
+    }
+
+    if (taskEntries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No tasks found in any notes')),
+      );
+      return;
+    }
+
+    final selected = <_TaskEntry>{};
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (ctx, scrollCtrl) => StatefulBuilder(
+          builder: (ctx, setSheetState) => Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text('Select Tasks (${selected.length})',
+                          style: Theme.of(context).textTheme.titleMedium),
+                    ),
+                    FilledButton(
+                      onPressed: selected.isEmpty
+                          ? null
+                          : () {
+                              Navigator.of(ctx).pop();
+                              final refs = selected
+                                  .map((e) => {
+                                        'noteId': e.noteId,
+                                        'taskId': e.taskId,
+                                        'taskType': e.taskType,
+                                      })
+                                  .toList();
+                              ref
+                                  .read(projectDocumentsProvider.notifier)
+                                  .addTaskBlock(
+                                      documentId, jsonEncode(refs));
+                            },
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollCtrl,
+                  itemCount: taskEntries.length,
+                  itemBuilder: (ctx, i) {
+                    final entry = taskEntries[i];
+                    final isSelected = selected.contains(entry);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (val) {
+                        setSheetState(() {
+                          if (val == true) {
+                            selected.add(entry);
+                          } else {
+                            selected.remove(entry);
+                          }
+                        });
+                      },
+                      title: Text(
+                        entry.text,
+                        style: TextStyle(
+                          fontSize: 14,
+                          decoration: entry.isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${entry.taskType == 'action' ? 'Action' : 'To-Do'} · ${entry.noteTitle}${entry.dueDate != null ? ' · ${entry.dueDate!.month}/${entry.dueDate!.day}' : ''}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      secondary: Icon(
+                        entry.taskType == 'action'
+                            ? Icons.flash_on_rounded
+                            : Icons.check_circle_outline_rounded,
+                        size: 20,
+                        color: entry.taskType == 'action'
+                            ? Colors.orange
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                      dense: true,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickAndAddImage(String documentId) async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -767,33 +1377,45 @@ class _ProjectDocumentDetailPageState
     );
     if (source == null || !mounted) return;
 
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source, imageQuality: 85);
-    if (picked == null || !mounted) return;
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: source, imageQuality: 85);
+      if (picked == null || !mounted) return;
 
-    // Offer crop before saving
-    final cropped = await ImageCropper().cropImage(
-      sourcePath: picked.path,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Crop Image',
-          toolbarColor: Theme.of(context).colorScheme.surface,
-          toolbarWidgetColor: Theme.of(context).colorScheme.onSurface,
-          lockAspectRatio: false,
-        ),
-      ],
-    );
-    if (cropped == null || !mounted) return;
+      // Offer crop before saving
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Image',
+            toolbarColor: Theme.of(context).colorScheme.surface,
+            toolbarWidgetColor: Theme.of(context).colorScheme.onSurface,
+            lockAspectRatio: false,
+          ),
+        ],
+      );
+      if (cropped == null || !mounted) return;
 
-    final repo = ImageAttachmentRepository();
-    final attachment = await repo.saveImage(
-      sourceFile: File(cropped.path),
-      sourceType: source == ImageSource.gallery ? 'gallery' : 'camera',
-    );
+      final repo = ImageAttachmentRepository();
+      final attachment = await repo.saveImage(
+        sourceFile: File(cropped.path),
+        sourceType: source == ImageSource.gallery ? 'gallery' : 'camera',
+      );
 
-    ref
-        .read(projectDocumentsProvider.notifier)
-        .addImageBlock(documentId, attachment.id, null);
+      ref
+          .read(projectDocumentsProvider.notifier)
+          .addImageBlock(documentId, attachment.id, null);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add image: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _showRenameDialog(BuildContext context, dynamic doc) {
@@ -878,6 +1500,8 @@ class _NoteReferenceCard extends ConsumerStatefulWidget {
   final List<Note> allNotes;
   final bool isFirst;
   final bool isLast;
+  final String? searchQuery;
+  final ({int start, int end})? activeMatchRange;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
   final VoidCallback onRemove;
@@ -891,6 +1515,8 @@ class _NoteReferenceCard extends ConsumerStatefulWidget {
     required this.allNotes,
     required this.isFirst,
     required this.isLast,
+    this.searchQuery,
+    this.activeMatchRange,
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onRemove,
@@ -906,7 +1532,6 @@ class _NoteReferenceCard extends ConsumerStatefulWidget {
 
 class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
   bool _editing = false;
-  bool _tasksExpanded = false;
   late TextEditingController _controller;
   QuillController? _quillController;
 
@@ -982,14 +1607,6 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
   void initState() {
     super.initState();
     _controller = TextEditingController();
-    // Auto-expand if note has tasks
-    final note = widget.allNotes
-        .where((n) => n.id == widget.block.noteId)
-        .firstOrNull;
-    if (note != null &&
-        (note.todos.isNotEmpty || note.actions.isNotEmpty)) {
-      _tasksExpanded = true;
-    }
   }
 
   @override
@@ -997,70 +1614,6 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
     _controller.dispose();
     _quillController?.dispose();
     super.dispose();
-  }
-
-  String _tasksSummary(Note note) {
-    final total = note.todos.length + note.actions.length;
-    final completed = note.todos.where((t) => t.isCompleted).length +
-        note.actions.where((a) => a.isCompleted).length;
-    return '$total tasks ($completed completed)';
-  }
-
-  Widget _buildTaskRow(
-    BuildContext context, {
-    required String text,
-    required bool checked,
-    DateTime? dueDate,
-    required VoidCallback onTap,
-  }) {
-    final isOverdue =
-        dueDate != null && !checked && dueDate.isBefore(DateTime.now());
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          children: [
-            Icon(
-              checked
-                  ? Icons.check_box_rounded
-                  : Icons.check_box_outline_blank_rounded,
-              size: 18,
-              color: checked
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.secondary,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: checked
-                      ? Theme.of(context)
-                          .colorScheme
-                          .secondary
-                          .withValues(alpha: 0.7)
-                      : Theme.of(context).colorScheme.onSurface,
-                  decoration: checked ? TextDecoration.lineThrough : null,
-                ),
-              ),
-            ),
-            if (dueDate != null)
-              Text(
-                '${dueDate.month}/${dueDate.day}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isOverdue
-                      ? Colors.red
-                      : Theme.of(context).colorScheme.secondary,
-                  fontWeight: isOverdue ? FontWeight.bold : null,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
   }
 
   void _showDetailsDialog(BuildContext context, Note note) {
@@ -1156,9 +1709,6 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (_isRichText(note) && _quillController != null) ...[
-                        buildQuillToolbar(
-                            _quillController!, Theme.of(context)),
-                        const SizedBox(height: 6),
                         Container(
                           constraints: const BoxConstraints(
                               minHeight: 80, maxHeight: 300),
@@ -1171,6 +1721,9 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 6),
+                        buildQuillToolbar(
+                            _quillController!, Theme.of(context)),
                       ] else
                         TextField(
                           controller: _controller,
@@ -1255,85 +1808,31 @@ class _NoteReferenceCardState extends ConsumerState<_NoteReferenceCard> {
                                   color: Theme.of(context).hintColor,
                                 ),
                               )
-                            : note.contentFormat == 'quill_delta'
-                                ? _buildReadOnlyQuill(note)
-                                : Text(
-                                    note.rawTranscription,
+                            : widget.searchQuery != null
+                                ? _HighlightedText(
+                                    text: _plainText(note),
+                                    query: widget.searchQuery!,
+                                    activeRange: widget.activeMatchRange,
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Theme.of(context)
                                           .colorScheme
                                           .onSurface,
                                     ),
-                                  ),
-                      ),
-                      // Collapsible Tasks sub-section
-                      if (note.todos.isNotEmpty ||
-                          note.actions.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        const Divider(height: 1),
-                        GestureDetector(
-                          onTap: () => setState(
-                              () => _tasksExpanded = !_tasksExpanded),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 6),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _tasksExpanded
-                                      ? Icons.expand_less
-                                      : Icons.expand_more,
-                                  size: 18,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _tasksSummary(note),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelSmall
-                                      ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .secondary,
-                                        fontWeight: FontWeight.w600,
+                                  )
+                                : note.contentFormat == 'quill_delta'
+                                    ? _buildReadOnlyQuill(note)
+                                    : Text(
+                                        note.rawTranscription,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
+                                        ),
                                       ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (_tasksExpanded) ...[
-                          ...note.actions.map((action) =>
-                              _buildTaskRow(
-                                context,
-                                text: action.text,
-                                checked: action.isCompleted,
-                                onTap: () => ref
-                                    .read(notesProvider.notifier)
-                                    .toggleActionCompleted(
-                                      noteId: note.id,
-                                      actionId: action.id,
-                                    ),
-                              )),
-                          ...note.todos.map((todo) =>
-                              _buildTaskRow(
-                                context,
-                                text: todo.text,
-                                checked: todo.isCompleted,
-                                dueDate: todo.dueDate,
-                                onTap: () => ref
-                                    .read(notesProvider.notifier)
-                                    .toggleTodoCompleted(
-                                      noteId: note.id,
-                                      todoId: todo.id,
-                                    ),
-                              )),
-                        ],
-                      ],
+                      ),
+                      // Tasks are shown via dedicated Task Blocks — not inline here
                     ],
                   ),
           ),
@@ -1444,6 +1943,8 @@ class _FreeTextCard extends StatefulWidget {
   final ProjectBlock block;
   final bool isFirst;
   final bool isLast;
+  final String? searchQuery;
+  final ({int start, int end})? activeMatchRange;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
   final VoidCallback onRemove;
@@ -1454,6 +1955,8 @@ class _FreeTextCard extends StatefulWidget {
     required this.block,
     required this.isFirst,
     required this.isLast,
+    this.searchQuery,
+    this.activeMatchRange,
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onRemove,
@@ -1588,9 +2091,6 @@ class _FreeTextCardState extends State<_FreeTextCard> {
                     ? Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Formatting toolbar
-                          buildQuillToolbar(_quillController, Theme.of(context)),
-                          const SizedBox(height: 6),
                           Container(
                             constraints: const BoxConstraints(
                                 minHeight: 80, maxHeight: 300),
@@ -1611,6 +2111,9 @@ class _FreeTextCardState extends State<_FreeTextCard> {
                               ),
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          // Formatting toolbar
+                          buildQuillToolbar(_quillController, Theme.of(context)),
                           const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
@@ -1650,23 +2153,35 @@ class _FreeTextCardState extends State<_FreeTextCard> {
                                   color: Theme.of(context).hintColor,
                                 ),
                               )
-                            : _isRichText
-                                ? QuillEditor.basic(
-                                    controller: _quillController,
-                                    config: const QuillEditorConfig(
-                                      showCursor: false,
-                                      enableInteractiveSelection: false,
-                                    ),
-                                  )
-                                : Text(
-                                    _getPlainText(),
+                            : widget.searchQuery != null
+                                ? _HighlightedText(
+                                    text: _getPlainText(),
+                                    query: widget.searchQuery!,
+                                    activeRange: widget.activeMatchRange,
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Theme.of(context)
                                           .colorScheme
                                           .onSurface,
                                     ),
-                                  ),
+                                  )
+                                : _isRichText
+                                    ? QuillEditor.basic(
+                                        controller: _quillController,
+                                        config: const QuillEditorConfig(
+                                          showCursor: false,
+                                          enableInteractiveSelection: false,
+                                        ),
+                                      )
+                                    : Text(
+                                        _getPlainText(),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
+                                        ),
+                                      ),
                       ),
               ),
 
@@ -1745,6 +2260,8 @@ class _SectionHeaderCard extends StatefulWidget {
   final ProjectBlock block;
   final bool isFirst;
   final bool isLast;
+  final String? searchQuery;
+  final ({int start, int end})? activeMatchRange;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
   final VoidCallback onRemove;
@@ -1755,6 +2272,8 @@ class _SectionHeaderCard extends StatefulWidget {
     required this.block,
     required this.isFirst,
     required this.isLast,
+    this.searchQuery,
+    this.activeMatchRange,
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onRemove,
@@ -1866,8 +2385,6 @@ class _SectionHeaderCardState extends State<_SectionHeaderCard> {
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      buildQuillToolbar(_quillController, Theme.of(context), showHeaders: false, showBullets: false),
-                      const SizedBox(height: 4),
                       QuillEditor.basic(
                         controller: _quillController,
                         config: const QuillEditorConfig(
@@ -1876,6 +2393,8 @@ class _SectionHeaderCardState extends State<_SectionHeaderCard> {
                           placeholder: 'Section title',
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      buildQuillToolbar(_quillController, Theme.of(context), showHeaders: false, showBullets: false),
                       const SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -1907,21 +2426,31 @@ class _SectionHeaderCardState extends State<_SectionHeaderCard> {
                   )
                 : GestureDetector(
                     onTap: () => setState(() => _editing = true),
-                    child: _isRichText
-                        ? QuillEditor.basic(
-                            controller: _quillController,
-                            config: const QuillEditorConfig(
-                              showCursor: false,
-                              enableInteractiveSelection: false,
-                            ),
-                          )
-                        : Text(
-                            widget.block.content ?? 'Section Header',
+                    child: widget.searchQuery != null
+                        ? _HighlightedText(
+                            text: _quillController.document.toPlainText().trim(),
+                            query: widget.searchQuery!,
+                            activeRange: widget.activeMatchRange,
                             style: Theme.of(context)
                                 .textTheme
                                 .titleMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
+                          )
+                        : _isRichText
+                            ? QuillEditor.basic(
+                                controller: _quillController,
+                                config: const QuillEditorConfig(
+                                  showCursor: false,
+                                  enableInteractiveSelection: false,
+                                ),
+                              )
+                            : Text(
+                                widget.block.content ?? 'Section Header',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
                   ),
           ),
 
@@ -2024,6 +2553,435 @@ class _DetailRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Renders text with search query matches highlighted.
+class _HighlightedText extends StatelessWidget {
+  final String text;
+  final String query;
+  final ({int start, int end})? activeRange;
+  final TextStyle? style;
+
+  const _HighlightedText({
+    required this.text,
+    required this.query,
+    this.activeRange,
+    this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (query.isEmpty) return Text(text, style: style);
+
+    final spans = <TextSpan>[];
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    int lastEnd = 0;
+
+    int searchFrom = 0;
+    while (true) {
+      final idx = lowerText.indexOf(lowerQuery, searchFrom);
+      if (idx == -1) break;
+      if (idx > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, idx)));
+      }
+      final isActive = activeRange != null && activeRange!.start == idx;
+      spans.add(TextSpan(
+        text: text.substring(idx, idx + query.length),
+        style: TextStyle(
+          backgroundColor: isActive
+              ? Colors.orange.withAlpha(180)
+              : Colors.yellow.withAlpha(120),
+        ),
+      ));
+      lastEnd = idx + query.length;
+      searchFrom = idx + 1;
+    }
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+    if (spans.isEmpty) return Text(text, style: style);
+    return RichText(text: TextSpan(style: style, children: spans));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Task Block helpers
+// ---------------------------------------------------------------------------
+
+/// Lightweight value object for the existing-task picker.
+class _TaskEntry {
+  final String noteId;
+  final String taskId;
+  final String taskType; // 'action' | 'todo'
+  final String text;
+  final bool isCompleted;
+  final String noteTitle;
+  final DateTime? dueDate;
+
+  const _TaskEntry({
+    required this.noteId,
+    required this.taskId,
+    required this.taskType,
+    required this.text,
+    required this.isCompleted,
+    required this.noteTitle,
+    this.dueDate,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _TaskEntry &&
+          noteId == other.noteId &&
+          taskId == other.taskId;
+
+  @override
+  int get hashCode => Object.hash(noteId, taskId);
+}
+
+// ---------------------------------------------------------------------------
+// _TaskBlockCard — renders a Task Block in a project document
+// ---------------------------------------------------------------------------
+
+class _TaskBlockCard extends ConsumerStatefulWidget {
+  final ProjectBlock block;
+  final List<Note> allNotes;
+  final bool isFirst;
+  final bool isLast;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
+  final VoidCallback onRemove;
+  final void Function(String newContent) onUpdate;
+  final void Function(String noteId) onViewNote;
+
+  const _TaskBlockCard({
+    required this.block,
+    required this.allNotes,
+    required this.isFirst,
+    required this.isLast,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.onRemove,
+    required this.onUpdate,
+    required this.onViewNote,
+  });
+
+  @override
+  ConsumerState<_TaskBlockCard> createState() => _TaskBlockCardState();
+}
+
+class _TaskBlockCardState extends ConsumerState<_TaskBlockCard> {
+  /// Parse the JSON task references stored in block.content.
+  List<Map<String, dynamic>> _parseRefs() {
+    final raw = widget.block.content;
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      return (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Look up live task data from the referenced note.
+  ({String text, bool isCompleted, DateTime? dueDate, bool found, String noteTitle})?
+      _resolveTask(Map<String, dynamic> ref) {
+    final noteId = ref['noteId'] as String?;
+    final taskId = ref['taskId'] as String?;
+    final taskType = ref['taskType'] as String?;
+    if (noteId == null || taskId == null || taskType == null) return null;
+
+    final note =
+        widget.allNotes.where((n) => n.id == noteId).firstOrNull;
+    if (note == null) {
+      return (
+        text: '(Note deleted)',
+        isCompleted: false,
+        dueDate: null,
+        found: false,
+        noteTitle: '',
+      );
+    }
+
+    if (taskType == 'action') {
+      final action =
+          note.actions.where((a) => a.id == taskId).firstOrNull;
+      if (action != null) {
+        return (
+          text: action.text,
+          isCompleted: action.isCompleted,
+          dueDate: null,
+          found: true,
+          noteTitle: note.title,
+        );
+      }
+    } else {
+      final todo =
+          note.todos.where((t) => t.id == taskId).firstOrNull;
+      if (todo != null) {
+        return (
+          text: todo.text,
+          isCompleted: todo.isCompleted,
+          dueDate: todo.dueDate,
+          found: true,
+          noteTitle: note.title,
+        );
+      }
+    }
+    return (
+      text: '(Task removed)',
+      isCompleted: false,
+      dueDate: null,
+      found: false,
+      noteTitle: note.title,
+    );
+  }
+
+  void _removeTaskRef(int index) {
+    final refs = _parseRefs();
+    if (index < refs.length) {
+      refs.removeAt(index);
+      widget.onUpdate(jsonEncode(refs));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final refs = _parseRefs();
+    final theme = Theme.of(context);
+    final completedCount = refs.where((r) {
+      final resolved = _resolveTask(r);
+      return resolved != null && resolved.isCompleted;
+    }).length;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(
+          color: Colors.orange.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header row
+                Row(
+                  children: [
+                    const Icon(Icons.checklist_rounded,
+                        size: 16, color: Colors.orange),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${refs.length} tasks ($completedCount completed)',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Task rows
+                ...List.generate(refs.length, (i) {
+                  final taskRef = refs[i];
+                  final resolved = _resolveTask(taskRef);
+                  if (resolved == null) return const SizedBox.shrink();
+
+                  final taskType = taskRef['taskType'] as String? ?? 'todo';
+                  final noteId = taskRef['noteId'] as String? ?? '';
+                  final taskId = taskRef['taskId'] as String? ?? '';
+                  final isOverdue = resolved.dueDate != null &&
+                      !resolved.isCompleted &&
+                      resolved.dueDate!.isBefore(DateTime.now());
+
+                  return GestureDetector(
+                    onTap: resolved.found
+                        ? () {
+                            if (taskType == 'action') {
+                              ref
+                                  .read(notesProvider.notifier)
+                                  .toggleActionCompleted(
+                                    noteId: noteId,
+                                    actionId: taskId,
+                                  );
+                            } else {
+                              ref
+                                  .read(notesProvider.notifier)
+                                  .toggleTodoCompleted(
+                                    noteId: noteId,
+                                    todoId: taskId,
+                                  );
+                            }
+                          }
+                        : null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        children: [
+                          Icon(
+                            resolved.isCompleted
+                                ? Icons.check_box_rounded
+                                : Icons.check_box_outline_blank_rounded,
+                            size: 18,
+                            color: resolved.isCompleted
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.secondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            taskType == 'action'
+                                ? Icons.flash_on_rounded
+                                : Icons.check_circle_outline_rounded,
+                            size: 14,
+                            color: taskType == 'action'
+                                ? Colors.orange
+                                : theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              resolved.text,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: !resolved.found
+                                    ? theme.hintColor
+                                    : resolved.isCompleted
+                                        ? theme.colorScheme.secondary
+                                            .withValues(alpha: 0.7)
+                                        : theme.colorScheme.onSurface,
+                                decoration: resolved.isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                fontStyle: !resolved.found
+                                    ? FontStyle.italic
+                                    : null,
+                              ),
+                            ),
+                          ),
+                          if (resolved.dueDate != null)
+                            Text(
+                              '${resolved.dueDate!.month}/${resolved.dueDate!.day}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isOverdue
+                                    ? Colors.red
+                                    : theme.colorScheme.secondary,
+                                fontWeight:
+                                    isOverdue ? FontWeight.bold : null,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+
+          // 3-dot menu
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: PopupMenuButton<String>(
+              padding: EdgeInsets.zero,
+              iconSize: 18,
+              onSelected: (value) {
+                if (value == 'move_up') widget.onMoveUp();
+                if (value == 'move_down') widget.onMoveDown();
+                if (value == 'remove') widget.onRemove();
+                if (value.startsWith('view_')) {
+                  final noteId = value.substring(5);
+                  widget.onViewNote(noteId);
+                }
+                if (value.startsWith('delete_')) {
+                  final idx = int.tryParse(value.substring(7));
+                  if (idx != null) _removeTaskRef(idx);
+                }
+              },
+              itemBuilder: (context) {
+                final items = <PopupMenuEntry<String>>[
+                  PopupMenuItem(
+                    value: 'move_up',
+                    enabled: !widget.isFirst,
+                    child: const Row(
+                      children: [
+                        Icon(Icons.arrow_upward_rounded, size: 18),
+                        SizedBox(width: 8),
+                        Text('Move up'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'move_down',
+                    enabled: !widget.isLast,
+                    child: const Row(
+                      children: [
+                        Icon(Icons.arrow_downward_rounded, size: 18),
+                        SizedBox(width: 8),
+                        Text('Move down'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                ];
+
+                // Add "View note" entries for each unique noteId
+                final noteIds = refs
+                    .map((r) => r['noteId'] as String?)
+                    .whereType<String>()
+                    .toSet();
+                for (final nid in noteIds) {
+                  final note = widget.allNotes
+                      .where((n) => n.id == nid)
+                      .firstOrNull;
+                  items.add(PopupMenuItem(
+                    value: 'view_$nid',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.open_in_new, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            note?.title ?? 'View note',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ));
+                }
+
+                items.addAll([
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'remove',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, size: 18),
+                        SizedBox(width: 8),
+                        Text('Remove block'),
+                      ],
+                    ),
+                  ),
+                ]);
+
+                return items;
+              },
+              icon: Icon(Icons.more_vert,
+                  size: 18, color: theme.hintColor),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

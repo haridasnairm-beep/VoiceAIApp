@@ -49,6 +49,7 @@ class AppColors {
   static const lightAccent = Color(0xFFF6AD55);
   static const lightBackground = Color(0xFFFDFCFB);
   static const lightSurface = Color(0xFFFFFFFF);
+  static const lightAppBar = Color(0xFFEDF4FC); // Subtle blue tint for AppBar visibility
   static const lightOnSurface = Color(0xFF2D3748);
   static const lightPrimaryText = Color(0xFF1A202C);
   static const lightSecondaryText = Color(0xFF718096);
@@ -102,10 +103,11 @@ ThemeData get lightTheme => ThemeData(
       scaffoldBackgroundColor: AppColors.lightBackground,
       dividerColor: AppColors.lightDivider,
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.lightAppBar,
         foregroundColor: AppColors.lightPrimaryText,
         elevation: 0,
-        scrolledUnderElevation: 0,
+        scrolledUnderElevation: 0.5,
+        surfaceTintColor: AppColors.lightPrimary,
       ),
       cardTheme: CardThemeData(
         color: AppColors.lightSurface,

@@ -1,7 +1,7 @@
 # Vaanix - Implementation Plan
 
-**Version:** 4.0
-**Last Updated:** 2026-03-05
+**Version:** 4.3
+**Last Updated:** 2026-03-10
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Specification](PROJECT_SPECIFICATION.md) | [UX Audit](UX_PRODUCT_AUDIT.md)
 
@@ -780,18 +780,412 @@ PHASE 1.5 — UX & Launch Readiness
 │       ├── "Vaanix is Ready" page: Go Back button (returns without opening recording)
 │       ├── Splash no-lock: 2s display (was 5s)
 │       └── App lock unlock: 400ms success pause before navigation
-                                             │
-                                      PHASE 1.5 COMPLETE
+│   └── 18P.10 Media Resume & Audio Focus Hardening ── ✅
+│       ├── Native Kotlin: single lazy focusRequest (no orphaned focus holders)
+│       ├── Re-request audio focus on STT session cycle (silence timeout)
+│       ├── All exit paths (save, cancel, back) abandon focus + resume media
+│       └── holdingFocus flag for state tracking
+│   └── 18P.11 Calendar Page Redesign (Issue #15) ── ✅
+│       ├── Full month grid default, collapses to week strip on scroll
+│       ├── Horizontal dot indicators (teal=Notes, orange=Tasks, purple=Projects, max 3)
+│       ├── Month/year picker, grab handle with animated chevron
+│       ├── Filter chips: All Notes, With Tasks, With Projects
+│       ├── Sort options: newest, oldest, title A-Z/Z-A
+│       ├── GestureFab with speed dial (Record, Text Note, Template, Search)
+│       └── Multi-select with action bar (Open, Edit Title, Pin, Folder, Project, Delete)
+│   └── 18P.12 Note Picker & Version History Fixes ── ✅
+│       ├── Voice/text note classification: checks audioFilePath + V-prefix title
+│       ├── Version history deletion: deleteTranscriptVersions (hard delete, no trash)
+│       ├── Version history rich text preview: Quill editor rendering in version cards
+│       └── Live recording info banner (8s auto-dismiss, verify text before save)
+│   └── 18P.13 Project UX & Home Page Enhancements ── ✅
+│       ├── Pinned projects in home page Pinned section (merged with pinned notes)
+│       ├── Project swipe actions (pin/unpin, delete) + long press context menu
+│       ├── Project folder picker "New Folder" option
+│       ├── Project pin icon placement matching note cards (right side of metadata row)
+│       ├── ProjectDocument model: isPinned (HiveField 9), pinnedAt (HiveField 10)
+│       └── Support page: Privacy Policy & Terms & Conditions in LEGAL section
+│   └── 18P.14 Smart Filters, Search & Voice Commands ── ✅
+│       ├── Smart Filters functional: This Week / Open Tasks / Unorganized bottom sheets
+│       ├── Project search: titles, descriptions, section headers, free text blocks
+│       ├── Search empty state fix: checks both note and project results
+│       ├── Voice commands in live STT mode: processVoiceCommands in NotesNotifier
+│       ├── Calendar "New Project" shows name dialog (not project list page)
+│       └── Calendar FAB positioning fix (body-level Stack)
+│   └── 18P.15 Project Document Find & Replace ── ✅
+│       ├── FindReplaceBar integrated into project detail AppBar
+│       ├── Search across section headers, free text blocks, note references
+│       ├── Yellow/orange text highlighting with current match navigation
+│       ├── Replace creates new transcript versions for note reference blocks
+│       └── Supports both plain text and Quill delta content
+│   └── 18P.16 GitHub Issue Fixes (#16–#19) ── ✅
+│       ├── #16: Task capsules inline with folder/project/tag capsules (single Wrap)
+│       ├── #17: Reminder delete — added refresh() for state propagation
+│       ├── #18: Photo upload crash — added CAMERA/READ_MEDIA_IMAGES permissions + error handling
+│       └── #19: Backup restore auto-expands Restore section on file intent
+│   └── 18P.17 ProGuard & Crash Fixes (#21–#25) ── ✅
+│       ├── Gson TypeToken keep rules for flutter_local_notifications
+│       ├── UCropActivity manifest declaration + ProGuard keep rule
+│       ├── Reminder delete/reschedule: new-object mutation + try-catch safety nets
+│       ├── Photo add crash: try-catch in _addPhoto + _pickAndAddImage
+│       └── Backup version mismatch warning
+│
+├── Step 19P: Share to Vaanix ──────────────── [Medium]  ✅
+│   ├── 19P.A Data Model ✅
+│   │   ├── Added sourceType (HiveField 29), sharedFrom (30), originalFilename (31) to Note model
+│   │   ├── Updated toMap()/fromMap() for backup compatibility
+│   │   ├── Updated NotesRepository.createNote + NotesNotifier.addNote with new params
+│   │   └── Regenerated Hive adapters via build_runner
+│   ├── 19P.B Platform Integration (Android) ✅
+│   │   ├── Android: audio/* SEND intent filter in AndroidManifest.xml
+│   │   ├── Android: ACTION_SEND handler in MainActivity.kt (copies URI to temp, extracts filename)
+│   │   ├── Android: getSharedAudioInfo MethodChannel method (returns path + filename map)
+│   │   └── iOS: deferred (no iOS build yet)
+│   ├── 19P.C Share Bottom Sheet UI ✅
+│   │   ├── ShareReceiveSheet widget (lib/widgets/share_receive_sheet.dart)
+│   │   ├── File info card (filename, size), "From" text field, folder picker dropdown
+│   │   ├── Whisper model check: warning + "Set Up Whisper" button if not downloaded
+│   │   ├── Large file warning (>50 MB)
+│   │   └── Save & Transcribe / Save Audio CTA (saves even without Whisper)
+│   ├── 19P.D Processing Pipeline ✅
+│   │   ├── Copies shared audio to recordings/ permanent directory
+│   │   ├── Creates Note with sourceType='shared', isProcessed=false
+│   │   ├── Triggers existing Whisper transcription pipeline (transcribeInBackground)
+│   │   └── Cold-start + warm-start share intent detection in main.dart
+│   ├── 19P.E Shared Note Visual Identity ✅
+│   │   ├── Gold "Shared" badge chip on NoteCard with call_received icon + sender name
+│   │   └── Amber shared metadata section on Note Detail (sender, original filename)
+│   ├── 19P.F Native Audio Conversion ✅
+│   │   ├── Android MediaCodec-based audio converter (convertToWav in MainActivity.kt)
+│   │   ├── Decodes .opus/.ogg/.mp3/.aac to PCM via MediaExtractor + MediaCodec
+│   │   ├── Resamples to 16kHz mono via linear interpolation (resampleToMono16k)
+│   │   ├── Writes 44-byte WAV header + PCM data (writeWavFile)
+│   │   ├── WhisperService.transcribe() auto-detects non-WAV and converts before processing
+│   │   └── MethodChannel convertToWav runs on background thread
+│   ├── 19P.G Share Sheet UX Improvements ✅
+│   │   ├── Default folder pre-selected from user preferences (settingsProvider.defaultFolderId)
+│   │   ├── Action buttons sized to 48px with nav bar safe padding (viewPadding.bottom)
+│   │   └── DropdownButtonFormField uses initialValue (not deprecated value)
+│   └── 19P.H Edge Cases — Deferred
+│       ├── SHA-256 duplicate detection — deferred (low frequency scenario)
+│       ├── Multi-speaker toggle — deferred (Whisper doesn't do diarization in Phase 1)
+│       └── iOS share extension — deferred until iOS build
+│
+├── Step 20P: User Guide & Home Tip Tile ──── [Medium]  ✅
+│   ├── 20P.A User Guide Page ✅
+│   │   ├── UserGuidePage scaffold with 14 collapsible sections (AnimatedCrossFade)
+│   │   ├── _SectionTile + _GuideItem widget components
+│   │   ├── Full content for all 14 sections (plain-language guide items)
+│   │   ├── Deep-link support: openSectionIndex route extra
+│   │   └── Route /user_guide in go_router
+│   ├── 20P.B Home Tip Tile ✅
+│   │   ├── HomeTipTile widget (amber/gold accent, lightbulb icon)
+│   │   ├── 12 tips with action hints + deep-link navigation targets
+│   │   ├── Left/right chevron tip navigation
+│   │   ├── Dismiss (×) with session-only hide + snackbar with "Go There" action to Help & Support
+│   │   ├── Auto-hide after 1 minute of inactivity; reappears on app launch
+│   │   ├── Tips shuffled randomly per app session (static shuffled order)
+│   │   ├── Close button = session dismiss only (permanent disable via settings toggle)
+│   │   └── Positioned above pinned section in Notes tab
+│   ├── 20P.C Data Model & Provider ✅
+│   │   ├── UserSettings: currentTipIndex (HiveField 42), tipTileDismissed (HiveField 43)
+│   │   ├── SettingsNotifier: setCurrentTipIndex, setTipTileDismissed
+│   │   └── Run build_runner
+│   └── 20P.D Settings Integration ✅
+│       ├── Support page: "User Guide" tile + "Home Tips" switch
+│       └── Deep-link wiring for all tip actions
+│
+├── Step 21P: Re-transcribe Page ────────────── [Small]   ✅
+│   ├── 21P.A Page UI ✅
+│   │   ├── RetranscribePage scaffold with multi-select list of eligible notes
+│   │   ├── _NoteSelectTile widget (checkbox, title, transcription preview, metadata chips)
+│   │   ├── Metadata chips: duration, date, model, shared badge, rich text warning
+│   │   ├── Select All / Deselect All in AppBar
+│   │   ├── Empty state for no eligible notes + missing Whisper model state
+│   │   └── Bottom bar: Cancel + "Re-transcribe (N)" filled button
+│   ├── 21P.B Processing & Confirmation ✅
+│   │   ├── Confirmation dialog with warnings (plain text, version history, model name)
+│   │   ├── Linear progress indicator during bulk re-transcription
+│   │   ├── Success/failure count snackbar on completion
+│   │   └── List reloads after completion
+│   └── 21P.C Navigation Integration ✅
+│       ├── Route /retranscribe in go_router (31 routes total)
+│       ├── Audio Settings "Re-transcribe Notes" navigates to /retranscribe
+│       └── Removed inline _showBulkRetranscribe dialog from audio_settings_page
+│                                            │
+│                                     PHASE 1.5 COMPLETE
 
 PHASE 2 — AI-Powered
-├── Step 18: Auth & Account System ────── [Large]
-├── Step 19: AI Auto-Categorization ───── [Large]
-├── Step 20: Cloud Transcription ──────── [Medium]
-├── Step 21: Cloud Backup & Sync ──────── [Large]
-└── Step 22: n8n Integration & Advanced ── [Large]
+├── Step P2-1: Auth & Account System ──────── [Large]
+├── Step P2-2: AI Auto-Categorization ─────── [Large]
+├── Step P2-3: Cloud Transcription ────────── [Medium]
+├── Step P2-4: Cloud Backup & Sync ────────── [Large]
+├── Step P2-5: External Recorder Import (Pro) [Med-Lg]  ⬜
+│   ├── P2-5.A Data Model & Storage
+│   │   ├── ImportMetadata Hive model + TypeAdapter
+│   │   ├── ImportBatch Hive model + TypeAdapter
+│   │   ├── ImportError model + ImportBatchStatus enum
+│   │   ├── Add importMetadata field to Note model
+│   │   ├── Add importBatchesBox to HiveService (AES-256 encrypted)
+│   │   ├── Migration: set sourceType=in_app for existing notes
+│   │   └── Run build_runner
+│   ├── P2-5.B File Handling & Processing
+│   │   ├── file_picker for cross-platform file selection (multi-select)
+│   │   ├── Audio validation (format check, corruption detection)
+│   │   ├── Metadata extraction (duration, recording date, file info)
+│   │   ├── SHA-256 hash for duplicate detection
+│   │   ├── Audio format conversion (ffmpeg_kit_flutter for non-standard)
+│   │   ├── Chunked splitting for long recordings (silence detection)
+│   │   ├── Chunk result stitching for merged transcription
+│   │   └── ImportService orchestrating full pipeline
+│   ├── P2-5.C Repository & Provider Layer
+│   │   ├── ImportRepository with batch CRUD + file tracking
+│   │   ├── importBatchProvider (Notifier/NotifierProvider)
+│   │   ├── Import methods in NotesRepository
+│   │   └── Background processing (isolate for heavy processing)
+│   ├── P2-5.D UI — Import Flow
+│   │   ├── "Import Recording" in Home FAB menu
+│   │   ├── File picker with audio MIME type filtering
+│   │   ├── Import Confirmation screen (file list, preview, destination)
+│   │   ├── Audio preview playback (first 15 seconds)
+│   │   ├── Import Progress screen (batch + per-file status)
+│   │   ├── Background processing notification
+│   │   └── "Import into folder/project" from detail screens
+│   ├── P2-5.E UI — Indicators & History
+│   │   ├── Imported note badge widget
+│   │   ├── "Import Info" section on Note Detail
+│   │   ├── Import History screen (Settings → Import History)
+│   │   └── Duplicate warning in import confirmation
+│   └── P2-5.F Testing & Polish
+│       ├── Format tests: MP3, WAV, M4A, AAC (various bitrates)
+│       ├── Duration tests: 30s, 5min, 30min, 2hr
+│       ├── Batch tests: 1, 5, 20 files
+│       └── Edge cases: no metadata, storage warnings, interrupted import
+└── Step P2-6: n8n Integration & Advanced ── [Large]
                                              │
                                       PHASE 2 RELEASE
 ```
+
+---
+
+## Step 19P: Share to Vaanix — Detailed Plan
+
+**Goal:** Enable users to share audio files from any app (WhatsApp, Telegram, Signal, etc.) directly into Vaanix for on-device transcription and organization.
+
+**Tier:** Free — all users. **Phase:** Phase 1.5 (post-wave enhancement).
+
+**Estimated effort:** ~7 days
+
+### 19P.A Data Model
+
+1. Create `NoteSourceType` enum: `in_app`, `shared`, `imported`
+2. Create `SharedNoteMetadata` Hive model with TypeAdapter (typeId: TBD)
+   - Fields: `sharedFrom`, `multiSpeaker`, `sourceApp`, `originalFilename`, `originalFormat`, `originalDuration`, `sharedAt`
+3. Add `sourceType` (HiveField) and `sharedNoteMetadata` (HiveField) to `Note` model
+4. Write migration: set `sourceType = in_app` for all existing notes
+5. Run `build_runner` to regenerate type adapters
+
+### 19P.B Platform Integration (Android)
+
+1. Add `audio/*` intent filter to `AndroidManifest.xml` inside `MainActivity`:
+   ```xml
+   <intent-filter>
+       <action android:name="android.intent.action.SEND" />
+       <category android:name="android.intent.category.DEFAULT" />
+       <data android:mimeType="audio/*" />
+   </intent-filter>
+   ```
+2. Add `receive_sharing_intent` package to `pubspec.yaml`
+3. Handle cold-start and warm-start share intents in `MainActivity.kt`
+4. Pass shared audio URI to Flutter via MethodChannel or `receive_sharing_intent` stream
+
+### 19P.B Platform Integration (iOS — deferred until iOS build)
+
+1. Add Share Extension target to Xcode project
+2. Configure `NSExtensionActivationRule` for `kUTTypeAudio`, `public.audio`
+3. Set up App Group shared container for file handoff
+4. Add `ffmpeg_kit_flutter_audio` for Opus/OGG → M4A transcoding
+
+### 19P.C Share Bottom Sheet UI
+
+1. Create `ShareReceiveSheet` widget — non-swipe-dismissible, 70% max height
+2. Components: audio preview strip, "From" text field, "Multiple voices?" toggle, folder selector, context note field
+3. "Save & Transcribe" CTA + "Cancel" link
+4. Whisper model not downloaded → "Set Up Whisper First" button navigates to Settings
+5. App Lock gate: require auth before showing sheet
+6. Sheet appears immediately on share intent — no splash or loading delay
+
+### 19P.D Processing Pipeline
+
+1. Create `ShareIntentService`:
+   - Validate file (MIME type, readability, size check)
+   - Compute SHA-256 hash for duplicate detection
+   - Check against existing `sharedNoteMetadata.fileHash` values
+2. Copy audio file to Vaanix AES-256 encrypted local storage
+3. Create `Note` record with `sourceType = shared`, pending transcription status, `SharedNoteMetadata` populated
+4. Trigger existing `WhisperService` transcription (same pipeline as in-app recordings)
+5. On completion: fire local notification "Voice note from [Name] is ready" — tap navigates to Note Detail
+
+### 19P.E Shared Note Visual Identity
+
+1. Add shared badge icon (gold `call_received_rounded` or similar) to `NoteCard` widget
+2. Add "From: [Name]" secondary line below title on `NoteCard`
+3. Add collapsible "Shared Note" metadata section to `NoteDetail` screen:
+   - Source app, sender, share date, original format, duration, multi-speaker indicator
+
+### 19P.F Edge Cases
+
+| Scenario | Handling |
+|---|---|
+| Whisper model not downloaded | "Set Up Whisper First" button replaces CTA |
+| App Lock enabled (Full) | Require auth before showing sheet |
+| File is not audio | Error message + Cancel only |
+| File > 100 MB | Warning with size; allow proceed or cancel |
+| Corrupt/unreadable file | Error message + Cancel only |
+| Cold-started by share intent | Open directly to Share Bottom Sheet |
+| Multiple rapid shares | Queue; one sheet at a time |
+| Storage < 200 MB free | Warning before copying |
+| Duplicate (SHA-256 match) | "Already saved on [date]. Save again?" |
+
+### New Files (Step 19P)
+
+| File | Purpose |
+|---|---|
+| `lib/models/note_source_type.dart` | NoteSourceType enum |
+| `lib/models/shared_note_metadata.dart` | SharedNoteMetadata Hive model |
+| `lib/services/share_intent_service.dart` | Validate, hash, duplicate check |
+| `lib/widgets/share_receive_sheet.dart` | Share Bottom Sheet UI |
+
+### Modified Files (Step 19P)
+
+| File | Change |
+|---|---|
+| `lib/models/note.dart` | Add `sourceType`, `sharedNoteMetadata` fields |
+| `android/app/src/main/AndroidManifest.xml` | Add `audio/*` intent filter |
+| `lib/widgets/note_card.dart` | Add shared badge + "From" line |
+| `lib/pages/note_detail_page.dart` | Add "Shared Note" metadata section |
+| `lib/main.dart` | Listen for share intents, show sheet |
+| `pubspec.yaml` | Add `receive_sharing_intent` |
+
+---
+
+## Step 20P: User Guide & Home Tip Tile — Detailed Plan
+
+**Goal:** Add a comprehensive in-app reference guide and a dismissible tip card on the Home page to improve feature discoverability.
+
+**Estimated effort:** ~5 days
+
+### 20P.A User Guide Page
+
+1. Create `lib/pages/user_guide_page.dart` with:
+   - `Scaffold` + AppBar (title "User Guide", back button)
+   - `ListView` with intro text + 14 `_SectionTile` widgets (collapsible `ExpansionTile`)
+   - Section 1 expanded by default; all others collapsed
+   - Each section contains intro sentence + `_GuideItem` widgets (bold label + description)
+2. Add `/user_guide` route to `nav.dart` (go_router)
+3. Accept `openSectionIndex` extra to pre-expand a specific section on navigation
+4. Content covers: Getting Started, Recording, Notes, Folders, Projects, Tasks, Search, Tags, Widgets, App Lock, Backup, Settings, Tips & Shortcuts, Privacy
+
+### 20P.B Home Tip Tile
+
+1. Create `lib/widgets/home_tip_tile.dart`:
+   - `Card` with amber/gold accent bar (left border), `tips_and_updates_rounded` icon
+   - Tip counter ("Tip N of 12"), tip text, action hint link
+   - Left/right chevron buttons for navigation, × dismiss button
+   - 12 hardcoded tips in fixed rotation order
+2. Position in `home_page.dart` above pinned section in Notes tab only
+3. Deep-link routing: tips link to `/user_guide`, `/backup_restore`, `/security`, Tasks tab, or no-op for gesture tips
+4. Dismissal: × button sets `tipTileDismissed = true`, shows snackbar with re-enable hint
+
+### 20P.C Data Model & Provider
+
+1. Add `currentTipIndex: int` (HiveField 42, default 0) to `UserSettings`
+2. Add `tipTileDismissed: bool` (HiveField 43, default false) to `UserSettings`
+3. Run `build_runner` to regenerate type adapters
+4. Add `setCurrentTipIndex(int)` and `setTipTileDismissed(bool)` to `SettingsNotifier`
+
+### 20P.D Settings Integration
+
+1. Add "User Guide" tile to `support_page.dart` (below Quick Guide, navigates to `/user_guide`)
+2. Add "Home Tips" switch to `support_page.dart` (toggle `tipTileDismissed`; toggling on resets `currentTipIndex` to 0)
+
+### New Files (Step 20P)
+
+| File | Purpose |
+|---|---|
+| `lib/pages/user_guide_page.dart` | Full User Guide page with 14 sections |
+| `lib/widgets/home_tip_tile.dart` | Dismissible tip card for Home feed |
+
+### Modified Files (Step 20P)
+
+| File | Change |
+|---|---|
+| `lib/models/user_settings.dart` | Add HiveFields 42–43 |
+| `lib/models/user_settings.g.dart` | Regenerate via build_runner |
+| `lib/providers/settings_provider.dart` | Add setCurrentTipIndex, setTipTileDismissed |
+| `lib/pages/support_page.dart` | Add User Guide tile + Home Tips switch |
+| `lib/pages/home_page.dart` | Add HomeTipTile above pinned section |
+| `lib/nav.dart` | Add /user_guide route |
+
+---
+
+## Security Hardening (v1.0.4) ✅ COMPLETE
+
+Comprehensive security audit and remediation. All items completed in a single pass.
+
+### Wave A: Security Fixes (Critical + High)
+| # | Fix | Status | Files |
+|---|---|---|---|
+| A1 | PIN salt — `Random.secure()` replaces timestamp | ✅ Done | `app_lock_service.dart` |
+| A2 | Persistent PIN lockout (HiveFields 44-45) | ✅ Done | `user_settings.dart`, `settings_provider.dart`, `app_lock_service.dart`, `splash_page.dart`, `lock_screen_page.dart` |
+| A3 | Backup KDF 10k → 100k iterations (backward compat) | ✅ Done | `backup_service.dart` |
+| A4 | Backup HMAC-SHA256 integrity (schema v2) | ✅ Done | `backup_service.dart` |
+| A5 | File intent validation (.vnbak, exists, <500MB) | ✅ Done | `main.dart` |
+| A6 | PIN hash removed from Riverpod state | ✅ Done | `settings_provider.dart`, `security_page.dart`, `splash_page.dart`, `app_lock_service.dart` |
+
+### Wave B: Privacy & Legal
+| # | Fix | Status | Files |
+|---|---|---|---|
+| B1 | Privacy policy — Sentry, biometric, widget, encryption clarification | ✅ Done | `privacy_policy_page.dart` |
+| B2 | Terms — OS sandboxing, network operations disclosure | ✅ Done | `terms_conditions_page.dart` |
+
+### Wave C: Code Quality
+| # | Fix | Status | Files |
+|---|---|---|---|
+| C1 | 14 `print()` → `debugPrint()` (4 files) | ✅ Done | `notes_provider.dart`, `splash_page.dart`, `security_page.dart`, `lock_screen_page.dart` |
+| C2 | CLAUDE.md gaps (HiveField range, missing pages/routes) | ✅ Done | `CLAUDE.md` |
+
+---
+
+## Widget UX & App Lock Hardening (v1.0.5) ✅ COMPLETE
+
+Post-security polish pass addressing widget usability, app lock edge cases, and tips discoverability.
+
+### Widget UX
+| # | Change | Status | Files |
+|---|---|---|---|
+| W1 | Dashboard redesign — background image, scrim, cell backgrounds, tappable Notes/Tasks cells | ✅ Done | `widget_dashboard.xml`, `VaanixWidgetDashboard.kt` |
+| W2 | Small widget — REC repositioned to right-center, color matched to dashboard | ✅ Done | `widget_small.xml` |
+| W3 | Minimal privacy mode — centered REC, stats hidden | ✅ Done | `widget_dashboard.xml`, `VaanixWidgetDashboard.kt` |
+| W4 | Live data updates on note/task CRUD and settings changes | ✅ Done | `notes_provider.dart`, `settings_provider.dart` |
+| W5 | Widget picker preview layout (API 31+) | ✅ Done | `widget_small_info.xml`, `widget_dashboard_info.xml` |
+| W6 | Deep link pre-check before `runApp()` to skip splash | ✅ Done | `main.dart` |
+
+### App Lock Hardening
+| # | Change | Status | Files |
+|---|---|---|---|
+| L1 | Widget deep links route through lock screen when locked | ✅ Done | `main.dart` |
+| L2 | Variable-length PIN (4-6 digit) with stored `pinLength` (HiveField 46) | ✅ Done | `user_settings.dart`, `settings_provider.dart`, `security_page.dart`, `lock_screen_page.dart`, `splash_page.dart` |
+| L3 | `singleTask` launch mode prevents multiple windows | ✅ Done | `AndroidManifest.xml` |
+| L4 | Quick capture floating lock icon (replaces full-width banner) | ✅ Done | `recording_page.dart` |
+
+### Tips & Discoverability
+| # | Change | Status | Files |
+|---|---|---|---|
+| T1 | Tip body tap opens User Guide at relevant section | ✅ Done | `home_tip_tile.dart` |
+| T2 | Widget tip (#14) added | ✅ Done | `home_tip_tile.dart` |
+| T3 | Dismiss snackbar wording + "Help & Support" action with highlight | ✅ Done | `home_tip_tile.dart`, `support_page.dart`, `nav.dart` |
+| T4 | User Guide sections updated (Widgets, App Lock) | ✅ Done | `user_guide_page.dart` |
 
 ---
 

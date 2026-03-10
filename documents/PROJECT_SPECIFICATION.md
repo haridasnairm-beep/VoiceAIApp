@@ -364,7 +364,73 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 - **Dashboard widget** (4×2) — note count, open task count, latest note preview
 - **Widget Privacy** — respects App Lock settings
 
-### 4.24 Backup & Restore
+### 4.24 Share to Vaanix
+- **Share audio from any app** — WhatsApp, Telegram, Signal, Google Messages, etc. — directly into Vaanix via OS Share Sheet
+- **Share Bottom Sheet** — fast, minimal confirmation UI:
+  - Audio preview strip (waveform + duration + 10-sec tap-to-play)
+  - "From" text field (optional — sender name, defaults to "Unknown")
+  - "Multiple voices?" toggle (off by default; flags for future diarization)
+  - Folder selector (defaults to last-used folder, inline "New Folder" creation)
+  - Optional context note field
+  - "Save & Transcribe" primary CTA + "Cancel" link
+  - Non-swipe-dismissible (prevents accidental data loss)
+  - If Whisper model not downloaded, shows "Set Up Whisper First" fallback
+  - App Lock gate: requires authentication if enabled
+- **Processing pipeline** — same on-device Whisper transcription as in-app recordings; no cloud API
+- **Shared note visual identity:**
+  - Gold shared badge icon (arrow-into-box) on note cards across all list views
+  - "From: [Name]" secondary line below note title on cards
+  - Collapsible "Shared Note" metadata section on Note Detail: source app, sender, share date, format, duration, multi-speaker flag
+- **Speaker handling (Phase 1):**
+  - Single speaker: name stored as `sharedFrom` in metadata
+  - Multiple speakers: user toggle sets `multiSpeaker: true` for future P2 diarization
+  - Unknown: defaults to "Unknown", editable in Note Detail
+- **Audio format support:** Opus/OGG (WhatsApp, Telegram, Google Messages) handled natively on Android via MediaCodec; iOS transcodes via `ffmpeg_kit_flutter_audio` (~3-5 MB). AAC, M4A, MP3, WAV already supported.
+- **Duplicate detection:** SHA-256 hash comparison against existing shared notes
+- **Edge cases:** corrupt files, large files (>100 MB warning), storage space check, intent queue for rapid shares, cold-start handling
+- **Privacy:** shared audio copied to AES-256 encrypted local storage; original file unchanged; no cloud upload
+- **Platform integration:**
+  - Android: `audio/*` intent filter + `receive_sharing_intent` package
+  - iOS: Share Extension with App Group shared container + `ffmpeg_kit_flutter_audio` for Opus transcoding
+- **Data model:** `NoteSourceType` enum (`in_app`, `shared`, `imported`), `SharedNoteMetadata` embedded in Note model
+- **Tier:** Free — all users
+- **Phase 2 upgrade path:** Notes with `multiSpeaker: true` are candidates for retroactive speaker diarization (P2-11)
+
+### 4.25 User Guide & Home Tip Tile
+
+**A. User Guide Page** — comprehensive in-app reference covering every major feature:
+- **Route:** `/user_guide`
+- **Access:** Settings → Help & Support → "User Guide" tile (alongside existing Quick Guide)
+- **Structure:** Single scrollable `ListView` with 14 collapsible `ExpansionTile` sections. Section 1 ("Getting Started") starts expanded; all others collapsed.
+- **Intro text:** *"Everything Vaanix can do, explained simply. Tap any section to expand it."*
+- **Sections:**
+  1. Getting Started (`rocket_launch_rounded`) — how it works, Live vs Whisper, first recording, no sign-in
+  2. Recording & Transcription (`mic_rounded`) — swipe to record, pause/resume, voice commands, audio quality, language, Whisper model
+  3. Your Notes (`notes_rounded`) — note detail, editing, actions, todos, reminders, pinning, tags, templates, images, find & replace, share/export, trash
+  4. Organizing with Folders (`folder_rounded`) — creating, adding notes, colors, archiving, reordering
+  5. Project Documents (`description_rounded`) — what projects are, creating, adding notes, free-text, rich text, section headers, reorder, images, version history, export
+  6. Tasks & Reminders (`task_alt_rounded`) — Tasks tab, marking complete, overdue, manual add, edit/delete, notifications, calendar integration
+  7. Search (`search_rounded`) — opening, sectioned results, keyword highlighting, filters, recent searches
+  8. Tags (`label_rounded`) — adding, removing, filtering, managing, voice command tagging
+  9. Home Screen Widgets (`widgets_rounded`) — Quick Record, Dashboard, adding, Widget Privacy
+  10. App Lock & Privacy (`lock_rounded`) — PIN, biometric, auto-lock, change/remove, Widget Privacy, data privacy
+  11. Backup & Restore (`backup_rounded`) — manual, auto, what's included, restore, passphrase, reminder
+  12. Settings & Preferences (`tune_rounded`) — preferences, theme, audio, security, storage, backup, help, about, danger zone
+  13. Tips & Shortcuts (`tips_and_updates_rounded`) — swipe gestures, FAB swipe-up, multi-select, long-press, folder chip, app shortcuts, sort, filter chips, project reorder
+  14. Privacy & Your Data (`shield_rounded`) — on-device only, no account, encryption, Whisper, crash reporting, delete everything
+- **Content format:** Each section has a brief intro sentence + `_GuideItem` widgets (bold label + plain description). Written in plain, friendly language.
+- **Deep-link support:** Route accepts `openSectionIndex` extra to pre-expand a specific section
+
+**B. Home Tip Tile** — dismissible card on Home page cycling through helpful tips:
+- **Position:** Above pinned section in Notes tab feed (not in Tasks tab)
+- **Styling:** Same card elevation/radius as note cards; amber/gold accent (`#F59E0B`); lightbulb icon (`tips_and_updates_rounded`); left border accent bar
+- **Content:** 12 tips in fixed rotation order (not random), each with one-sentence insight + action hint that deep-links to relevant screen or User Guide section
+- **Navigation:** Left/right chevron buttons advance tips; `currentTipIndex` persisted in UserSettings (HiveField 42)
+- **Dismissal:** × button permanently hides tile; confirmation snackbar with "Re-enable in Settings → Help & Support"; `tipTileDismissed` persisted (HiveField 43)
+- **Re-enable:** "Home Tips" switch in Settings → Help & Support; always visible; toggling on resets tip index to 0
+- **Tips do not auto-advance** — user controls pacing
+
+### 4.26 Backup & Restore
 - **Auto-backup** — scheduled automatic encrypted backups stored on-device; passphrase in flutter_secure_storage; frequency (daily/every 3 days/weekly); retention (3/5/10 files); runs silently on app launch; auto-rotates old files
 - **Create backup** — AES-256 encrypted with user passphrase; includes all data + optionally audio; shares as .vnbak file
 - **Restore** — select file → enter passphrase → preview manifest → confirm → restore
@@ -408,7 +474,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 
 ### 6.3 Navigation
 - **go_router** for declarative routing with extras for data passing
-- Active routes: splash, onboarding, guided_recording, home, recording, note_detail, library, folder_detail, preferences, audio_settings, security, storage, backup, support, danger_zone, search, project_document_detail, note_picker, version_history, privacy_policy, terms_conditions, about, feedback, trash, lock_screen, tags, whats_new
+- Active routes: splash, onboarding, guided_recording, home, recording, note_detail, library, folder_detail, preferences, audio_settings, security, storage, backup, support, danger_zone, search, project_document_detail, note_picker, version_history, privacy_policy, terms_conditions, about, feedback, trash, lock_screen, tags, whats_new, user_guide
 - Inactive route (Phase 2): login
 
 ### 6.4 Audio Recording
@@ -488,7 +554,10 @@ Note
 ├── projectDocumentIds: List<String>
 ├── imageAttachmentIds: List<String>
 ├── isPinned: bool (default: false)
-└── pinnedAt: DateTime? (for pin sort order)
+├── pinnedAt: DateTime? (for pin sort order)
+├── sourceType: NoteSourceType (in_app | shared | imported; default: in_app)
+├── sharedNoteMetadata: SharedNoteMetadata? (null for in_app notes)
+└── importMetadata: ImportMetadata? (null for in_app/shared notes; Phase 2)
 
 ActionItem
 ├── id: String
@@ -559,7 +628,9 @@ UserSettings
 ├── autoBackupEnabled: bool (default: false)
 ├── autoBackupFrequency: String (daily / every3days / weekly; default: weekly)
 ├── autoBackupMaxCount: int (3, 5, or 10; default: 5)
-└── autoBackupLastRun: DateTime? (last auto-backup timestamp)
+├── autoBackupLastRun: DateTime? (last auto-backup timestamp)
+├── currentTipIndex: int (0–11, index of displayed home tip; default: 0)
+└── tipTileDismissed: bool (whether home tip tile has been dismissed; default: false)
 
 ProjectDocument
 ├── id: String (UUID)
@@ -600,6 +671,40 @@ ImageAttachment
 ├── fileSizeBytes: int
 ├── createdAt: DateTime
 └── sourceType: String ("gallery" | "camera")
+
+NoteSourceType (enum)
+├── in_app       (recorded within Vaanix)
+├── shared       (received via OS Share Sheet)
+└── imported     (imported via file picker — Phase 2 Pro)
+
+SharedNoteMetadata
+├── sharedFrom: String? (sender name; display default: "Unknown")
+├── multiSpeaker: bool (default: false)
+├── sourceApp: String? (detected source app, e.g. "WhatsApp")
+├── originalFilename: String?
+├── originalFormat: String (e.g. "opus", "ogg", "m4a")
+├── originalDuration: Duration?
+└── sharedAt: DateTime
+
+ImportMetadata (Phase 2 — External Recorder Import)
+├── originalFilename: String
+├── originalFileSize: int (bytes)
+├── originalDuration: Duration
+├── originalRecordedAt: DateTime?
+├── importedAt: DateTime
+├── sourceDevice: String?
+├── fileFormat: String
+├── fileHash: String (SHA-256)
+└── importBatchId: String?
+
+ImportBatch (Phase 2 — External Recorder Import)
+├── id: String (UUID)
+├── importedAt: DateTime
+├── fileCount: int
+├── processedCount: int
+├── status: ImportBatchStatus (pending | processing | completed | partial_failure)
+├── noteIds: List<String>
+└── errors: List<ImportError>?
 
 TaskItem (UI view model — NOT stored in Hive)
 ├── type: TaskType (todo | action | reminder)
@@ -670,7 +775,7 @@ Folders organize. Tags cross-reference. Projects compose.
 | Smart filters (virtual folders) | Phase 2 |
 | Custom note templates (user-created) | Phase 2 |
 | Web companion | Phase 2 |
-| External recorder import | Phase 2 |
+| External recorder import (Pro) — manual file picker, batch import (up to 20), import confirmation/progress screens, duplicate detection, import history | Phase 2 |
 | Task assignment (multi-user) | Phase 3 |
 | Numbered lists, checklists in rich text | Phase 2 |
 | H3-H6 headings, inline images in text | Phase 2 |
@@ -746,5 +851,7 @@ Folders organize. Tags cross-reference. Projects compose.
 | archive | ZIP archive for backup | Active |
 | encrypt | AES-256 for backup encryption | Active |
 | permission_handler | Runtime permission management | Active |
+| receive_sharing_intent | Handle OS Share Sheet audio intents | Planned (Share to Vaanix) |
+| ffmpeg_kit_flutter_audio | iOS Opus/OGG transcoding (audio-only variant) | Planned (Share to Vaanix, iOS only) |
 | sentry_flutter | Opt-in crash reporting | Planned |
 | hive_generator + build_runner | Hive model code generation (dev) | Active |

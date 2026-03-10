@@ -145,16 +145,24 @@ class NoteAttachmentsSection extends ConsumerWidget {
     final picked = await picker.pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
 
-    final repo = ImageAttachmentRepository();
-    final attachment = await repo.saveImage(
-      sourceFile: File(picked.path),
-      sourceType: source == ImageSource.gallery ? 'gallery' : 'camera',
-    );
+    try {
+      final repo = ImageAttachmentRepository();
+      final attachment = await repo.saveImage(
+        sourceFile: File(picked.path),
+        sourceType: source == ImageSource.gallery ? 'gallery' : 'camera',
+      );
 
-    ref.read(notesProvider.notifier).addImageAttachment(
-          noteId: note.id,
-          attachmentId: attachment.id,
+      ref.read(notesProvider.notifier).addImageAttachment(
+            noteId: note.id,
+            attachmentId: attachment.id,
+          );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add photo: $e')),
         );
+      }
+    }
   }
 
   Future<void> _confirmDeletePhoto(

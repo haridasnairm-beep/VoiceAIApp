@@ -402,10 +402,13 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                     children: items.map((item) {
                       if (item.note != null) {
                         final note = item.note!;
-                        final noteFolderNames = folders
+                        final noteFolders = folders
                             .where((f) => f.noteIds.contains(note.id))
-                            .map((f) => f.name)
                             .toList();
+                        final noteFolderNames = noteFolders.map((f) => f.name).toList();
+                        final noteFolderColors = {
+                          for (final f in noteFolders) f.name: f.colorValue,
+                        };
                         final noteProjectNames = allProjects
                             .where((p) => note.projectDocumentIds.contains(p.id))
                             .map((p) => p.title)
@@ -414,6 +417,7 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                           note: note,
                           timestamp: _formatDate(note.createdAt),
                           folderNames: noteFolderNames,
+                          folderColors: noteFolderColors,
                           projectNames: noteProjectNames,
                           onTap: () => context.push(
                             AppRoutes.noteDetail,
@@ -473,10 +477,13 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                       )
                     : Column(
                         children: folderNotes.map((note) {
-                          final noteFolderNames = folders
+                          final noteFolders = folders
                               .where((f) => f.noteIds.contains(note.id))
-                              .map((f) => f.name)
                               .toList();
+                          final noteFolderNames = noteFolders.map((f) => f.name).toList();
+                          final noteFolderColors = {
+                            for (final f in noteFolders) f.name: f.colorValue,
+                          };
                           final noteProjectNames = allProjects
                               .where((p) => note.projectDocumentIds.contains(p.id))
                               .map((p) => p.title)
@@ -485,6 +492,7 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
                             note: note,
                             timestamp: _formatDate(note.createdAt),
                             folderNames: noteFolderNames,
+                            folderColors: noteFolderColors,
                             projectNames: noteProjectNames,
                             onTap: () => context.push(
                               AppRoutes.noteDetail,

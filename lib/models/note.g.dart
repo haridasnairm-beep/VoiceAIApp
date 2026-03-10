@@ -46,13 +46,16 @@ class NoteAdapter extends TypeAdapter<Note> {
       deletedAt: fields[26] as DateTime?,
       previousFolderId: fields[27] as String?,
       tags: (fields[28] as List?)?.cast<String>(),
+      sourceType: fields[29] == null ? 'in_app' : fields[29] as String,
+      sharedFrom: fields[30] as String?,
+      originalFilename: fields[31] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Note obj) {
     writer
-      ..writeByte(29)
+      ..writeByte(32)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -110,7 +113,13 @@ class NoteAdapter extends TypeAdapter<Note> {
       ..writeByte(27)
       ..write(obj.previousFolderId)
       ..writeByte(28)
-      ..write(obj.tags);
+      ..write(obj.tags)
+      ..writeByte(29)
+      ..write(obj.sourceType)
+      ..writeByte(30)
+      ..write(obj.sharedFrom)
+      ..writeByte(31)
+      ..write(obj.originalFilename);
   }
 
   @override

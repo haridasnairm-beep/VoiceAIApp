@@ -52,7 +52,7 @@ class TermsConditionsPage extends StatelessWidget {
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  'Last Updated: February 2026',
+                  'Last Updated: March 2026',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -224,8 +224,15 @@ class TermsConditionsPage extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '6.3 All local data is stored in your device\'s app-private storage, accessible only '
-                'to Vaanix and encrypted with AES-256.',
+                '6.3 All structured data (notes, folders, settings) is stored in your device\'s '
+                'app-private storage in an AES-256 encrypted database.',
+                style: bodyStyle,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '6.4 Audio recordings and image attachments are stored as files in the operating '
+                'system\'s sandboxed app directory. These files are not individually encrypted but are '
+                'protected by the OS application sandbox, which prevents other apps from accessing them.',
                 style: bodyStyle,
               ),
               const SizedBox(height: 20),
@@ -248,6 +255,14 @@ class TermsConditionsPage extends StatelessWidget {
               Text(
                 '7.3 Transcription accuracy depends on audio quality, background noise, and language. '
                 'We do not guarantee perfect transcription results.',
+                style: bodyStyle,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '7.4 The App makes two types of network operations: (a) a one-time download of the '
+                'Whisper transcription model over HTTPS, and (b) optional anonymous crash reporting '
+                'via Sentry, which is disabled by default and can be controlled in Settings > Preferences. '
+                'No user content is ever transmitted.',
                 style: bodyStyle,
               ),
               const SizedBox(height: 20),

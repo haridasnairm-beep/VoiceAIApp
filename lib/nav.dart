@@ -28,6 +28,8 @@ import 'pages/backup_restore_page.dart';
 import 'pages/tags_page.dart';
 import 'pages/calendar_page.dart';
 import 'pages/permission_page.dart';
+import 'pages/user_guide_page.dart';
+import 'pages/retranscribe_page.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -188,9 +190,16 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.support,
         name: 'support',
-        pageBuilder: (context, state) => const NoTransitionPage(
-          child: SupportPage(),
-        ),
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          bool highlightHomeTips = false;
+          if (extra is Map) {
+            highlightHomeTips = extra['highlightHomeTips'] == true;
+          }
+          return NoTransitionPage(
+            child: SupportPage(highlightHomeTips: highlightHomeTips),
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.security,
@@ -351,6 +360,28 @@ class AppRouter {
           child: PermissionPage(),
         ),
       ),
+      GoRoute(
+        path: AppRoutes.userGuide,
+        name: 'user_guide',
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          int? openSectionIndex;
+          if (extra is Map) {
+            final s = extra['openSectionIndex'];
+            if (s is int) openSectionIndex = s;
+          }
+          return NoTransitionPage(
+            child: UserGuidePage(openSectionIndex: openSectionIndex),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.retranscribe,
+        name: 'retranscribe',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: RetranscribePage(),
+        ),
+      ),
     ],
   );
 }
@@ -385,4 +416,6 @@ class AppRoutes {
   static const String tags = '/tags';
   static const String calendar = '/calendar';
   static const String permissions = '/permissions';
+  static const String userGuide = '/user_guide';
+  static const String retranscribe = '/retranscribe';
 }

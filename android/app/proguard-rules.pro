@@ -16,10 +16,18 @@
 -keep class org.jsoup.** { *; }
 -dontwarn org.jsoup.**
 
-# Keep Gson/JSON parsing (if used)
+# Keep Gson/JSON parsing — required by flutter_local_notifications
 -keep class com.google.gson.** { *; }
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
 -keepattributes Signature
 -keepattributes *Annotation*
+
+# flutter_local_notifications — keep scheduled notification serialization
+-keep class com.dexterous.** { *; }
+
+# image_cropper — keep UCrop activity
+-keep class com.yalantis.ucrop.** { *; }
 
 # Hive database
 -keep class hive.** { *; }

@@ -73,8 +73,10 @@ class BackupManifest {
 ///   [16 bytes] random salt
 ///   [16 bytes] random IV
 ///   [remaining] AES-256-CBC encrypted ZIP bytes (PKCS7-padded)
+///   [32 bytes] HMAC-SHA256 (schema >= 2 only, over magic+version+salt+IV+cipher)
 ///
-/// Key derivation: 10,000 rounds of SHA-256(hash || passphrase_bytes || salt)
+/// Key derivation: 100,000 rounds of SHA-256(hash || passphrase_bytes || salt)
+/// (legacy v1 backups used 10,000 rounds — decryption falls back automatically)
 ///
 /// ZIP contents:
 ///   manifest.json — metadata counts + version
@@ -83,15 +85,17 @@ class BackupManifest {
 ///   audio/ — audio recording files (binary, if includeAudio=true)
 class BackupService {
   static const List<int> _magic = [0x56, 0x4E, 0x42, 0x4B]; // VNBK
-  static const int _schemaVersion = 1;
-  static const String _appVersion = '1.0.2';
+  static const int _schemaVersion = 2;
+  static const String currentAppVersion = '1.0.3';
+  static const int _kdfIterationsNew = 100000;
+  static const int _kdfIterationsLegacy = 10000;
 
   // ─── Key Derivation ───────────────────────────────────────────────────────
 
-  static Uint8List _deriveKey(String passphrase, Uint8List salt) {
+  static Uint8List _deriveKey(String passphrase, Uint8List salt, {int iterations = _kdfIterationsNew}) {
     final passphraseBytes = utf8.encode(passphrase);
     List<int> hash = sha256.convert([...passphraseBytes, ...salt]).bytes;
-    for (int i = 1; i < 10000; i++) {
+    for (int i = 1; i < iterations; i++) {
       hash = sha256.convert([...hash, ...passphraseBytes, ...salt]).bytes;
     }
     return Uint8List.fromList(hash); // 32 bytes = AES-256
@@ -99,16 +103,16 @@ class BackupService {
 
   // ─── Encrypt / Decrypt ───────────────────────────────────────────────────
 
-  static Uint8List _encrypt(Uint8List plainBytes, String passphrase, Uint8List salt, Uint8List iv) {
-    final keyBytes = _deriveKey(passphrase, salt);
+  static Uint8List _encrypt(Uint8List plainBytes, String passphrase, Uint8List salt, Uint8List iv, {int iterations = _kdfIterationsNew}) {
+    final keyBytes = _deriveKey(passphrase, salt, iterations: iterations);
     final key = enc.Key(keyBytes);
     final encIv = enc.IV(iv);
     final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
     return Uint8List.fromList(encrypter.encryptBytes(plainBytes, iv: encIv).bytes);
   }
 
-  static Uint8List _decrypt(Uint8List cipherBytes, String passphrase, Uint8List salt, Uint8List iv) {
-    final keyBytes = _deriveKey(passphrase, salt);
+  static Uint8List _decrypt(Uint8List cipherBytes, String passphrase, Uint8List salt, Uint8List iv, {int iterations = _kdfIterationsNew}) {
+    final keyBytes = _deriveKey(passphrase, salt, iterations: iterations);
     final key = enc.Key(keyBytes);
     final encIv = enc.IV(iv);
     final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
@@ -138,7 +142,7 @@ class BackupService {
     final manifest = BackupManifest(
       schemaVersion: _schemaVersion,
       createdAt: DateTime.now(),
-      appVersion: _appVersion,
+      appVersion: currentAppVersion,
       noteCount: notes.length,
       folderCount: folders.length,
       projectDocumentCount: projectDocs.length,
@@ -227,11 +231,12 @@ class BackupService {
       passphrase: passphrase,
       salt: salt,
       iv: iv,
+      iterations: _kdfIterationsNew,
     ));
 
     onProgress?.call('Writing file…', 0.88);
 
-    // 8. Write backup file: magic + version + salt + IV + ciphertext
+    // 8. Write backup file: magic + version + salt + IV + ciphertext + HMAC
     final ts = DateTime.now();
     final fileName =
         'vaanix_backup_${ts.year}${ts.month.toString().padLeft(2, '0')}${ts.day.toString().padLeft(2, '0')}_${ts.hour.toString().padLeft(2, '0')}${ts.minute.toString().padLeft(2, '0')}.vnbak';
@@ -244,6 +249,13 @@ class BackupService {
     writer.add(salt);
     writer.add(iv);
     writer.add(cipherBytes);
+
+    // Compute HMAC-SHA256 over everything before it (schema v2+)
+    final preHmacBytes = writer.toBytes();
+    final hmacKey = _deriveKey(passphrase, salt, iterations: _kdfIterationsNew);
+    final hmacDigest = Hmac(sha256, hmacKey).convert(preHmacBytes);
+    writer.add(hmacDigest.bytes);
+
     await backupFile.writeAsBytes(writer.toBytes());
 
     onProgress?.call('Sharing…', 0.95);
@@ -420,22 +432,73 @@ class BackupService {
       throw Exception('Not a valid Vaanix backup file.');
     }
 
+    // Read schema version
+    final schemaVersion = (fileBytes[4] << 24) |
+        (fileBytes[5] << 16) |
+        (fileBytes[6] << 8) |
+        fileBytes[7];
+
     // Parse header
-    final salt = fileBytes.sublist(8, 24);
-    final iv = fileBytes.sublist(24, 40);
-    final cipherBytes = fileBytes.sublist(40);
+    final salt = Uint8List.fromList(fileBytes.sublist(8, 24));
+    final iv = Uint8List.fromList(fileBytes.sublist(24, 40));
 
-    // Decrypt
-    final zipBytes = await compute(_decryptIsolate, _EncryptParams(
-      plainBytes: cipherBytes,
-      passphrase: passphrase,
-      salt: salt,
-      iv: iv,
-    ));
+    Uint8List cipherBytes;
 
-    // Unzip
-    final archive = ZipDecoder().decodeBytes(zipBytes);
-    return archive;
+    if (schemaVersion >= 2) {
+      // Schema v2+: last 32 bytes are HMAC-SHA256
+      if (fileBytes.length < 72) throw Exception('Backup file is corrupt (too small for v2).');
+      final storedHmac = fileBytes.sublist(fileBytes.length - 32);
+      final preHmacBytes = fileBytes.sublist(0, fileBytes.length - 32);
+      cipherBytes = Uint8List.fromList(preHmacBytes.sublist(40));
+
+      // Verify HMAC before decrypting
+      final hmacKey = _deriveKey(passphrase, salt, iterations: _kdfIterationsNew);
+      final computedHmac = Hmac(sha256, hmacKey).convert(preHmacBytes);
+      bool hmacValid = true;
+      for (int i = 0; i < 32; i++) {
+        if (storedHmac[i] != computedHmac.bytes[i]) {
+          hmacValid = false;
+          break;
+        }
+      }
+      if (!hmacValid) {
+        throw Exception('Backup integrity check failed. The file may be corrupted or the passphrase is incorrect.');
+      }
+
+      // Decrypt with new iteration count
+      final zipBytes = await compute(_decryptIsolate, _EncryptParams(
+        plainBytes: cipherBytes,
+        passphrase: passphrase,
+        salt: salt,
+        iv: iv,
+        iterations: _kdfIterationsNew,
+      ));
+      return ZipDecoder().decodeBytes(zipBytes);
+    } else {
+      // Schema v1: no HMAC, try new iterations first then legacy fallback
+      cipherBytes = Uint8List.fromList(fileBytes.sublist(40));
+
+      try {
+        final zipBytes = await compute(_decryptIsolate, _EncryptParams(
+          plainBytes: cipherBytes,
+          passphrase: passphrase,
+          salt: salt,
+          iv: iv,
+          iterations: _kdfIterationsNew,
+        ));
+        return ZipDecoder().decodeBytes(zipBytes);
+      } catch (_) {
+        // Fallback to legacy 10k iterations for old backups
+        final zipBytes = await compute(_decryptIsolate, _EncryptParams(
+          plainBytes: cipherBytes,
+          passphrase: passphrase,
+          salt: salt,
+          iv: iv,
+          iterations: _kdfIterationsLegacy,
+        ));
+        return ZipDecoder().decodeBytes(zipBytes);
+      }
+    }
   }
 
   static BackupManifest _readManifest(Archive archive) {
@@ -530,7 +593,7 @@ class BackupService {
       final manifest = BackupManifest(
         schemaVersion: _schemaVersion,
         createdAt: DateTime.now(),
-        appVersion: _appVersion,
+        appVersion: currentAppVersion,
         noteCount: notes.length,
         folderCount: folders.length,
         projectDocumentCount: projectDocs.length,
@@ -590,6 +653,7 @@ class BackupService {
         passphrase: passphrase,
         salt: salt,
         iv: iv,
+        iterations: _kdfIterationsNew,
       ));
 
       // 7. Write to auto-backup directory
@@ -605,6 +669,13 @@ class BackupService {
       writer.add(salt);
       writer.add(iv);
       writer.add(cipherBytes);
+
+      // Compute HMAC-SHA256 (schema v2+)
+      final preHmacBytes = writer.toBytes();
+      final hmacKey = _deriveKey(passphrase, salt, iterations: _kdfIterationsNew);
+      final hmacDigest = Hmac(sha256, hmacKey).convert(preHmacBytes);
+      writer.add(hmacDigest.bytes);
+
       await backupFile.writeAsBytes(writer.toBytes());
 
       debugPrint('AutoBackup: saved to ${backupFile.path}');
@@ -657,11 +728,11 @@ class BackupService {
   // ─── Isolate-safe encrypt/decrypt ─────────────────────────────────────────
 
   static Uint8List _encryptIsolate(_EncryptParams params) {
-    return _encrypt(params.plainBytes, params.passphrase, params.salt, params.iv);
+    return _encrypt(params.plainBytes, params.passphrase, params.salt, params.iv, iterations: params.iterations);
   }
 
   static Uint8List _decryptIsolate(_EncryptParams params) {
-    return _decrypt(params.plainBytes, params.passphrase, params.salt, params.iv);
+    return _decrypt(params.plainBytes, params.passphrase, params.salt, params.iv, iterations: params.iterations);
   }
 }
 
@@ -671,11 +742,13 @@ class _EncryptParams {
   final String passphrase;
   final Uint8List salt;
   final Uint8List iv;
+  final int iterations;
 
   const _EncryptParams({
     required this.plainBytes,
     required this.passphrase,
     required this.salt,
     required this.iv,
+    this.iterations = 100000,
   });
 }

@@ -52,7 +52,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  'Last Updated: February 2026',
+                  'Last Updated: March 2026',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -102,6 +102,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               _bulletItem('Project Documents and linked note references', bulletStyle),
               _bulletItem('Todo items, action items, and reminders', bulletStyle),
               _bulletItem('Image attachments', bulletStyle),
+              _bulletItem('Shared audio metadata (source type, original filename) when importing recordings', bulletStyle),
               _bulletItem('App settings and preferences (theme, audio quality, prefixes)', bulletStyle),
               _bulletItem('Notification scheduling data', bulletStyle),
               const SizedBox(height: 20),
@@ -154,7 +155,22 @@ class PrivacyPolicyPage extends StatelessWidget {
               _dontItem('We don\'t use cookies, tracking pixels, or device fingerprinting.', bulletStyle),
               _dontItem('We don\'t require an internet connection to function.', bulletStyle),
               _dontItem('We don\'t have ads and never will.', bulletStyle),
-              _dontItem('We don\'t make any network calls except for the one-time Whisper model download.', bulletStyle),
+              _dontItem('We don\'t make any network calls except for (a) the one-time Whisper model download over HTTPS, and (b) optional anonymous crash reports if you enable crash reporting in Settings.', bulletStyle),
+              const SizedBox(height: 20),
+
+              // 6A. OPTIONAL CRASH REPORTING
+              _sectionHeader('6A. OPTIONAL CRASH REPORTING', headingStyle),
+              Text(
+                'Vaanix includes an optional, opt-in crash reporting feature powered by Sentry. '
+                'This is disabled by default and can be toggled in Settings > Preferences.\n\n'
+                'When enabled, only the following data is sent:\n'
+                '\u2022  Stack traces and error messages\n'
+                '\u2022  Device model and OS version\n'
+                '\u2022  App version\n\n'
+                'No personal content (recordings, transcriptions, notes, or settings) is ever included '
+                'in crash reports. You can disable crash reporting at any time.',
+                style: bodyStyle,
+              ),
               const SizedBox(height: 20),
 
               // 7. MICROPHONE ACCESS
@@ -208,10 +224,33 @@ class PrivacyPolicyPage extends StatelessWidget {
               // 11. DATA SECURITY
               _sectionHeader('11. DATA SECURITY', headingStyle),
               Text(
-                'All local data is stored in an AES-256 encrypted Hive database within your '
-                'device\'s app-private storage. This storage is sandboxed by the operating system '
-                'and accessible only to Vaanix. No data is transmitted over any network '
-                '(except the one-time Whisper model download over HTTPS).',
+                'Your notes, folders, projects, settings, and other structured data are stored in an '
+                'AES-256 encrypted Hive database within your device\'s app-private storage. '
+                'Audio recordings and image attachments are stored as files in the OS-sandboxed '
+                'app directory — they are not individually encrypted but are protected by the '
+                'operating system\'s application sandbox. This storage is accessible only to Vaanix.',
+                style: bodyStyle,
+              ),
+              const SizedBox(height: 20),
+
+              // 11A. BIOMETRIC AUTHENTICATION
+              _sectionHeader('11A. BIOMETRIC AUTHENTICATION', headingStyle),
+              Text(
+                'Vaanix offers optional biometric unlock (fingerprint/face) via your device\'s '
+                'built-in authentication system (local_auth). All biometric processing is handled '
+                'by your device\'s OS — Vaanix never receives, stores, or transmits any biometric '
+                'data. Only a success/failure result is returned to the app.',
+                style: bodyStyle,
+              ),
+              const SizedBox(height: 20),
+
+              // 11B. HOME SCREEN WIDGETS
+              _sectionHeader('11B. HOME SCREEN WIDGETS', headingStyle),
+              Text(
+                'Vaanix provides optional home screen widgets (Quick Record and Dashboard). '
+                'Widget data (note counts, preview text) is sent to the OS widget framework for display. '
+                'This data never leaves your device. You can control what information appears on widgets '
+                'using the Widget Privacy setting in Settings > Security.',
                 style: bodyStyle,
               ),
               const SizedBox(height: 20),
@@ -227,7 +266,8 @@ class PrivacyPolicyPage extends StatelessWidget {
               // 13. CONTACT
               _sectionHeader('13. CONTACT', headingStyle),
               Text(
-                'For questions about privacy, email: support@hdmpixels.com',
+                'For questions about privacy, email: support@hdmpixels.com\n'
+                'For feedback: hdmpixels@gmail.com',
                 style: bodyStyle,
               ),
               const SizedBox(height: 20),

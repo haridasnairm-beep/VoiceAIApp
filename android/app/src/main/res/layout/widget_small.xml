@@ -1,47 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Quick Record widget (2×1) — tap anywhere to open Recording screen -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Quick Record widget (2×1) — full-bleed image with REC button overlay -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_small_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:gravity="center"
-    android:paddingStart="12dp"
-    android:paddingEnd="12dp"
-    android:paddingTop="6dp"
-    android:paddingBottom="6dp"
     android:background="@drawable/widget_background">
 
+    <!-- Full-bleed background image -->
     <ImageView
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:src="@mipmap/ic_launcher"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/widget_quick_record_bg"
+        android:contentDescription="Quick Record"
+        android:scaleType="centerCrop" />
 
-    <TextView
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginStart="8dp"
-        android:text="Vaanix"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:textColor="#CC1A1A1A"
-        android:maxLines="1"
-        android:ellipsize="end" />
-
+    <!-- REC button — right-center, larger touch area -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="10dp"
         android:text="REC"
-        android:textSize="10sp"
+        android:textSize="11sp"
         android:textStyle="bold"
         android:textColor="#FFFFFFFF"
         android:background="@drawable/widget_btn_background"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp" />
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp" />
 
-</LinearLayout>
+</FrameLayout>

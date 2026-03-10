@@ -76,6 +76,18 @@ class ProjectDocumentsNotifier extends Notifier<List<ProjectDocument>> {
     ];
   }
 
+  /// Toggle pin status on a project document.
+  Future<void> togglePin(String projectId) async {
+    final repo = ref.read(projectDocumentsRepositoryProvider);
+    final doc = repo.getProjectDocument(projectId);
+    if (doc == null) return;
+    doc.isPinned = !doc.isPinned;
+    doc.pinnedAt = doc.isPinned ? DateTime.now() : null;
+    doc.updatedAt = DateTime.now();
+    await repo.updateProjectDocument(doc);
+    refresh();
+  }
+
   /// Move a project to a different folder (atomic).
   Future<void> moveProjectToFolder(String projectId, String newFolderId) async {
     await ref
@@ -120,6 +132,13 @@ class ProjectDocumentsNotifier extends Notifier<List<ProjectDocument>> {
     await ref
         .read(projectDocumentsRepositoryProvider)
         .addSectionHeaderBlock(documentId, content);
+    refresh();
+  }
+
+  Future<void> addTaskBlock(String documentId, String content) async {
+    await ref
+        .read(projectDocumentsRepositoryProvider)
+        .addTaskBlock(documentId, content);
     refresh();
   }
 

@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:local_auth/local_auth.dart';
 import 'services/app_lock_service.dart';
 import 'services/home_widget_service.dart';
 import 'services/hive_service.dart';
@@ -10,6 +13,7 @@ import 'services/folders_repository.dart';
 import 'services/notes_repository.dart';
 import 'services/project_documents_repository.dart';
 import 'services/sharing_service.dart';
+import 'widgets/share_receive_sheet.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/settings_repository.dart';
 import 'services/backup_service.dart';
@@ -53,7 +57,32 @@ void main() async {
   ProjectDocumentsRepository().purgeExpiredTrash();
   // Auto-backup if enabled and due
   _runAutoBackupIfDue(settings);
+  // Pre-check for widget launch URI so splash can skip animation
+  await _preCheckWidgetLaunch();
   runApp(const ProviderScope(child: VaanixApp()));
+}
+
+/// Check for widget launch URI before splash page builds,
+/// so splash can skip its animation when a deep link is pending.
+Future<void> _preCheckWidgetLaunch() async {
+  try {
+    final uri = await HomeWidget.initiallyLaunchedFromHomeWidget();
+    if (uri == null) return;
+    final uriStr = uri.toString();
+    if (uriStr == 'vaanix://record') {
+      VaanixApp.pendingDeepLink = AppRoutes.recording;
+    } else if (uriStr == 'vaanix://search') {
+      VaanixApp.pendingDeepLink = AppRoutes.search;
+    } else if (uriStr == 'vaanix://home-notes') {
+      VaanixApp.pendingDeepLink = AppRoutes.home;
+      VaanixApp.pendingHomeTab = 0;
+    } else if (uriStr == 'vaanix://home-tasks') {
+      VaanixApp.pendingDeepLink = AppRoutes.home;
+      VaanixApp.pendingHomeTab = 1;
+    }
+  } catch (_) {
+    // Widget launch check is non-critical
+  }
 }
 
 /// Fire-and-forget auto-backup check on app launch.
@@ -81,6 +110,12 @@ void _runAutoBackupIfDue(dynamic settings) {
 class VaanixApp extends ConsumerStatefulWidget {
   const VaanixApp({super.key});
 
+  /// Pending deep-link from widget tap (consumed by SplashPage._navigateForward).
+  static String? pendingDeepLink;
+
+  /// Pending home tab index from widget tap (0 = Notes, 1 = Tasks).
+  static int? pendingHomeTab;
+
   @override
   ConsumerState<VaanixApp> createState() => _VaanixAppState();
 }
@@ -94,6 +129,7 @@ class _VaanixAppState extends ConsumerState<VaanixApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkWidgetLaunch();
       _checkFileIntent();
+      _checkShareIntent();
       _refreshWidget();
       // Recover any transcriptions that were interrupted by app kill
       ref.read(notesProvider.notifier).recoverStuckTranscriptions();
@@ -115,12 +151,15 @@ class _VaanixAppState extends ConsumerState<VaanixApp>
 
     if (state == AppLifecycleState.paused) {
       // Only record background time if app is unlocked.
-      // If locked (biometric dialog open), skip to avoid re-lock loop.
-      if (!AppLockService.instance.isLocked) {
+      // If locked (biometric dialog open) or in widget recording session, skip.
+      if (!AppLockService.instance.isLocked &&
+          !AppLockService.instance.isInWidgetRecordingSession) {
         AppLockService.instance.onAppPaused();
       }
     } else if (state == AppLifecycleState.resumed) {
-      if (!AppLockService.instance.isLocked) {
+      // Don't lock during widget recording session (user is recording without auth)
+      if (!AppLockService.instance.isLocked &&
+          !AppLockService.instance.isInWidgetRecordingSession) {
         final shouldLock = AppLockService.instance
             .shouldLockOnResume(settings.autoLockTimeoutSeconds);
         if (shouldLock) {
@@ -130,11 +169,17 @@ class _VaanixAppState extends ConsumerState<VaanixApp>
         }
       }
       _refreshWidget();
+      // Check for warm-start share intent (app was already running)
+      _checkShareIntent();
     }
   }
 
   /// Handle URI from a widget tap that launched the app cold.
+  /// On cold start, _preCheckWidgetLaunch already consumed the URI,
+  /// so this is a no-op (pendingDeepLink already set). Kept for safety.
   Future<void> _checkWidgetLaunch() async {
+    // Skip if _preCheckWidgetLaunch already handled the cold-start URI
+    if (VaanixApp.pendingDeepLink != null) return;
     final uri = await HomeWidget.initiallyLaunchedFromHomeWidget();
     _onWidgetClicked(uri);
   }
@@ -143,11 +188,46 @@ class _VaanixAppState extends ConsumerState<VaanixApp>
   void _onWidgetClicked(Uri? uri) {
     if (uri == null) return;
     final uriStr = uri.toString();
+    String? route;
     if (uriStr == 'vaanix://record') {
-      AppRouter.router.go(AppRoutes.recording);
+      route = AppRoutes.recording;
     } else if (uriStr == 'vaanix://search') {
-      AppRouter.router.go(AppRoutes.search);
+      route = AppRoutes.search;
+    } else if (uriStr == 'vaanix://home-notes') {
+      route = AppRoutes.home;
+      VaanixApp.pendingHomeTab = 0;
+    } else if (uriStr == 'vaanix://home-tasks') {
+      route = AppRoutes.home;
+      VaanixApp.pendingHomeTab = 1;
     }
+    if (route == null) return;
+
+    // Store for splash page to consume on cold start
+    VaanixApp.pendingDeepLink = route;
+
+    // Widget recording bypass: if app is locked and user tapped record widget,
+    // start a widget recording session so the lock check in
+    // didChangeAppLifecycleState doesn't override navigation to splash.
+    if (route == AppRoutes.recording &&
+        AppLockService.instance.isLocked) {
+      AppLockService.instance.startWidgetRecordingSession();
+      // Dismiss any active biometric dialog from the lock screen —
+      // it persists as a system overlay even after go_router replaces the page.
+      LocalAuthentication().stopAuthentication();
+    }
+
+    // If app is locked and this is NOT a recording bypass, route through
+    // splash → lock screen so user must authenticate first.
+    final targetRoute = (AppLockService.instance.isLocked &&
+            route != AppRoutes.recording)
+        ? AppRoutes.splash
+        : route;
+
+    // Schedule navigation after current frame to avoid issues when
+    // called during lifecycle transitions (inactive state).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppRouter.router.go(targetRoute);
+    });
   }
 
   /// Check if the app was launched by opening a .vnbak file.
@@ -156,11 +236,67 @@ class _VaanixAppState extends ConsumerState<VaanixApp>
     try {
       final String? filePath = await channel.invokeMethod('getOpenFilePath');
       if (filePath != null && filePath.isNotEmpty) {
+        // Validate the file before navigating
+        if (!filePath.toLowerCase().endsWith('.vnbak')) {
+          _showFileError('Only .vnbak backup files are supported.');
+          return;
+        }
+        final file = File(filePath);
+        if (!await file.exists()) {
+          _showFileError('The file could not be found.');
+          return;
+        }
+        final fileSize = await file.length();
+        if (fileSize > 500 * 1024 * 1024) {
+          _showFileError('Backup file is too large (max 500 MB).');
+          return;
+        }
         // Navigate to backup restore page with the file path
         AppRouter.router.go(AppRoutes.backupRestore, extra: {'restoreFilePath': filePath});
       }
     } catch (_) {
       // Channel not available or no file — ignore
+    }
+  }
+
+  void _showFileError(String message) {
+    final ctx = AppRouter.router.routerDelegate.navigatorKey.currentContext;
+    if (ctx != null) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+  }
+
+  /// Check if the app was launched by sharing an audio file.
+  Future<void> _checkShareIntent() async {
+    const channel = MethodChannel('com.vaanix.app/file_intent');
+    try {
+      final result = await channel.invokeMethod('getSharedAudioInfo');
+      if (result != null && result is Map) {
+        final path = result['path'] as String?;
+        final filename = result['filename'] as String?;
+        if (path != null && path.isNotEmpty) {
+          // Small delay to ensure navigation is ready
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (!mounted) return;
+          final ctx = AppRouter.router.routerDelegate.navigatorKey.currentContext;
+          if (ctx != null) {
+            showModalBottomSheet(
+              context: ctx,
+              isScrollControlled: true,
+              isDismissible: false,
+              enableDrag: false,
+              builder: (_) => ShareReceiveSheet(
+                audioPath: path,
+                originalFilename: filename,
+              ),
+            );
+          }
+        }
+      }
+    } catch (_) {
+      // Channel not available or no shared audio — ignore
     }
   }
 

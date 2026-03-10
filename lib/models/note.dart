@@ -95,6 +95,18 @@ class Note extends HiveObject {
   @HiveField(28)
   List<String> tags;
 
+  /// Source of the note: 'in_app' (default), 'shared' (received via Android share intent)
+  @HiveField(29, defaultValue: 'in_app')
+  String sourceType;
+
+  /// Sender name for shared notes (e.g., "Mom", "Work Group")
+  @HiveField(30)
+  String? sharedFrom;
+
+  /// Original filename of the shared audio file
+  @HiveField(31)
+  String? originalFilename;
+
   Note({
     required this.id,
     required this.title,
@@ -125,6 +137,9 @@ class Note extends HiveObject {
     this.deletedAt,
     this.previousFolderId,
     List<String>? tags,
+    this.sourceType = 'in_app',
+    this.sharedFrom,
+    this.originalFilename,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         topics = topics ?? [],
@@ -167,6 +182,9 @@ class Note extends HiveObject {
         'deletedAt': deletedAt?.toIso8601String(),
         'previousFolderId': previousFolderId,
         'tags': tags,
+        'sourceType': sourceType,
+        'sharedFrom': sharedFrom,
+        'originalFilename': originalFilename,
       };
 
   factory Note.fromMap(Map<String, dynamic> m) => Note(
@@ -209,5 +227,8 @@ class Note extends HiveObject {
         deletedAt: m['deletedAt'] != null ? DateTime.parse(m['deletedAt'] as String) : null,
         previousFolderId: m['previousFolderId'] as String?,
         tags: List<String>.from(m['tags'] as List? ?? []),
+        sourceType: m['sourceType'] as String? ?? 'in_app',
+        sharedFrom: m['sharedFrom'] as String?,
+        originalFilename: m['originalFilename'] as String?,
       );
 }

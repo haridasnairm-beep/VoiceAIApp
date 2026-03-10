@@ -37,11 +37,19 @@ class _NotePickerPageState extends ConsumerState<NotePickerPage> {
       }
     }
 
+    // Helper: a note is a voice note if it has an audio file OR its title
+    // starts with the voice-note prefix pattern (V1, V2, ...).
+    // Live STT mode produces voice notes without audio files, so we must
+    // also check the title prefix to correctly classify them.
+    bool isVoiceNote(n) =>
+        n.audioFilePath.isNotEmpty ||
+        RegExp(r'^V\d+').hasMatch(n.title);
+
     // Filter by type first
     final typeFiltered = widget.filterType == 'voice'
-        ? allNotes.where((n) => n.audioFilePath.isNotEmpty).toList()
+        ? allNotes.where((n) => isVoiceNote(n)).toList()
         : widget.filterType == 'text'
-            ? allNotes.where((n) => n.audioFilePath.isEmpty).toList()
+            ? allNotes.where((n) => !isVoiceNote(n)).toList()
             : allNotes;
 
     // Then filter by search
@@ -173,9 +181,9 @@ class _NotePickerPageState extends ConsumerState<NotePickerPage> {
                             ],
                           ],
                         ),
-                        secondary: Icon(note.audioFilePath.isEmpty
-                            ? Icons.edit_note_rounded
-                            : Icons.mic_rounded),
+                        secondary: Icon(isVoiceNote(note)
+                            ? Icons.mic_rounded
+                            : Icons.edit_note_rounded),
                       );
                     },
                   ),

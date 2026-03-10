@@ -7,13 +7,18 @@ import '../services/app_lock_service.dart';
 class LockScreenPage extends StatefulWidget {
   final String pinHash;
   final bool biometricEnabled;
+  final int pinLength;
   final VoidCallback onUnlocked;
+  /// Called when failed attempts / lockout state changes so caller can persist.
+  final void Function(int failedAttempts, DateTime? lockoutUntil)? onLockoutChanged;
 
   const LockScreenPage({
     super.key,
     required this.pinHash,
     required this.biometricEnabled,
+    this.pinLength = 4,
     required this.onUnlocked,
+    this.onLockoutChanged,
   });
 
   @override
@@ -38,6 +43,14 @@ class _LockScreenPageState extends State<LockScreenPage>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
+    // Resume lockout timer if still active from persisted state
+    final remaining = AppLockService.instance.lockoutRemaining;
+    if (remaining != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startLockoutTimer(remaining);
+        setState(() => _showPinPad = true);
+      });
+    }
     // Auto-trigger biometric if enabled
     if (widget.biometricEnabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _tryBiometric());
@@ -57,9 +70,9 @@ class _LockScreenPageState extends State<LockScreenPage>
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
-      print('LockScreen biometric: canCheck=$canCheck isSupported=$isSupported');
+      debugPrint('LockScreen biometric: canCheck=$canCheck isSupported=$isSupported');
       if ((!canCheck && !isSupported) || !mounted) {
-        print('LockScreen biometric: not available, skipping');
+        debugPrint('LockScreen biometric: not available, skipping');
         setState(() => _isAuthenticating = false);
         return;
       }
@@ -70,13 +83,13 @@ class _LockScreenPageState extends State<LockScreenPage>
           stickyAuth: true,
         ),
       );
-      print('LockScreen biometric: didAuth=$didAuth');
+      debugPrint('LockScreen biometric: didAuth=$didAuth');
       if (didAuth && mounted) {
         AppLockService.instance.unlock();
         widget.onUnlocked();
       }
     } catch (e) {
-      print('LockScreen biometric error: $e');
+      debugPrint('LockScreen biometric error: $e');
     } finally {
       if (mounted) setState(() => _isAuthenticating = false);
     }
@@ -92,8 +105,8 @@ class _LockScreenPageState extends State<LockScreenPage>
       _errorText = null;
     });
 
-    // Auto-verify at 4-6 digits
-    if (_enteredPin.length >= 4) {
+    // Auto-verify when PIN reaches the stored length
+    if (_enteredPin.length == widget.pinLength) {
       _verifyPin();
     }
   }
@@ -113,10 +126,19 @@ class _LockScreenPageState extends State<LockScreenPage>
 
     if (isValid) {
       AppLockService.instance.unlock();
+      // Clear persisted lockout
+      widget.onLockoutChanged?.call(0, null);
       widget.onUnlocked();
     } else {
       final lockoutDuration =
           AppLockService.instance.recordFailedAttempt();
+      // Persist failed attempts + lockout deadline
+      widget.onLockoutChanged?.call(
+        AppLockService.instance.failedAttempts,
+        lockoutDuration != null
+            ? DateTime.now().add(lockoutDuration)
+            : null,
+      );
       _shakeController.forward(from: 0);
       setState(() {
         _enteredPin = '';

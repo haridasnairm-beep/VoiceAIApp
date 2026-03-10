@@ -249,15 +249,11 @@ class HiveService {
     debugPrint('HiveService: transcript version migration complete');
   }
 
-  /// Migrate transcription mode default from 'live' to 'whisper'.
+  /// One-time migration (completed) — no longer needed.
+  /// Previously forced 'live' → 'whisper' but ran on every startup,
+  /// preventing users from selecting Live mode.
   static Future<void> migrateDefaultTranscriptionMode() async {
-    const settingsKey = 'user_settings';
-    final settings = settingsBox.get(settingsKey);
-    if (settings != null && settings.transcriptionMode == 'live') {
-      settings.transcriptionMode = 'whisper';
-      await settingsBox.put(settingsKey, settings);
-      debugPrint('HiveService: migrated transcription mode to whisper');
-    }
+    // No-op: migration already applied to all existing installs.
   }
 
   /// Migrate old default prefixes VOICE→V and TXT→T.

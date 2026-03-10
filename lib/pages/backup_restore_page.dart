@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../nav.dart';
@@ -75,6 +76,10 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
     _checkAutoPassphrase();
     if (widget.restoreFilePath != null) {
       _restoreFilePath = widget.restoreFilePath;
+      // Collapse other sections, expand restore when opened from file intent
+      _autoBackupExpanded = false;
+      _createBackupExpanded = false;
+      _restoreBackupExpanded = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _previewBackup();
       });
@@ -422,11 +427,17 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Restore complete! Please restart the app.'),
+            content: Text('Restore complete! Restarting app\u2026'),
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 5),
+            duration: Duration(seconds: 2),
           ),
         );
+
+        // Kill all app instances after brief delay to show snackbar
+        Future.delayed(const Duration(milliseconds: 800), () {
+          const MethodChannel('com.vaanix.app/file_intent')
+              .invokeMethod('exitApp');
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -990,6 +1001,26 @@ class _ManifestCard extends StatelessWidget {
           const SizedBox(height: 12),
           _ManifestRow('Created', _fmtDate(manifest.createdAt)),
           _ManifestRow('App version', manifest.appVersion),
+          if (manifest.appVersion != BackupService.currentAppVersion)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      size: 16, color: scheme.error),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Backup created with v${manifest.appVersion}, current app is v${BackupService.currentAppVersion}. Restoring may revert bug fixes.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _ManifestRow('Notes', '${manifest.noteCount}'),
           _ManifestRow('Folders', '${manifest.folderCount}'),
           _ManifestRow('Projects', '${manifest.projectDocumentCount}'),

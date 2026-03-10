@@ -15,6 +15,9 @@ enum BlockType {
 
   @HiveField(3)
   imageBlock,
+
+  @HiveField(4)
+  taskBlock,
 }
 
 @HiveType(typeId: 7)

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' show Document;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../nav.dart';
@@ -6,6 +8,7 @@ import '../theme.dart';
 import '../providers/folders_provider.dart';
 import '../providers/notes_provider.dart';
 import '../providers/tags_provider.dart';
+import '../models/note.dart';
 import '../widgets/speed_dial_fab.dart';
 import '../widgets/gesture_fab.dart';
 import '../providers/settings_provider.dart';
@@ -124,8 +127,16 @@ class FoldersPage extends ConsumerWidget {
                                   icon: Icons.date_range_rounded,
                                   label: 'This Week',
                                   count: thisWeekCount,
-                                  onTap: () => context.push(
-                                      AppRoutes.search),
+                                  onTap: () => _showFilteredNotes(
+                                    context,
+                                    ref,
+                                    title: 'This Week',
+                                    icon: Icons.date_range_rounded,
+                                    color: Theme.of(context).colorScheme.primary,
+                                    filteredNotes: notes.where((n) =>
+                                        now.difference(n.createdAt).inDays < 7).toList()
+                                      ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
+                                  ),
                                 ),
                               if (openTaskCount > 0)
                                 _SmartFilterChip(
@@ -133,8 +144,17 @@ class FoldersPage extends ConsumerWidget {
                                   label: 'Open Tasks',
                                   count: openTaskCount,
                                   color: Colors.orange,
-                                  onTap: () => context.push(
-                                      AppRoutes.search),
+                                  onTap: () => _showFilteredNotes(
+                                    context,
+                                    ref,
+                                    title: 'Open Tasks',
+                                    icon: Icons.task_alt_rounded,
+                                    color: Colors.orange,
+                                    filteredNotes: notes.where((n) =>
+                                        n.todos.any((t) => !t.isCompleted) ||
+                                        n.actions.any((a) => !a.isCompleted)).toList()
+                                      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)),
+                                  ),
                                 ),
                               if (unorganizedCount > 0)
                                 _SmartFilterChip(
@@ -142,8 +162,16 @@ class FoldersPage extends ConsumerWidget {
                                   label: 'Unorganized',
                                   count: unorganizedCount,
                                   color: Theme.of(context).hintColor,
-                                  onTap: () => context.push(
-                                      AppRoutes.search),
+                                  onTap: () => _showFilteredNotes(
+                                    context,
+                                    ref,
+                                    title: 'Unorganized Notes',
+                                    icon: Icons.folder_off_outlined,
+                                    color: Theme.of(context).hintColor,
+                                    filteredNotes: notes.where((n) =>
+                                        n.folderId == null && n.tags.isEmpty).toList()
+                                      ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
+                                  ),
                                 ),
                             ],
                           ),
@@ -345,6 +373,143 @@ class FoldersPage extends ConsumerWidget {
               child: const Text('Create'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showFilteredNotes(
+    BuildContext context,
+    WidgetRef ref, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required List<Note> filteredNotes,
+  }) {
+    final folders = ref.read(foldersProvider);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        minChildSize: 0.3,
+        expand: false,
+        builder: (_, scrollController) => SafeArea(
+          child: Column(
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 20, color: color),
+                    const SizedBox(width: 10),
+                    Text(
+                      '$title (${filteredNotes.length})',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: filteredNotes.isEmpty
+                    ? Center(
+                        child: Text('No notes',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.secondary,
+                                )),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: filteredNotes.length,
+                        itemBuilder: (_, index) {
+                          final note = filteredNotes[index];
+                          final folderName = folders
+                              .where((f) => f.noteIds.contains(note.id))
+                              .map((f) => f.name)
+                              .toList();
+                          String preview = note.rawTranscription;
+                          if (note.contentFormat == 'quill_delta' && preview.isNotEmpty) {
+                            try {
+                              final json = jsonDecode(preview) as List;
+                              preview = Document.fromJson(json).toPlainText().trim();
+                            } catch (_) {}
+                          }
+                          final openTasks = note.todos.where((t) => !t.isCompleted).length +
+                              note.actions.where((a) => !a.isCompleted).length;
+                          return ListTile(
+                            leading: Icon(
+                              note.audioFilePath.isNotEmpty
+                                  ? Icons.mic_rounded
+                                  : Icons.edit_note_rounded,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            title: Text(
+                              note.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    preview.isEmpty
+                                        ? (folderName.isNotEmpty
+                                            ? folderName.first
+                                            : 'No folder')
+                                        : preview,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).colorScheme.secondary,
+                                        ),
+                                  ),
+                                ),
+                                if (openTasks > 0) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '$openTasks task${openTasks > 1 ? 's' : ''}',
+                                      style: const TextStyle(
+                                          color: Colors.orange,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              context.push(
+                                AppRoutes.noteDetail,
+                                extra: {'noteId': note.id},
+                              );
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

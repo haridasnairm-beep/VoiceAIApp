@@ -36,6 +36,15 @@ class VaanixWidgetDashboard : HomeWidgetProvider() {
             views.setTextViewText(R.id.widget_note_count, if (showCounts) noteCount else "")
             views.setTextViewText(R.id.widget_task_count, if (showCounts) taskCount else "")
 
+            // Toggle stats row vs minimal centered REC
+            if (showCounts) {
+                views.setViewVisibility(R.id.widget_stats_row, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_minimal_rec, View.GONE)
+            } else {
+                views.setViewVisibility(R.id.widget_stats_row, View.GONE)
+                views.setViewVisibility(R.id.widget_minimal_rec, View.VISIBLE)
+            }
+
             // Latest note preview
             if (showPreview && latestNote.isNotEmpty()) {
                 views.setTextViewText(R.id.widget_latest_note, latestNote)
@@ -51,6 +60,23 @@ class VaanixWidgetDashboard : HomeWidgetProvider() {
                 Uri.parse("vaanix://record"),
             )
             views.setOnClickPendingIntent(R.id.widget_record_btn, recordIntent)
+            views.setOnClickPendingIntent(R.id.widget_minimal_rec_btn, recordIntent)
+
+            // Notes cell → Home page Notes tab
+            val notesIntent = HomeWidgetLaunchIntent.getActivity(
+                context,
+                MainActivity::class.java,
+                Uri.parse("vaanix://home-notes"),
+            )
+            views.setOnClickPendingIntent(R.id.widget_notes_cell, notesIntent)
+
+            // Tasks cell → Home page Tasks tab
+            val tasksIntent = HomeWidgetLaunchIntent.getActivity(
+                context,
+                MainActivity::class.java,
+                Uri.parse("vaanix://home-tasks"),
+            )
+            views.setOnClickPendingIntent(R.id.widget_tasks_cell, tasksIntent)
 
             // Container tap → open app Home (App Lock will trigger if enabled)
             val homeIntent = HomeWidgetLaunchIntent.getActivity(

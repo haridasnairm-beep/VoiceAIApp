@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
+import '../main.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../providers/settings_provider.dart';
@@ -36,6 +37,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
 
   String? _pinHash;
   bool _biometricEnabled = false;
+  int _pinLength = 4;
 
   @override
   void initState() {
@@ -51,17 +53,48 @@ class _SplashPageState extends ConsumerState<SplashPage>
     _controller.forward();
 
     final settings = ref.read(settingsProvider);
-    _pinHash = settings.appLockPinHash;
+    _pinHash = AppLockService.getStoredPinHash();
     _biometricEnabled = settings.biometricEnabled;
+    _pinLength = settings.pinLength;
 
     if (settings.appLockEnabled &&
         _pinHash != null &&
         AppLockService.instance.isLocked) {
-      // App lock is on — show lock UI instead of auto-navigating
-      _isLocked = true;
-      _checkBiometricAvailability();
+      // Widget recording bypass: allow recording without auth
+      if (VaanixApp.pendingDeepLink == AppRoutes.recording) {
+        AppLockService.instance.startWidgetRecordingSession();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            final route = VaanixApp.pendingDeepLink!;
+            VaanixApp.pendingDeepLink = null;
+            context.go(route);
+          }
+        });
+      } else {
+        // Restore persisted lockout state
+        AppLockService.instance.initFromSettings(
+          settings.failedPinAttempts,
+          settings.pinLockoutUntil,
+        );
+        // App lock is on — show lock UI instead of auto-navigating
+        _isLocked = true;
+        // Resume lockout timer if still active
+        final remaining = AppLockService.instance.lockoutRemaining;
+        if (remaining != null) {
+          _showPinPad = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _startLockoutTimer(remaining);
+          });
+        }
+        _checkBiometricAvailability();
+      }
+    } else if (VaanixApp.pendingDeepLink != null) {
+      // Widget deep-link — skip splash animation, navigate immediately
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _navigateForward();
+      });
     } else {
-      // No lock — auto-navigate after splash
+      // No lock, no deep-link — show splash for 2 seconds
       Timer(const Duration(seconds: 2), () {
         if (mounted) _navigateForward();
       });
@@ -76,6 +109,14 @@ class _SplashPageState extends ConsumerState<SplashPage>
   }
 
   void _navigateForward() {
+    // Check for pending widget deep-link (cold start from widget tap)
+    final deepLink = VaanixApp.pendingDeepLink;
+    if (deepLink != null) {
+      VaanixApp.pendingDeepLink = null; // consume it
+      context.go(deepLink);
+      return;
+    }
+
     final settings = ref.read(settingsProvider);
     if (!settings.onboardingCompleted) {
       context.go(AppRoutes.onboarding);
@@ -92,7 +133,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
-      print('Splash biometric: canCheck=$canCheck isSupported=$isSupported');
+      debugPrint('Splash biometric: canCheck=$canCheck isSupported=$isSupported');
       if (mounted) {
         setState(() => _biometricAvailable = canCheck || isSupported);
         if (_biometricEnabled && _biometricAvailable) {
@@ -102,7 +143,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
         }
       }
     } catch (e) {
-      print('Splash biometric check failed: $e');
+      debugPrint('Splash biometric check failed: $e');
     }
   }
 
@@ -117,7 +158,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
           stickyAuth: true,
         ),
       );
-      print('Splash biometric: didAuth=$didAuth');
+      debugPrint('Splash biometric: didAuth=$didAuth');
       if (didAuth && mounted) {
         AppLockService.instance.unlock();
         setState(() => _unlockSuccess = true);
@@ -125,7 +166,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
         if (mounted) _navigateForward();
       }
     } catch (e) {
-      print('Splash biometric error: $e');
+      debugPrint('Splash biometric error: $e');
     } finally {
       if (mounted) setState(() => _isAuthenticating = false);
     }
@@ -143,7 +184,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
       _errorText = null;
     });
 
-    if (_enteredPin.length >= 4) {
+    if (_enteredPin.length == _pinLength) {
       _verifyPin();
     }
   }
@@ -163,12 +204,22 @@ class _SplashPageState extends ConsumerState<SplashPage>
 
     if (isValid) {
       AppLockService.instance.unlock();
+      // Clear persisted lockout
+      final notifier = ref.read(settingsProvider.notifier);
+      notifier.setFailedPinAttempts(0);
+      notifier.setPinLockoutUntil(null);
       setState(() => _unlockSuccess = true);
       await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
       _navigateForward();
     } else {
       final lockoutDuration = AppLockService.instance.recordFailedAttempt();
+      // Persist failed attempts + lockout deadline
+      final notifier = ref.read(settingsProvider.notifier);
+      notifier.setFailedPinAttempts(AppLockService.instance.failedAttempts);
+      if (lockoutDuration != null) {
+        notifier.setPinLockoutUntil(DateTime.now().add(lockoutDuration));
+      }
       setState(() {
         _enteredPin = '';
         if (lockoutDuration != null) {

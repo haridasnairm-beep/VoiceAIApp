@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../main.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../models/note.dart';
@@ -18,6 +19,7 @@ import '../widgets/template_picker_sheet.dart';
 import '../constants/note_templates.dart';
 import '../widgets/empty_state_illustrated.dart';
 import '../widgets/backup_reminder_banner.dart';
+import '../widgets/home_tip_tile.dart';
 import '../providers/settings_provider.dart';
 import '../services/haptic_service.dart';
 
@@ -31,6 +33,17 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   int _selectedTab = 0; // 0 = Notes, 1 = Tasks
   bool _selectionMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Consume pending home tab from widget deep link
+    final tab = VaanixApp.pendingHomeTab;
+    if (tab != null) {
+      _selectedTab = tab;
+      VaanixApp.pendingHomeTab = null;
+    }
+  }
   final Set<String> _selectedNoteIds = {};
   bool _backupReminderDismissed = false;
   bool _isDialOpen = false;
@@ -92,7 +105,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     return PopScope(
-      canPop: !_selectionMode && !_isDialOpen,
+      canPop: !_selectionMode && !_isDialOpen && _selectedTab == 0,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (_isDialOpen) {
@@ -101,6 +114,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         }
         if (_selectionMode) {
           _exitSelectionMode();
+          return;
+        }
+        if (_selectedTab != 0) {
+          setState(() => _selectedTab = 0);
         }
       },
       child: Scaffold(
@@ -379,6 +396,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                         onDismiss: () => setState(() =>
                             _backupReminderDismissed = true),
                       ),
+
+                    // Tip tile (above notes list)
+                    if (_selectedTab == 0)
+                      const HomeTipTile(),
 
                     // Notes + Projects List or Empty State
                     if (notes.isEmpty && projects.isEmpty && !showGuidedBanner)
@@ -774,16 +795,23 @@ class _HomePageState extends ConsumerState<HomePage> {
     List<ProjectDocument> projects,
     String sortOrder,
   ) {
-    final pinned = notes.where((n) => n.isPinned).toList()
-      ..sort((a, b) =>
-          (b.pinnedAt ?? DateTime.now()).compareTo(a.pinnedAt ?? DateTime.now()));
+    final pinnedNotes = notes.where((n) => n.isPinned).toList();
+    final pinnedProjects = projects.where((p) => p.isPinned).toList();
+
+    // Merge pinned notes + projects into one list sorted by pinnedAt
+    final List<_FeedItem> pinnedItems = [
+      ...pinnedNotes.map((n) => _FeedItem(note: n, createdAt: n.pinnedAt ?? n.createdAt, title: n.title)),
+      ...pinnedProjects.map((p) => _FeedItem(project: p, createdAt: p.pinnedAt ?? p.createdAt, title: p.title)),
+    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
     final unpinned = _applySortOrder(
         notes.where((n) => !n.isPinned).toList(), sortOrder);
+    final unpinnedProjects = projects.where((p) => !p.isPinned).toList();
 
     // Build mixed list of unpinned notes + projects sorted together
     final List<_FeedItem> feedItems = [
       ...unpinned.map((n) => _FeedItem(note: n, createdAt: n.createdAt, title: n.title)),
-      ...projects.map((p) => _FeedItem(project: p, createdAt: p.createdAt, title: p.title)),
+      ...unpinnedProjects.map((p) => _FeedItem(project: p, createdAt: p.createdAt, title: p.title)),
     ];
     // Apply same sort order to mixed list
     switch (sortOrder) {
@@ -799,8 +827,8 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     final widgets = <Widget>[];
 
-    // Pinned section header + items
-    if (pinned.isNotEmpty) {
+    // Pinned section header + items (notes + projects)
+    if (pinnedItems.isNotEmpty) {
       widgets.add(Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Row(
@@ -810,7 +838,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 6),
             Text(
-              'Pinned (${pinned.length})',
+              'Pinned (${pinnedItems.length})',
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.primary,
@@ -819,8 +847,12 @@ class _HomePageState extends ConsumerState<HomePage> {
           ],
         ),
       ));
-      for (final note in pinned) {
-        widgets.add(_buildNoteItem(context, ref, note, folders));
+      for (final item in pinnedItems) {
+        if (item.note != null) {
+          widgets.add(_buildNoteItem(context, ref, item.note!, folders));
+        } else if (item.project != null) {
+          widgets.add(_buildProjectItem(context, ref, item.project!, folders));
+        }
       }
       // Recent section header
       if (feedItems.isNotEmpty) {
@@ -862,11 +894,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         .toList();
     final theme = Theme.of(context);
 
-    return GestureDetector(
+    final card = GestureDetector(
       onTap: () => context.push(
         AppRoutes.projectDocumentDetail,
         extra: {'documentId': project.id},
       ),
+      onLongPress: () => _showProjectContextMenu(context, ref, project),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(16),
@@ -880,7 +913,11 @@ class _HomePageState extends ConsumerState<HomePage> {
               offset: const Offset(0, 1),
             ),
           ],
-          border: Border.all(color: theme.dividerColor),
+          border: Border.all(
+            color: project.isPinned
+                ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                : theme.dividerColor,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -905,6 +942,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                     color: theme.hintColor,
                   ),
                 ),
+                if (project.isPinned) const Spacer(),
+                if (project.isPinned)
+                  Icon(Icons.push_pin_rounded,
+                      size: 14, color: theme.colorScheme.primary),
               ],
             ),
             // Row 2: Description
@@ -943,6 +984,311 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ),
     );
+
+    return Dismissible(
+      key: ValueKey('project_${project.id}'),
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 24),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              project.isPinned
+                  ? Icons.push_pin_outlined
+                  : Icons.push_pin_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              project.isPinned ? 'Unpin' : 'Pin',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+      secondaryBackground: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text('Delete',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
+            SizedBox(width: 6),
+            Icon(Icons.delete_rounded, color: Colors.white, size: 22),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          HapticService.light();
+          ref.read(projectDocumentsProvider.notifier).togglePin(project.id);
+          return false;
+        } else {
+          return await _confirmProjectDelete(context, project);
+        }
+      },
+      onDismissed: (direction) {
+        if (direction == DismissDirection.endToStart) {
+          ref.read(projectDocumentsProvider.notifier).delete(project.id);
+        }
+      },
+      child: card,
+    );
+  }
+
+  Future<bool> _confirmProjectDelete(
+      BuildContext context, ProjectDocument project) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.delete_rounded,
+                color: Colors.red.shade400, size: 22),
+            const SizedBox(width: 8),
+            const Text('Delete Project'),
+          ],
+        ),
+        content: Text(
+            'Move "${project.title}" to trash? It will be permanently deleted after 30 days.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  void _showProjectContextMenu(
+      BuildContext context, WidgetRef ref, ProjectDocument project) {
+    HapticService.medium();
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              decoration: BoxDecoration(
+                color: theme.dividerColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                project.title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: Icon(
+                project.isPinned
+                    ? Icons.push_pin_outlined
+                    : Icons.push_pin_rounded,
+              ),
+              title: Text(project.isPinned ? 'Unpin' : 'Pin'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                ref
+                    .read(projectDocumentsProvider.notifier)
+                    .togglePin(project.id);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_rounded),
+              title: const Text('Change Folder'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showProjectFolderPicker(context, ref, project);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_rounded),
+              title: const Text('Edit Title'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showProjectEditTitleDialog(context, ref, project);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_rounded, color: Colors.red.shade400),
+              title: Text('Delete',
+                  style: TextStyle(color: Colors.red.shade400)),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                final confirmed =
+                    await _confirmProjectDelete(context, project);
+                if (confirmed) {
+                  ref
+                      .read(projectDocumentsProvider.notifier)
+                      .delete(project.id);
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showProjectFolderPicker(
+      BuildContext context, WidgetRef ref, ProjectDocument project) {
+    final allFolders = ref.read(foldersProvider);
+    final currentFolderId = project.folderId;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        maxChildSize: 0.8,
+        minChildSize: 0.3,
+        expand: false,
+        builder: (_, scrollController) {
+          return SafeArea(
+            child: Column(
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Move to Folder',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          )),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(Icons.create_new_folder_rounded,
+                      color: Theme.of(context).colorScheme.primary),
+                  title: const Text('New Folder'),
+                  onTap: () async {
+                    final name = await _showNewNameDialog(
+                        context, 'New Folder', 'Folder name');
+                    if (name != null && name.trim().isNotEmpty) {
+                      final folder = await ref
+                          .read(foldersProvider.notifier)
+                          .addFolder(name: name.trim());
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                        ref
+                            .read(projectDocumentsProvider.notifier)
+                            .moveProjectToFolder(project.id, folder.id);
+                      }
+                    }
+                  },
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    children: allFolders.map((folder) {
+                      final isSelected = folder.id == currentFolderId;
+                      return ListTile(
+                        leading: Icon(
+                          Icons.folder_rounded,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
+                        title: Text(folder.name),
+                        trailing: isSelected
+                            ? Icon(Icons.check_rounded,
+                                color: Theme.of(context).colorScheme.primary)
+                            : null,
+                        onTap: () {
+                          Navigator.of(ctx).pop();
+                          ref
+                              .read(projectDocumentsProvider.notifier)
+                              .moveProjectToFolder(project.id, folder.id);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showProjectEditTitleDialog(
+      BuildContext context, WidgetRef ref, ProjectDocument project) {
+    final controller = TextEditingController(text: project.title);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Title'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Project title'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final newTitle = controller.text.trim();
+              if (newTitle.isNotEmpty && newTitle != project.title) {
+                project.title = newTitle;
+                project.updatedAt = DateTime.now();
+                ref
+                    .read(projectDocumentsProvider.notifier)
+                    .updateDocument(project);
+              }
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildNoteItem(
@@ -951,10 +1297,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     Note note,
     List<dynamic> folders,
   ) {
-    final noteFolderNames = folders
+    final noteFolders = folders
         .where((f) => f.noteIds.contains(note.id))
-        .map((f) => f.name as String)
         .toList();
+    final noteFolderNames = noteFolders.map((f) => f.name as String).toList();
+    final noteFolderColors = {
+      for (final f in noteFolders) f.name as String: f.colorValue as int?,
+    };
 
     final projects = ref.read(projectDocumentsProvider);
     final noteProjectNames = projects
@@ -966,6 +1315,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       note: note,
       timestamp: _formatDate(note.createdAt),
       folderNames: noteFolderNames,
+      folderColors: noteFolderColors,
       projectNames: noteProjectNames,
       isSelected: _selectedNoteIds.contains(note.id),
       selectionMode: _selectionMode,

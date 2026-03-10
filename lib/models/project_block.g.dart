@@ -79,6 +79,8 @@ class BlockTypeAdapter extends TypeAdapter<BlockType> {
         return BlockType.sectionHeader;
       case 3:
         return BlockType.imageBlock;
+      case 4:
+        return BlockType.taskBlock;
       default:
         return BlockType.noteReference;
     }
@@ -98,6 +100,9 @@ class BlockTypeAdapter extends TypeAdapter<BlockType> {
         break;
       case BlockType.imageBlock:
         writer.writeByte(3);
+        break;
+      case BlockType.taskBlock:
+        writer.writeByte(4);
         break;
     }
   }

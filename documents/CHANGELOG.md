@@ -4,6 +4,213 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.0.5] - 2026-03-10 - Widget UX, App Lock Hardening & Tips Polish
+
+### Widget Enhancements
+- **Dashboard widget redesign** — background image with scrim overlay; tappable Notes and Tasks cells with cell-background finish; cells deep-link to Home Notes/Tasks tabs respectively; larger REC button with more tap area; minimal mode layout with centered REC when privacy is set to Minimal
+- **Small widget REC repositioned** — REC button moved from bottom-right to right-center for better reach; button color matched to dashboard widget (purple theme)
+- **Widget preview in picker** — added `previewLayout` attribute to both widget info XMLs (API 31+) so Android widget picker shows a live layout preview
+- **Widget data live updates** — widget data now refreshes immediately on note/task CRUD (from `NotesNotifier`) and on widget privacy or app lock setting changes (from `SettingsNotifier`), not just on app foreground resume
+- **Widget deep link pre-check** — widget launch URI is now parsed in `main()` before `runApp()` to set `pendingDeepLink` before splash's `initState`, preventing unnecessary splash animation on widget taps
+
+### App Lock Fixes
+- **Widget app lock bypass fixed** — tapping Notes/Tasks cells from dashboard widget no longer bypasses lock screen; non-recording deep links now route through splash when `AppLockService.isLocked`
+- **PIN length storage (critical)** — fixed 6-digit PINs auto-verifying at 4 digits; PIN length now stored in `UserSettings` (HiveField 46); lock screen and splash auto-verify at exact stored length instead of `>= 4`
+- **Single-task launch mode** — changed Android `launchMode` from `singleTop` to `singleTask` and removed `taskAffinity=""` to prevent multiple app windows opening from widget taps
+
+### Recording UX
+- **Quick capture lock icon** — replaced full-width "Quick capture" overlay banner with a floating 44×44 circular lock icon at top-right of recording page; tap shows tooltip explaining limited access mode
+- **Debug prints removed** — cleaned up remaining `print()` calls from `recording_page.dart` and `main.dart` deep link handlers
+
+### Tips & Discoverability
+- **Tip body opens User Guide** — tapping the tip text (not the action link) now navigates to the User Guide at the relevant section via `guideSectionIndex` mapping
+- **Widget tip added** — new tip #14: "Add Vaanix widgets to your home screen for quick recording and stats at a glance" (maps to Widgets section in User Guide)
+- **Improved dismiss snackbar** — reworded to "Tips appear briefly at launch to help you discover features. To turn them off, use the toggle in Help & Support." with "Help & Support" action button
+- **Support page highlight** — tapping "Help & Support" from snackbar scrolls to and briefly highlights the Home Tips toggle with a 2-second animated highlight effect
+- **User Guide updated** — Widgets section expanded to 5 items (Quick Record, Dashboard, Quick Capture, Widget Privacy, Live Updates); App Lock section updated for variable-length PINs and widget access
+
+### Changed
+- `lib/models/user_settings.dart` — added HiveField 46 (`pinLength`, default 4)
+- `lib/models/user_settings.g.dart` — regenerated with HiveField 46
+- `lib/providers/settings_provider.dart` — added `pinLength` to state, `setPinLength()` setter; widget data push on privacy/lock changes
+- `lib/providers/notes_provider.dart` — `_refreshWidget()` call after addNote/updateNote/deleteNote
+- `lib/pages/lock_screen_page.dart` — `pinLength` parameter for exact-length auto-verify
+- `lib/pages/splash_page.dart` — reads `pinLength` from settings for lock screen
+- `lib/pages/security_page.dart` — persists `pinLength` on PIN create/change
+- `lib/pages/recording_page.dart` — floating lock icon, debug prints removed
+- `lib/pages/home_page.dart` — consumes `VaanixApp.pendingHomeTab` for widget deep links
+- `lib/pages/support_page.dart` — converted to StatefulWidget with `highlightHomeTips` parameter and scroll-to-highlight
+- `lib/pages/user_guide_page.dart` — expanded Widgets and App Lock sections
+- `lib/widgets/home_tip_tile.dart` — `guideSectionIndex` on tips, body tap navigation, widget tip, snackbar improvements
+- `lib/main.dart` — `pendingHomeTab`, `pendingDeepLink` pre-check, home-notes/home-tasks deep links, debug prints removed
+- `lib/nav.dart` — support route parses `highlightHomeTips` extra
+- `android/app/src/main/AndroidManifest.xml` — `singleTask` launch mode
+- `android/app/src/main/res/layout/widget_dashboard.xml` — redesigned with scrim, cell backgrounds, tappable cells, minimal mode
+- `android/app/src/main/res/layout/widget_small.xml` — REC repositioned to center-right
+- `android/app/src/main/kotlin/com/vaanix/app/VaanixWidgetDashboard.kt` — cell click intents, minimal mode visibility toggle
+- `android/app/src/main/res/xml/widget_small_info.xml` — added `previewLayout`
+- `android/app/src/main/res/xml/widget_dashboard_info.xml` — added `previewLayout`
+
+### New Android Resources
+- `android/app/src/main/res/drawable/widget_scrim.xml` — semi-transparent black overlay
+- `android/app/src/main/res/drawable/widget_divider.xml` — translucent white divider
+- `android/app/src/main/res/drawable/widget_cell_bg.xml` — dark translucent cell background with rounded corners
+
+---
+
+## [1.0.4] - 2026-03-09 - Security Hardening & Privacy Policy Updates
+
+### Security Fixes
+- **PIN salt hardened (A1)** — replaced predictable timestamp-based salt with `Random.secure()` generating 16 cryptographically random bytes (base64-encoded); existing users keep their stored salt, only new PINs use secure salt
+- **Persistent PIN lockout (A2)** — failed PIN attempts and lockout deadlines now persist across app restarts via HiveFields 44-45 (`failedPinAttempts`, `pinLockoutUntil`); previously in-memory only, so killing the app reset the lockout counter; `AppLockService.initFromSettings()` restores state on startup
+- **Backup KDF iteration increase (A3)** — key derivation increased from 10,000 to 100,000 SHA-256 iterations for new backups; decryption falls back to 10,000 for old backups (backward compatible)
+- **Backup HMAC integrity verification (A4)** — new backups (schema v2) append a 32-byte HMAC-SHA256 digest; on restore, HMAC is verified before decryption to detect file corruption or tampering; old v1 backups without HMAC still restore normally
+- **File intent validation (A5)** — `.vnbak` extension, file existence, and file size (<500MB) are now validated before navigating to restore page; invalid files show a snackbar error instead of crashing
+- **PIN hash isolated from Riverpod (A6)** — `appLockPinHash` removed from `SettingsState` (no longer broadcast through Riverpod state); all PIN hash reads/writes now go through `AppLockService.getStoredPinHash()` / `setStoredPinHash()` which access `SettingsRepository` directly
+
+### Privacy & Legal
+- **Privacy policy updated (B1)** — added Section 6A (optional Sentry crash reporting disclosure), Section 11A (biometric authentication — no biometric data stored), Section 11B (home screen widget data scope); clarified Section 11 (Hive DB encrypted, audio/image files protected by OS sandbox only); added shared audio metadata to Section 2; added feedback email to Section 13; date updated to March 2026
+- **Terms & Conditions updated (B2)** — added Section 6.4 (audio/image files rely on OS sandboxing, not individually encrypted); added Section 7.4 (two network operations: Whisper model download + optional Sentry crash reporting); date updated to March 2026
+
+### Code Quality
+- **Release logging cleanup (C1)** — replaced 14 bare `print()` calls with `debugPrint()` across 4 files (`notes_provider.dart`, `splash_page.dart`, `security_page.dart`, `lock_screen_page.dart`); `debugPrint` is stripped in release builds, preventing sensitive debug info from leaking to logcat
+
+### Changed
+- `lib/services/app_lock_service.dart` — secure random salt, `initFromSettings()`, `getStoredPinHash()`, `setStoredPinHash()`
+- `lib/services/backup_service.dart` — schema v2, 100k KDF iterations, HMAC-SHA256 append/verify, backward-compatible v1 fallback
+- `lib/models/user_settings.dart` — HiveFields 44-45 (`failedPinAttempts`, `pinLockoutUntil`)
+- `lib/providers/settings_provider.dart` — removed `appLockPinHash` from state, added lockout setters
+- `lib/pages/splash_page.dart` — init lockout from settings, PIN hash from AppLockService
+- `lib/pages/security_page.dart` — PIN hash via AppLockService instead of Riverpod
+- `lib/pages/lock_screen_page.dart` — `onLockoutChanged` callback for persistent lockout
+- `lib/main.dart` — file intent validation with extension/existence/size checks
+- `lib/pages/privacy_policy_page.dart` — Sentry disclosure, biometric/widget sections, encryption clarification
+- `lib/pages/terms_conditions_page.dart` — OS sandboxing clarification, network operations disclosure
+
+---
+
+## [1.0.3] - 2026-03-09 - GitHub Issues #21–#25, UX Enhancements, Share & Re-transcribe
+
+### Added
+- **User Guide & Home Tip Tile (Step 20P)** — full User Guide page (`/user_guide`) with 14 collapsible sections covering all features (Getting Started, Recording, Notes, Folders, Projects, Tasks, Search, Tags, Calendar, Widgets, App Lock, Backup, Settings, Tips & Privacy); deep-link support via `openSectionIndex` extra; dismissible Home Tip Tile on the home page with 12 rotating tips, left/right navigation, action deep-links, dismiss with undo; "User Guide" tile and "Home Tips" toggle added to Help & Support page; `UserSettings` extended with `currentTipIndex` (HiveField 42) and `tipTileDismissed` (HiveField 43)
+- **Share to Vaanix (Step 19P)** — users can share audio files from any app (WhatsApp, Telegram, etc.) directly into Vaanix via the Android share sheet; shows a bottom sheet with file info, optional "From" sender field, and folder picker; copies audio to encrypted local storage and triggers on-device Whisper transcription in background; shared notes display a gold "Shared" badge on note cards with sender name; note detail page shows shared metadata section (sender, original filename); handles both cold-start and warm-start share intents; warns if Whisper model not downloaded with "Set Up Whisper" button; large file (>50MB) warning
+- **Task Block in Project Documents** — new `taskBlock` block type added to project document canvas; "Tasks" option in speed dial FAB (orange checklist icon); two creation paths: "Create New Task" (creates a text note with action/todo and adds as task block) and "Select Existing Tasks" (multi-select picker showing all tasks across notes); task block renders with live data from source notes, supports toggle completion, shows action/todo type icons, due dates, overdue highlighting; 3-dot menu with move up/down, view source note, remove block; tasks from note reference blocks are now hidden (use Task Blocks instead); task block content included in share text, markdown export, and PDF export
+- **Calendar page redesign (Issue #15)** — full month grid by default, collapses to week strip on scroll; horizontal dot indicators (teal=Notes, orange=Tasks, purple=Projects, max 3); month/year picker; grab handle with animated chevron; filter chips ("All Notes", "With Tasks", "With Projects"); sort options (newest/oldest/title A-Z/Z-A); GestureFab with speed dial; multi-select with action bar (Open, Edit Title, Pin/Unpin, Folder, Project, Delete)
+- **Live recording info banner** — dismissible overlay shown briefly (8s) when live STT recording starts, warning user to verify all spoken text appears in white (green = still processing) before saving, and suggesting Whisper mode for better accuracy
+- **Version history deletion** — select and delete individual transcript versions; added `deleteTranscriptVersions` method to `NotesRepository` and `NotesNotifier`; hard delete (no trash/soft-delete for versions — note-level trash protection is sufficient)
+- **Version history rich text preview** — version cards now render rich text formatting (colors, bold, etc.) via read-only Quill editor when `richContentJson` is available; plain text fallback for older versions
+- **Pinned projects in home page** — pinned projects now appear in the "Pinned" section alongside pinned notes (previously only notes showed); pin icon moved to right side of metadata row to match note card placement
+- **Project swipe & long press actions** — swipe left to delete, swipe right to pin/unpin; long press context menu with edit title, change folder, and delete options
+- **Project folder picker "New Folder" option** — folder picker bottom sheet (from project long press) now includes a "New Folder" creation option at the top
+- **Privacy Policy & Terms in Help & Support** — added "LEGAL" section with Privacy Policy and Terms & Conditions links
+- **Smart Filters functional** — Library page smart filter chips ("This Week", "Open Tasks", "Unorganized") now open draggable bottom sheets with filtered note lists; tapping a note navigates to its detail page; "Open Tasks" shows orange task count badges
+- **Project search** — Search page now includes projects alongside notes; searches project titles, descriptions, section headers, and free text block content; results shown in purple "PROJECT" section; works with both no-query (flat list) and query (sectioned) modes
+- **Voice commands in live STT mode** — voice commands (folder/project/tag assignment, task creation) now work in live recording mode; previously only worked in Whisper mode; added `processVoiceCommands` method to `NotesNotifier`
+- **Calendar "New Project" dialog** — speed dial "New Project" button now shows a name dialog instead of navigating to project list page
+- **Find & Replace in project documents** — project detail page now has a Find & Replace toolbar (AppBar icon toggle); searches across all section headers, free text blocks, and note reference blocks; highlights matches in yellow with current match in orange; next/prev navigation with auto-scroll; replace creates new transcript versions for note references; supports both plain text and Quill delta content
+- **Inline project title editing** — pen icon beside project title in AppBar for quick inline editing (tap to edit, checkmark to save); matches note detail page pattern
+- **Folder color in note card capsules** — folder capsules on note cards now reflect the user-selected folder color; background uses a light tint of the folder color with a dark text variant for readability; applied across all pages (home, calendar, folder detail)
+- **Native audio format conversion for shared audio** — shared audio files (.opus, .ogg, .mp3, .aac, etc.) from WhatsApp/Telegram are now automatically converted to 16kHz mono WAV before Whisper transcription; uses Android `MediaCodec` + `MediaExtractor` for decoding and linear-interpolation resampling; runs on background thread via `convertToWav` MethodChannel method in `MainActivity.kt`; `WhisperService.transcribe()` auto-detects non-WAV files and converts before transcription
+- **Re-transcribe page** — new dedicated page (`/retranscribe`) for bulk re-transcription of voice notes; shows all notes with audio files in a multi-select list with metadata chips (duration, date, model, shared badge, rich text warning); confirmation dialog warns about plain text replacing rich text and version history preservation; linear progress indicator during processing; empty states for no eligible notes and missing Whisper model; accessible from Audio & Recording settings
+- **Home tip tile session behavior** — tips now auto-hide after 1 minute of inactivity; tips reappear on each app launch; close button hides tips for current session only (not permanently); snackbar shows "Tips hidden for now. To disable permanently, go to Help & Support > Home Tips." with "Go There" action button; tips are shuffled randomly on each app session; left/right navigation resets the auto-hide timer
+- **Share receive sheet improvements** — default folder from user preferences is pre-selected in folder picker; action buttons sized to 48px height; bottom padding accounts for Android gesture navigation bar via `MediaQuery.viewPadding.bottom`
+
+### Fixed
+- **Task capsule layout (Issue #16)** — task indicator capsules (Todo, Action, Reminder, Photos) moved inline with folder/project/tag capsules in a single Wrap widget; previously occupied a separate line in note cards
+- **Reminder deletion not working (Issue #17)** — deleting reminders from note detail page appeared to work but UI didn't update; added `refresh()` call after `updateNote` in `deleteReminder` to force state propagation
+- **Photo upload crash (Issue #18)** — app crashed when trying to upload photos; added missing Android permissions (`CAMERA`, `READ_MEDIA_IMAGES`, `READ_EXTERNAL_STORAGE`); added try-catch with user-friendly error snackbar
+- **Backup restore section not auto-expanding (Issue #19)** — when opening .vnbak file from WhatsApp/file manager, Create Backup section was open instead of Restore; now auto-collapses other sections and expands Restore section when opened via file intent
+- **Reminder reschedule not persisting (Issue #20)** — rescheduleReminder was mutating HiveObject nested list items in-place which doesn't trigger Hive change detection; fixed by creating new `ReminderItem` objects and reassigning the entire `note.reminders` list
+- **Restore kills all app instances (Issue #21)** — replaced `SystemNavigator.pop()` with platform channel `finishAffinity()` + `Process.killProcess()` to close all windows/instances after backup restore
+- **Back button navigates Tasks→Notes before minimize (Issue #22)** — pressing back on Tasks tab now switches to Notes tab first; only on Notes tab does back minimize the app
+- **Reminder toggle corrupts state (Issue #23)** — `toggleReminderCompleted` was mutating HiveObject nested items in-place; fixed to create new `ReminderItem` objects and reassign the entire list (same pattern as reschedule fix)
+- **Backup version compatibility warning (Issue #24)** — manifest card now shows a version mismatch warning when backup was created with a different app version; app version synced to `1.0.3`; warns user that restoring old backups may revert bug fixes
+- **Smart filter shows raw Quill JSON (Issue #25)** — `_showFilteredNotes()` in Library page was displaying `rawTranscription` directly; now parses Quill delta format to plain text before showing preview
+- **Note picker voice/text classification** — live STT voice notes (no audio file) were incorrectly shown as text notes in project document pickers; fixed by also checking V-prefix title pattern (`V\d+`) in addition to `audioFilePath`
+- **Media resume during live recording pauses** — music from other apps (Spotify, etc.) briefly resumed during natural speech pauses because `speech_to_text`'s internal SpeechRecognizer released audio focus on silence timeout; fixed by re-requesting native audio focus in `_onStatusChanged` callback
+- **Media resume on recording exit** — `_goBack()` (X/back button) and cancel in live mode were not abandoning audio focus or sending media-play key event; both now properly call `_abandonAudioFocus()` + `_resumeMedia()`
+- **Orphaned audio focus requests** — Kotlin `buildFocusRequest()` was called recursively from its own `OnAudioFocusChangeListener`, creating orphaned focus holders that could never be abandoned (blocked media from playing even outside the app); rewrote to use a single lazy `focusRequest` instance
+- **R8/ProGuard notification crash** — `flutter_local_notifications` uses Gson `TypeToken` internally; R8 strips generic type info, causing `PlatformException` when cancelling/rescheduling notifications; added ProGuard keep rules for `com.google.gson.**` and `com.dexterous.**`; wrapped all notification calls in try-catch safety nets
+- **R8/ProGuard photo add crash (UCropActivity)** — `image_cropper`'s `UCropActivity` was obfuscated by R8 to an unrecognizable class name, causing `ActivityNotFoundException` when adding photos; fixed by declaring `UCropActivity` explicitly in `AndroidManifest.xml` and adding ProGuard keep rule for `com.yalantis.ucrop.**`
+- **Reminder delete/reschedule cascade failure** — notification cancellation crash (from ProGuard issue) was not caught, causing the entire reminder delete/reschedule operation to fail silently; fixed by wrapping `cancelNotification` and `scheduleReminder` in individual try-catch blocks so reminder state updates even if notification operations fail
+- **Version history deletion not working** — select-and-delete confirmed but never actually removed versions; added missing `deleteTranscriptVersions` call after confirmation dialog
+- **Search empty state blocking project results** — search for project content showed "No results" because empty state check only considered note results; fixed to also check project matches before showing empty state
+- **Calendar FAB pushed off screen** — GestureFab in calendar page was pushed below viewport when calendar expanded; moved to body-level Stack with fixed Positioned
+- **UCrop image cropper behind system bars** — crop activity drew behind status bar and navigation buttons because it inherited the app's transparent system bar theme; fixed by creating a dedicated `UCropTheme` with opaque black bars and `fitsSystemWindows: true`
+- **Share text showing raw Quill formatting codes** — sharing a project document with rich text showed `{{color:#ff...}}` pseudo-markup literally in WhatsApp/messaging apps; removed non-standard color markers from `_deltaToMarkdown` — only standard Markdown (bold, italic, headers, lists) is preserved
+- **Share text showing `***` bold/italic markers** — messaging apps (WhatsApp etc.) showed literal `***text***`, `**text**`, `*text*` markers for bold/italic text; removed all inline formatting from `_deltaToMarkdown` — only line-level formatting (headers, lists) is now preserved
+- **PDF em dash and smart quotes rendering as boxes** — em dash `—`, en dash `–`, smart quotes `''""`, ellipsis `…`, bullet `•`, and non-breaking space rendered as unknown character boxes in PDF export; added `_pdfSafe()` sanitizer to replace unsupported Unicode with ASCII equivalents; also replaced Unicode checkbox symbols `☑`/`☐` with `[x]`/`[ ]`
+
+### New Files
+- `lib/widgets/share_receive_sheet.dart` — Share bottom sheet UI (file info, sender field, folder picker, Whisper check)
+- `lib/pages/retranscribe_page.dart` — Bulk re-transcription page with multi-select, progress, confirmation dialog
+
+### Changed
+- `lib/models/note.dart` — added HiveFields 29–31: `sourceType` (default `'in_app'`), `sharedFrom`, `originalFilename`; updated `toMap()`/`fromMap()` for backup compatibility
+- `lib/models/note.g.dart` — regenerated Hive adapter with fields 29–31
+- `lib/services/notes_repository.dart` — `createNote()` accepts `sourceType`, `sharedFrom`, `originalFilename` params
+- `lib/providers/notes_provider.dart` — `addNote()` passes through `sourceType`, `sharedFrom`, `originalFilename`
+- `android/app/src/main/AndroidManifest.xml` — added `audio/*` SEND intent filter for share-to-Vaanix
+- `android/app/src/main/kotlin/com/vaanix/app/MainActivity.kt` — handles `ACTION_SEND` audio intents: copies content URI to temp file, extracts display name via `ContentResolver`; new `getSharedAudioInfo` MethodChannel method returns path + filename
+- `lib/main.dart` — added `_checkShareIntent()` for cold-start and warm-start share detection; shows `ShareReceiveSheet` modal on audio share
+- `lib/widgets/note_card.dart` — gold "Shared" badge chip with `call_received_rounded` icon and sender name for shared notes
+- `lib/pages/note_detail_page.dart` — shared note metadata section (amber card with sender name and original filename) shown between metadata rows and tags
+- **Crash reporting enabled by default** — `crashReportingEnabled` now defaults to `true` for new installs; existing users retain their current setting via Hive stored value
+- **Light mode AppBar visibility** — AppBar background changed from transparent to subtle blue tint (`#EDF4FC`) with `scrolledUnderElevation: 0.5`; makes the bar clearly distinguishable from page content
+- `MainActivity.kt` — rewrote audio focus management: single `focusRequest` via `lazy`, no-op listener (no recursive re-creation), `holdingFocus` flag for state tracking; cleaner abandon that always releases the exact granted request
+- `recording_page.dart` — added `_resumeMedia()` to all exit paths (save, cancel, back); added live STT info banner with auto-dismiss; re-requests audio focus on STT session cycle; calls `processVoiceCommands` after live mode save
+- `note_picker_page.dart` — `isVoiceNote()` helper checks both `audioFilePath.isNotEmpty` and title prefix `V\d+`; used for filtering and icon display
+- `note_detail_page.dart` — version cards use `_VersionTextPreview` widget with Quill rendering; `_deleteSelectedVersions` now calls `deleteTranscriptVersions`
+- `notes_repository.dart` — added `deleteTranscriptVersions(noteId, versionIds)` method
+- `notes_provider.dart` — exposed `deleteTranscriptVersions` method; added `processVoiceCommands` for live STT voice command processing
+- `home_page.dart` — `_buildPinnedSection` merges pinned notes + projects; project card pin icon at row end; `_showProjectFolderPicker` has "New Folder" option; project Dismissible + long press menu
+- `search_page.dart` — searches projects (title, description, section headers, free text); purple "PROJECT" section in results; empty state checks both notes and projects
+- `folders_page.dart` — smart filters open functional bottom sheets instead of navigating to search
+- `calendar_page.dart` — "New Project" speed dial shows name dialog instead of project list page
+- `support_page.dart` — added "LEGAL" section with Privacy Policy and Terms & Conditions
+- `project_document.dart` — added `isPinned` (HiveField 9) and `pinnedAt` (HiveField 10) fields
+- `project_document_detail_page.dart` — added Find & Replace: `_performSearch`, `_replaceCurrentMatch`, `_replaceAllMatches` methods; `FindReplaceBar` widget integration; `_HighlightedText` widget for search highlighting; highlight params passed to `_NoteReferenceCard`, `_FreeTextCard`, `_SectionHeaderCard`
+- `note_card.dart` — merged task capsules (Todo, Action, Reminder, Photos) into single Wrap with folder/project/tag capsules; removed separate Row 5 and unused `hasTags` variable
+- `notes_provider.dart` — added `refresh()` call in `deleteReminder` after `updateNote` to ensure UI state propagation; `toggleReminderCompleted`, `deleteReminder`, `rescheduleReminder` now create new `ReminderItem` objects (no in-place mutation) and wrap notification calls in try-catch
+- `notes_repository.dart` — `rescheduleReminder` creates new `ReminderItem` objects and reassigns list (same immutable-mutation pattern)
+- `AndroidManifest.xml` — added `CAMERA`, `READ_MEDIA_IMAGES`, `READ_EXTERNAL_STORAGE` permissions for photo upload; declared `UCropActivity` for `image_cropper`
+- `proguard-rules.pro` — added keep rules for Gson TypeToken, `com.dexterous.**` (notifications), `com.yalantis.ucrop.**` (image cropper), Hive type adapters
+- `note_attachments_section.dart` — wrapped photo save in try-catch with error snackbar
+- `note_detail_page.dart` — wrapped `_addPhoto` in try-catch with error snackbar
+- `project_document_detail_page.dart` — wrapped `_pickAndAddImage` in try-catch; added inline title editing with pen icon
+- `android/app/src/main/kotlin/com/vaanix/app/MainActivity.kt` — added `convertToWav` MethodChannel handler; new `convertAudioToWav()`, `resampleToMono16k()`, `writeWavFile()` methods for native audio format conversion via MediaCodec
+- `lib/services/whisper_service.dart` — added `_convertToWav()` method using MethodChannel; `transcribe()` auto-detects non-WAV files and converts before Whisper processing
+- `lib/pages/audio_settings_page.dart` — "Re-transcribe Notes" now navigates to `/retranscribe` page instead of inline dialog; removed `_showBulkRetranscribe` method
+- `lib/widgets/home_tip_tile.dart` — rewritten from `ConsumerWidget` to `ConsumerStatefulWidget`; session-local dismiss, 1-minute auto-hide timer, shuffled tip order per session, close snackbar with menu link
+- `lib/widgets/share_receive_sheet.dart` — pre-selects default folder from settings; 48px buttons; nav bar safe padding
+- `lib/nav.dart` — added `/retranscribe` route (31 routes total)
+- `backup_restore_page.dart` — auto-collapse Create Backup and expand Restore section when opened via file intent; added version mismatch warning in manifest card
+- `backup_service.dart` — `_appVersion` → `currentAppVersion` (public static const) set to `1.0.3`
+- `note_card.dart` — added `folderColors` parameter; folder capsules use color-tinted backgrounds with HSL-derived dark text
+- `sharing_service.dart` — removed `{{color:...}}` pseudo-markup and all inline formatting (`***`, `**`, `*`) from `_deltaToMarkdown`; added `_pdfSafe()` static helper applied to all dynamic text in PDF generation; checkbox symbols changed to ASCII `[x]`/`[ ]`
+- `values/styles.xml` — added `UCropTheme` style with opaque black system bars and `fitsSystemWindows: true`
+- `values-night/styles.xml` — added matching `UCropTheme` for dark mode with `DayNight` parent
+- `project_block.dart` / `project_block.g.dart` — added `taskBlock` to `BlockType` enum (HiveField 4)
+- `project_documents_repository.dart` — added `addTaskBlock()` method
+- `project_documents_provider.dart` — exposed `addTaskBlock()` method
+- `project_document_detail_page.dart` — added `_TaskBlockCard` widget, `_TaskEntry` model, task creation dialog, existing task picker sheet; removed inline task display from `_NoteReferenceCard`; added "Tasks" to speed dial FAB
+- `sharing_service.dart` — added `_writeTaskBlock()`, `_buildTaskBlockPdfWidgets()`, `_parseTaskRefs()` helpers; taskBlock handling in `assembleDocumentText`, `exportDocumentAsMarkdown`, `exportDocumentAsPdf`
+- `user_settings.dart` / `user_settings.g.dart` — `crashReportingEnabled` default changed from `false` to `true`
+- `theme.dart` — added `lightAppBar` color; light mode AppBar changed from transparent to `#EDF4FC` with `scrolledUnderElevation: 0.5`
+
+### Documentation
+- Incorporated **Share to Vaanix** feature spec into `PROJECT_SPECIFICATION.md` (Section 4.24) and `IMPLEMENTATION_PLAN.md` (Step 19P) — Phase 1 free tier feature
+- Incorporated **External Recorder Import** feature spec into `PROJECT_SPECIFICATION.md` (Phase 2 Out of Scope) and `IMPLEMENTATION_PLAN.md` (Step P2-5) — Phase 2 Pro feature
+- Deleted standalone feature spec files: `FEATURE_EXTERNAL_RECORDER_IMPORT.md`, `FEATURE_SHARE_TO_VAANIX.md`
+- Added `NoteSourceType`, `SharedNoteMetadata`, `ImportMetadata`, `ImportBatch` data models to specification
+- Added `receive_sharing_intent` and `ffmpeg_kit_flutter_audio` to planned dependencies
+- Incorporated **User Guide & Home Tip Tile** feature spec into `PROJECT_SPECIFICATION.md` (Section 4.25) and `IMPLEMENTATION_PLAN.md` (Step 20P) — 14-section in-app guide + dismissible tip card on Home page
+- Deleted standalone feature spec file: `FEATURE_USER_GUIDE.md`
+- Added `currentTipIndex` (HiveField 42) and `tipTileDismissed` (HiveField 43) to UserSettings data model in spec
+- Added `/user_guide` route to navigation spec
+
+---
+
 ## [Unreleased] - 2026-03-07 - Session Enhancements
 
 ### Added

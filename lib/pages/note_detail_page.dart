@@ -958,33 +958,53 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     );
     if (source == null) return;
 
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source, imageQuality: 85);
-    if (picked == null || !mounted) return;
+    try {
 
-    final cropped = await ImageCropper().cropImage(
-      sourcePath: picked.path,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Crop Image',
-          toolbarColor: Theme.of(context).colorScheme.surface,
-          toolbarWidgetColor: Theme.of(context).colorScheme.onSurface,
-          lockAspectRatio: false,
-        ),
-      ],
-    );
-    if (cropped == null || !mounted) return;
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: source, imageQuality: 85);
 
-    final repo = ImageAttachmentRepository();
-    final attachment = await repo.saveImage(
-      sourceFile: File(cropped.path),
-      sourceType: source == ImageSource.gallery ? 'gallery' : 'camera',
-    );
+      if (picked == null || !mounted) return;
 
-    ref.read(notesProvider.notifier).addImageAttachment(
-          noteId: note.id,
-          attachmentId: attachment.id,
+
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Image',
+            toolbarColor: Theme.of(context).colorScheme.surface,
+            toolbarWidgetColor: Theme.of(context).colorScheme.onSurface,
+            lockAspectRatio: false,
+          ),
+        ],
+      );
+
+      if (cropped == null || !mounted) return;
+
+
+      final repo = ImageAttachmentRepository();
+      final attachment = await repo.saveImage(
+        sourceFile: File(cropped.path),
+        sourceType: source == ImageSource.gallery ? 'gallery' : 'camera',
+      );
+
+
+      ref.read(notesProvider.notifier).addImageAttachment(
+            noteId: note.id,
+            attachmentId: attachment.id,
+          );
+
+    } catch (e) {
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add photo: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
+      }
+    }
   }
 
   Future<void> _confirmDeletePhoto(
@@ -1234,11 +1254,11 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     );
 
     if (confirmed == true && mounted) {
-      // Restore to the latest non-deleted version if current is being deleted
+      // If the current transcription matches a version being deleted,
+      // restore to the latest remaining version first.
       for (final versionId in _selectedVersionIds) {
         final version = versions.where((v) => v.id == versionId).firstOrNull;
         if (version != null && version.text == note.rawTranscription) {
-          // Find the newest non-selected, non-original version to use
           final remaining = versions
               .where((v) => !_selectedVersionIds.contains(v.id))
               .toList();
@@ -1250,6 +1270,11 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           break;
         }
       }
+
+      // Actually delete the selected versions
+      await ref
+          .read(notesProvider.notifier)
+          .deleteTranscriptVersions(note.id, _selectedVersionIds);
     }
 
     _exitVersionSelectionMode();
@@ -1527,6 +1552,57 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                 ],
               ),
             ),
+
+            // === SHARED NOTE METADATA ===
+            if (note.sourceType == 'shared') ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFFFE082),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.call_received_rounded,
+                          size: 16, color: Color(0xFFF57F17)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (note.sharedFrom != null &&
+                                note.sharedFrom!.isNotEmpty)
+                              Text(
+                                'From: ${note.sharedFrom}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFFF57F17),
+                                ),
+                              ),
+                            if (note.originalFilename != null &&
+                                note.originalFilename!.isNotEmpty)
+                              Text(
+                                note.originalFilename!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.hintColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 12),
 
@@ -1849,13 +1925,12 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            version.text,
+                          _VersionTextPreview(
+                            plainText: version.text,
+                            richContentJson: version.richContentJson,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurface,
                             ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -3072,6 +3147,67 @@ class _VersionTag extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
       ),
+    );
+  }
+}
+
+/// Renders a version preview with rich text formatting when available,
+/// falling back to plain text.
+class _VersionTextPreview extends StatelessWidget {
+  final String plainText;
+  final String? richContentJson;
+  final TextStyle? style;
+
+  const _VersionTextPreview({
+    required this.plainText,
+    this.richContentJson,
+    this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (richContentJson != null && richContentJson!.isNotEmpty) {
+      try {
+        final json = jsonDecode(richContentJson!);
+        final doc = Document.fromJson(json is List ? json : json['ops'] ?? json);
+        final controller = QuillController(
+          document: doc,
+          selection: const TextSelection.collapsed(offset: 0),
+          readOnly: true,
+        );
+        return AbsorbPointer(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 54),
+            child: ClipRect(
+              child: QuillEditor.basic(
+                controller: controller,
+                config: QuillEditorConfig(
+                  showCursor: false,
+                  customStyles: DefaultStyles(
+                    paragraph: DefaultTextBlockStyle(
+                      style ?? Theme.of(context).textTheme.bodySmall!.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      const HorizontalSpacing(0, 0),
+                      const VerticalSpacing(0, 0),
+                      const VerticalSpacing(0, 0),
+                      null,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      } catch (_) {
+        // Fall through to plain text
+      }
+    }
+    return Text(
+      plainText,
+      style: style,
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

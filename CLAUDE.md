@@ -11,7 +11,7 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 
 **Vaanix** is a privacy-first, voice-driven note-taking and task management mobile app built with Flutter. Users record voice notes, the app transcribes audio on-device, and organizes content into folders with manual categorization.
 
-**Current Phase:** Phase 1 (Release) — 100% complete. All 7 core steps + Steps 4.5/4.6/4.7 + post-release enhancements (Issues #7–#12) + all 8 value proposition gap features (Steps 8–10.7). Version 1.0.0. **Next:** Phase 2 (AI-powered features).
+**Current Phase:** Phase 1 (Release) — 100% complete. All 7 core steps + Steps 4.5/4.6/4.7 + post-release enhancements (Issues #7–#12) + all 8 value proposition gap features (Steps 8–10.7) + Steps 19P–21P. Version 1.0.5. **Next:** Phase 2 (AI-powered features).
 
 ---
 
@@ -115,7 +115,7 @@ These fields in `lib/models/note.dart` should **remain in the model** (for Phase
 ```
 lib/
 ├── main.dart                         # App entry point (Hive init + ProviderScope + widget/lock init)
-├── nav.dart                          # GoRouter routes (29 routes) and AppRoutes constants
+├── nav.dart                          # GoRouter routes (31 routes) and AppRoutes constants
 ├── theme.dart                        # Material 3 theme (light + dark + AMOLED)
 ├── models/
 │   ├── note.dart                     # Hive model (typeId: 0) — includes isPinned, isDeleted, toMap/fromMap
@@ -123,7 +123,7 @@ lib/
 │   ├── todo_item.dart                # Hive model (typeId: 2) — toMap/fromMap
 │   ├── reminder_item.dart            # Hive model (typeId: 3) — toMap/fromMap
 │   ├── folder.dart                   # Hive model (typeId: 4) — includes isDeleted, toMap/fromMap
-│   ├── user_settings.dart            # Hive model (typeId: 5) — HiveFields 0–41, toMap/fromMap
+│   ├── user_settings.dart            # Hive model (typeId: 5) — HiveFields 0–46, toMap/fromMap
 │   ├── project_document.dart         # Hive model (typeId: 6) — toMap/fromMap
 │   ├── project_block.dart            # Hive model (typeId: 7) + BlockType enum (typeId: 9) — toMap/fromMap
 │   ├── transcript_version.dart       # Hive model (typeId: 8) — toMap/fromMap
@@ -180,9 +180,13 @@ lib/
 │   ├── backup_restore_page.dart      # Encrypted backup creation & restore UI (Step 10.7)
 │   ├── lock_screen_page.dart         # PIN / biometric unlock screen (Step 10.5)
 │   ├── permission_page.dart         # Post-onboarding permission request (mic + notifications)
+│   ├── user_guide_page.dart          # Full User Guide with 14 collapsible sections (Step 20P)
+│   ├── retranscribe_page.dart        # Bulk re-transcription: multi-select, progress, confirm (Step 21P)
 │   ├── about_page.dart               # App info, credits, legal
 │   ├── feedback_page.dart            # User feedback form
 │   ├── support_us_page.dart          # Buy Me a Coffee
+│   ├── calendar_page.dart            # Calendar view of notes by date
+│   ├── tags_page.dart                # Tags management page
 │   ├── privacy_policy_page.dart      # Privacy policy
 │   └── terms_conditions_page.dart    # Terms & conditions
 ├── widgets/
@@ -198,7 +202,9 @@ lib/
 │   ├── task_list_item.dart           # Task row in aggregated tasks view
 │   ├── tasks_tab.dart                # Tasks tab content for Home page
 │   ├── reminder_destination_sheet.dart  # "Keep in-app / Also add to OS" choice
-│   └── template_picker_sheet.dart    # Note template selection bottom sheet (Step 9)
+│   ├── template_picker_sheet.dart    # Note template selection bottom sheet (Step 9)
+│   ├── share_receive_sheet.dart      # Share-to-Vaanix bottom sheet (Step 19P)
+│   └── home_tip_tile.dart            # Dismissible tip card for home page (14 tips, Step 20P)
 └── utils/
     ├── voice_command_parser.dart      # Voice command keyword parsing
     └── profanity_filter.dart          # Offline profanity filter (whole-word regex)
@@ -211,6 +217,7 @@ lib/
 | File | Reason | When Active |
 |---|---|---|
 | `lib/pages/login_page.dart` | No authentication in Phase 1 | Phase 2 |
+| `lib/pages/whats_new_page.dart` | Orphaned — no route defined | TBD |
 
 ---
 
@@ -244,7 +251,7 @@ lib/
 
 ---
 
-## Routes (go_router) — 26 routes
+## Routes (go_router) — 33 routes
 
 | Path | Screen | Status |
 |---|---|---|
@@ -275,6 +282,10 @@ lib/
 | `/note_picker` | Note Picker | Active |
 | `/version_history` | Version History | Active |
 | `/permissions` | Permission Request | Active (post-onboarding, one-time mic + notifications) |
+| `/user_guide` | User Guide | Active (14 collapsible sections, accepts `openSectionIndex` extra) |
+| `/retranscribe` | Re-transcribe | Active (bulk re-transcription with multi-select) |
+| `/calendar` | Calendar | Active (calendar view of notes by date) |
+| `/tags` | Tags | Active (tags management) |
 
 ---
 

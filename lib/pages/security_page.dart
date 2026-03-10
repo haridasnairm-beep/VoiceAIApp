@@ -29,14 +29,14 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
       final isSupported = await _localAuth.isDeviceSupported();
       final available = await _localAuth.getAvailableBiometrics();
       final hasBio = (canCheck || isSupported) && available.isNotEmpty;
-      print('Biometric: canCheck=$canCheck isSupported=$isSupported available=$available hasBio=$hasBio');
+      debugPrint('Biometric: canCheck=$canCheck isSupported=$isSupported available=$available hasBio=$hasBio');
       if (mounted) {
         // Use isDeviceSupported as fallback — some Samsung devices report
         // canCheckBiometrics=false but isDeviceSupported=true with PIN/pattern
         setState(() => _hasBiometrics = hasBio);
       }
     } catch (e) {
-      print('Biometric check failed: $e');
+      debugPrint('Biometric check failed: $e');
     }
   }
 
@@ -108,7 +108,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
                             .setBiometricEnabled(true);
                       }
                     } catch (e) {
-                      print('Biometric auth failed: $e');
+                      debugPrint('Biometric auth failed: $e');
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -282,8 +282,9 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
           onComplete: (confirmPin) async {
             if (pin == confirmPin) {
               final hash = await AppLockService.hashPin(pin);
+              await AppLockService.setStoredPinHash(hash);
               final notifier = ref.read(settingsProvider.notifier);
-              await notifier.setAppLockPinHash(hash);
+              await notifier.setPinLength(pin.length);
               await notifier.setAppLockEnabled(true);
               if (_hasBiometrics && mounted) {
                 _promptBiometric();
@@ -304,7 +305,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
   }
 
   void _showChangePinFlow() {
-    final currentHash = ref.read(settingsProvider).appLockPinHash;
+    final currentHash = AppLockService.getStoredPinHash();
     if (currentHash == null) return;
 
     _showPinEntry(
@@ -331,8 +332,8 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
               onComplete: (confirmPin) async {
                 if (newPin == confirmPin) {
                   final hash = await AppLockService.hashPin(newPin);
-                  await ref.read(settingsProvider.notifier)
-                      .setAppLockPinHash(hash);
+                  await AppLockService.setStoredPinHash(hash);
+                  await ref.read(settingsProvider.notifier).setPinLength(newPin.length);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('PIN changed')),
@@ -353,7 +354,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
   }
 
   void _confirmDisableAppLock() {
-    final currentHash = ref.read(settingsProvider).appLockPinHash;
+    final currentHash = AppLockService.getStoredPinHash();
     if (currentHash == null) {
       ref.read(settingsProvider.notifier).setAppLockEnabled(false);
       return;
@@ -365,9 +366,9 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
       onComplete: (pin) async {
         final isValid = await AppLockService.verifyPin(pin, currentHash);
         if (isValid) {
+          await AppLockService.setStoredPinHash(null);
           final notifier = ref.read(settingsProvider.notifier);
           await notifier.setAppLockEnabled(false);
-          await notifier.setAppLockPinHash(null);
           await notifier.setBiometricEnabled(false);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

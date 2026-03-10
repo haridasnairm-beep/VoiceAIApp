@@ -45,7 +45,7 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       lastBackupDate: fields[24] as DateTime?,
       soundCuesEnabled: fields[25] == null ? true : fields[25] as bool,
       guidedRecordingCompleted: fields[26] == null ? false : fields[26] as bool,
-      crashReportingEnabled: fields[27] == null ? false : fields[27] as bool,
+      crashReportingEnabled: fields[27] == null ? true : fields[27] as bool,
       dismissedTips: (fields[28] as List?)?.cast<String>(),
       lastSeenAppVersion: fields[29] as String?,
       noteSortOrder: fields[30] == null ? 'newest' : fields[30] as String,
@@ -58,17 +58,21 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       textNoteCounter: fields[36] == null ? 0 : fields[36] as int,
       whisperReadyShown: fields[37] == null ? false : fields[37] as bool,
       autoBackupEnabled: fields[38] == null ? false : fields[38] as bool,
-      autoBackupFrequency:
-          fields[39] == null ? 'weekly' : fields[39] as String,
+      autoBackupFrequency: fields[39] == null ? 'weekly' : fields[39] as String,
       autoBackupMaxCount: fields[40] == null ? 5 : fields[40] as int,
       autoBackupLastRun: fields[41] as DateTime?,
+      currentTipIndex: fields[42] == null ? 0 : fields[42] as int,
+      tipTileDismissed: fields[43] == null ? false : fields[43] as bool,
+      failedPinAttempts: fields[44] == null ? 0 : fields[44] as int,
+      pinLockoutUntil: fields[45] as DateTime?,
+      pinLength: fields[46] == null ? 4 : fields[46] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(42)
+      ..writeByte(47)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -152,7 +156,17 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(40)
       ..write(obj.autoBackupMaxCount)
       ..writeByte(41)
-      ..write(obj.autoBackupLastRun);
+      ..write(obj.autoBackupLastRun)
+      ..writeByte(42)
+      ..write(obj.currentTipIndex)
+      ..writeByte(43)
+      ..write(obj.tipTileDismissed)
+      ..writeByte(44)
+      ..write(obj.failedPinAttempts)
+      ..writeByte(45)
+      ..write(obj.pinLockoutUntil)
+      ..writeByte(46)
+      ..write(obj.pinLength);
   }
 
   @override

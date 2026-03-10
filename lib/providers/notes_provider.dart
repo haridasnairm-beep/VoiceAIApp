@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../models/note.dart';
 import '../models/reminder_item.dart';
 import '../models/transcript_version.dart';
+import '../services/home_widget_service.dart';
 import '../services/notes_repository.dart';
 import '../services/notification_service.dart';
 import '../services/voice_command_processor.dart';
@@ -51,12 +52,12 @@ class NotesNotifier extends Notifier<List<Note>> {
 
     final stuckList = stuckNotes.toList();
     if (stuckList.isNotEmpty) {
-      print('RecoverStuck: found ${stuckList.length} unprocessed note(s)');
+      debugPrint('RecoverStuck: found ${stuckList.length} unprocessed note(s)');
     }
     for (final note in stuckList) {
       if (note.audioFilePath.isNotEmpty && File(note.audioFilePath).existsSync()) {
         // Retry transcription
-        print('RecoverStuck: retrying transcription for ${note.id}');
+        debugPrint('RecoverStuck: retrying transcription for ${note.id}');
         transcribeInBackground(
           note.id,
           note.audioFilePath,
@@ -69,7 +70,7 @@ class NotesNotifier extends Notifier<List<Note>> {
             ? 'Transcription interrupted — no audio file available'
             : note.rawTranscription;
         await repo.updateNote(note);
-        print('RecoverStuck: marked ${note.id} as processed (no audio)');
+        debugPrint('RecoverStuck: marked ${note.id} as processed (no audio)');
       }
     }
     if (stuckList.isNotEmpty) refresh();
@@ -146,6 +147,9 @@ class NotesNotifier extends Notifier<List<Note>> {
     String? folderId,
     bool isProcessed = true,
     bool isVoiceNote = false,
+    String sourceType = 'in_app',
+    String? sharedFrom,
+    String? originalFilename,
   }) async {
     final isTextNote = audioFilePath.isEmpty && !isVoiceNote;
 
@@ -174,6 +178,9 @@ class NotesNotifier extends Notifier<List<Note>> {
       detectedLanguage: detectedLanguage,
       folderId: effectiveFolderId,
       isProcessed: isProcessed,
+      sourceType: sourceType,
+      sharedFrom: sharedFrom,
+      originalFilename: originalFilename,
     );
 
     // Add to General folder's noteIds list
@@ -193,6 +200,7 @@ class NotesNotifier extends Notifier<List<Note>> {
     }
 
     state = [note, ...state];
+    _refreshWidget();
     return note;
   }
 
@@ -226,6 +234,7 @@ class NotesNotifier extends Notifier<List<Note>> {
     bool hasManualFolder = false,
   }) async {
     try {
+      debugPrint('TranscribeBG: starting for note=$noteId, file=$wavPath');
       // Determine if we need translation to English
       final settings = ref.read(settingsProvider);
       final isTranslate = (language != 'en' && settings.noteOutputMode == 'english');
@@ -234,6 +243,7 @@ class NotesNotifier extends Notifier<List<Note>> {
         language: language,
         isTranslate: isTranslate,
       );
+      debugPrint('TranscribeBG: result length=${transcription.length}, isEmpty=${transcription.isEmpty}');
 
       // Apply profanity filter if enabled
       if (settings.blockOffensiveWords) {
@@ -349,6 +359,122 @@ class NotesNotifier extends Notifier<List<Note>> {
       note.isProcessed = true;
       await updateNote(note);
     }
+  }
+
+  /// Process voice commands for an already-transcribed note (live STT mode).
+  /// Strips command prefix from transcription, auto-assigns folder/project/tags,
+  /// creates task items, and generates auto-title.
+  Future<void> processVoiceCommands({
+    required String noteId,
+    required bool hasManualFolder,
+    required bool hasManualProject,
+  }) async {
+    final settings = ref.read(settingsProvider);
+    if (!settings.voiceCommandsEnabled) return;
+
+    final note = getNoteById(noteId);
+    if (note == null || note.rawTranscription.isEmpty) return;
+
+    debugPrint('VoiceCmd(live): processing transcription (${note.rawTranscription.length} chars)');
+    final result =
+        await VoiceCommandProcessor.process(note.rawTranscription, ref);
+    debugPrint('VoiceCmd(live): hasFolder=${result.folderId != null}, hasProject=${result.projectId != null}');
+
+    final hasCommand = result.folderId != null ||
+        result.projectId != null ||
+        result.tags.isNotEmpty ||
+        result.taskType != null;
+    if (!hasCommand) {
+      // No command found — still generate auto-title
+      if (!note.isUserEditedTitle && note.rawTranscription.isNotEmpty) {
+        final autoTitle = TitleGeneratorService.generate(note.rawTranscription);
+        if (autoTitle != null) _applyAutoTitle(note, autoTitle);
+        await updateNote(note);
+      }
+      return;
+    }
+
+    // Use processed content (command prefix stripped)
+    note.rawTranscription = result.noteContent.isNotEmpty
+        ? result.noteContent
+        : note.rawTranscription;
+
+    // Auto-assign folder if detected and user didn't manually select one
+    if (result.folderId != null && !hasManualFolder) {
+      note.folderId = result.folderId;
+      ref
+          .read(foldersProvider.notifier)
+          .addNoteToFolder(result.folderId!, noteId);
+      debugPrint('VoiceCmd(live): assigned folder ${result.folderId}');
+    }
+
+    // Auto-link note to project if detected by voice command
+    if (result.projectId != null && !hasManualProject) {
+      await ref
+          .read(projectDocumentsProvider.notifier)
+          .addNoteBlock(result.projectId!, noteId);
+      debugPrint('VoiceCmd(live): linked note to project ${result.projectId}');
+    }
+
+    // Auto-assign tags if detected by voice command
+    if (result.tags.isNotEmpty) {
+      for (final tag in result.tags) {
+        await ref.read(notesRepositoryProvider).addTag(noteId, tag);
+      }
+      debugPrint('VoiceCmd(live): assigned tags ${result.tags}');
+    }
+
+    // Build feedback message for UI
+    final parts = <String>[];
+    if (result.folderId != null) parts.add('Folder assigned');
+    if (result.projectId != null) parts.add('Project linked');
+    if (result.tags.isNotEmpty) {
+      parts.add('Tags: ${result.tags.map((t) => '#$t').join(', ')}');
+    }
+
+    // Auto-create task item if voice command detected a task keyword
+    if (result.taskType != null && result.taskDescription != null) {
+      debugPrint('VoiceCmd(live): creating ${result.taskType} task: "${result.taskDescription}"');
+      switch (result.taskType) {
+        case 'todo':
+          await addTodoItem(noteId: noteId, text: result.taskDescription!);
+          break;
+        case 'action':
+          await addActionItem(noteId: noteId, text: result.taskDescription!);
+          break;
+        case 'reminder':
+          final tomorrow = DateTime.now().add(const Duration(days: 1));
+          final notifEnabled = settings.notificationsEnabled;
+          await addReminder(
+            noteId: noteId,
+            text: result.taskDescription!,
+            reminderTime: tomorrow,
+            notificationsEnabled: notifEnabled,
+          );
+          break;
+      }
+      if (result.taskType != null) {
+        parts.add('${result.taskType}: ${result.taskDescription}');
+      }
+    }
+
+    // Notify UI with feedback
+    if (parts.isNotEmpty) {
+      ref.read(voiceCommandFeedbackProvider.notifier).set(parts.join(' · '));
+    }
+
+    // Auto-generate title
+    if (!note.isUserEditedTitle && note.rawTranscription.isNotEmpty) {
+      final autoTitle = TitleGeneratorService.generate(
+        note.rawTranscription,
+        todos: note.todos.map((t) => t.text).toList(),
+        actions: note.actions.map((a) => a.text).toList(),
+        reminders: note.reminders.map((r) => r.text).toList(),
+      );
+      if (autoTitle != null) _applyAutoTitle(note, autoTitle);
+    }
+
+    await updateNote(note);
   }
 
   /// Re-transcribe an existing note using the currently active Whisper model.
@@ -476,11 +602,22 @@ class NotesNotifier extends Notifier<List<Note>> {
       for (final n in state)
         if (n.id == note.id) note else n,
     ];
+    _refreshWidget();
   }
 
   Future<void> deleteNote(String id) async {
     await ref.read(notesRepositoryProvider).deleteNote(id);
     state = state.where((n) => n.id != id).toList();
+    _refreshWidget();
+  }
+
+  /// Push updated note/task counts to home screen widgets.
+  void _refreshWidget() {
+    final settings = ref.read(settingsProvider);
+    HomeWidgetService.updateWidgetData(
+      appLockEnabled: settings.appLockEnabled,
+      widgetPrivacyLevel: settings.widgetPrivacyLevel,
+    );
   }
 
   /// Restore a note from trash.
@@ -577,13 +714,27 @@ class NotesNotifier extends Notifier<List<Note>> {
     final idx = note.reminders.indexWhere((r) => r.id == reminderId);
     if (idx == -1) return;
 
-    note.reminders[idx].isCompleted = !note.reminders[idx].isCompleted;
+    final old = note.reminders[idx];
+    final toggled = ReminderItem(
+      id: old.id,
+      text: old.text,
+      reminderTime: old.reminderTime,
+      isCompleted: !old.isCompleted,
+      notificationId: old.notificationId,
+      createdAt: old.createdAt,
+    );
+
+    note.reminders = [
+      for (int i = 0; i < note.reminders.length; i++)
+        if (i == idx) toggled else note.reminders[i],
+    ];
     note.updatedAt = DateTime.now();
 
-    if (note.reminders[idx].isCompleted &&
-        note.reminders[idx].notificationId != null) {
-      await NotificationService.instance
-          .cancelNotification(note.reminders[idx].notificationId!);
+    if (toggled.isCompleted && toggled.notificationId != null) {
+      try {
+        await NotificationService.instance
+            .cancelNotification(toggled.notificationId!);
+      } catch (_) {}
     }
 
     await updateNote(note);
@@ -616,6 +767,15 @@ class NotesNotifier extends Notifier<List<Note>> {
     refresh();
   }
 
+  /// Delete specific transcript versions by their IDs.
+  Future<void> deleteTranscriptVersions(
+      String noteId, Set<String> versionIds) async {
+    await ref
+        .read(notesRepositoryProvider)
+        .deleteTranscriptVersions(noteId, versionIds);
+    refresh();
+  }
+
   /// Ensure a note has at least one transcript version (original snapshot).
   Future<void> ensureTranscriptVersion(Note note) async {
     await ref.read(notesRepositoryProvider).ensureTranscriptVersion(note);
@@ -640,13 +800,18 @@ class NotesNotifier extends Notifier<List<Note>> {
 
     final reminder = note.reminders.where((r) => r.id == reminderId).firstOrNull;
     if (reminder?.notificationId != null) {
-      await NotificationService.instance
-          .cancelNotification(reminder!.notificationId!);
+      try {
+        await NotificationService.instance
+            .cancelNotification(reminder!.notificationId!);
+      } catch (_) {
+        // Notification cancel may fail due to R8/ProGuard — proceed anyway
+      }
     }
 
     note.reminders = note.reminders.where((r) => r.id != reminderId).toList();
     note.updatedAt = DateTime.now();
     await updateNote(note);
+    refresh();
   }
 
   // --- Todo Item CRUD ---
@@ -759,28 +924,46 @@ class NotesNotifier extends Notifier<List<Note>> {
         note.reminders.where((r) => r.id == reminderId).firstOrNull;
     if (reminder == null) return;
 
-    // Cancel old notification
+    // Cancel old notification (wrapped in try-catch — R8/ProGuard can break Gson TypeToken)
     if (reminder.notificationId != null) {
-      await NotificationService.instance
-          .cancelNotification(reminder.notificationId!);
+      try {
+        await NotificationService.instance
+            .cancelNotification(reminder.notificationId!);
+      } catch (_) {}
     }
 
-    // Update in repository
-    await ref
-        .read(notesRepositoryProvider)
-        .rescheduleReminder(noteId, reminderId, newTime);
+    final notifId = reminder.notificationId ??
+        (reminderId.hashCode & 0x7FFFFFFF);
+
+    // Create a new ReminderItem with updated time (ensures Hive detects change)
+    final updated = ReminderItem(
+      id: reminder.id,
+      text: reminder.text,
+      reminderTime: newTime,
+      isCompleted: false,
+      notificationId: notifId,
+      createdAt: reminder.createdAt,
+    );
+
+    // Replace the entire reminders list to trigger proper state change
+    note.reminders = [
+      for (final r in note.reminders)
+        if (r.id == reminderId) updated else r,
+    ];
+    note.updatedAt = DateTime.now();
+    await updateNote(note);
 
     // Schedule new notification
     if (notificationsEnabled && newTime.isAfter(DateTime.now())) {
-      final notificationId = reminder.notificationId ??
-          (reminderId.hashCode & 0x7FFFFFFF);
-      await NotificationService.instance.scheduleReminder(
-        notificationId: notificationId,
-        title: 'Reminder: ${note.title}',
-        body: reminder.text,
-        scheduledTime: newTime,
-        noteId: noteId,
-      );
+      try {
+        await NotificationService.instance.scheduleReminder(
+          notificationId: notifId,
+          title: 'Reminder: ${note.title}',
+          body: reminder.text,
+          scheduledTime: newTime,
+          noteId: noteId,
+        );
+      } catch (_) {}
     }
 
     refresh();

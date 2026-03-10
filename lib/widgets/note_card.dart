@@ -12,6 +12,7 @@ class NoteCard extends StatelessWidget {
   final String timestamp;
   final List<String> folderNames;
   final List<String> projectNames;
+  final Map<String, int?> folderColors;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onLongPress;
@@ -27,6 +28,7 @@ class NoteCard extends StatelessWidget {
     required this.timestamp,
     required this.folderNames,
     required this.projectNames,
+    this.folderColors = const {},
     required this.onTap,
     required this.onDelete,
     required this.onLongPress,
@@ -72,10 +74,6 @@ class NoteCard extends StatelessWidget {
     }
     final preview = rawText.length > 120 ? rawText.substring(0, 120) : rawText;
     final duration = _formatDuration(note.audioDurationSeconds);
-    final hasTags = note.todos.isNotEmpty ||
-        note.actions.isNotEmpty ||
-        note.reminders.isNotEmpty ||
-        note.imageAttachmentIds.isNotEmpty;
 
     return GestureDetector(
       onTap: onTap,
@@ -223,15 +221,30 @@ class NoteCard extends StatelessWidget {
                       ? const Color(0xFFE65100)
                       : const Color(0xFF2E7D32),
                 ),
-                ...folderNames.map((name) => GestureDetector(
-                      onTap: onFolderTap != null ? () => onFolderTap!(name) : null,
-                      child: _LabelChip(
-                        icon: Icons.folder_rounded,
-                        label: name,
-                        bgColor: const Color(0xFFE3F2FD),
-                        textColor: const Color(0xFF1565C0),
-                      ),
-                    )),
+                ...folderNames.map((name) {
+                  final colorVal = folderColors[name];
+                  final Color bgColor;
+                  final Color textColor;
+                  if (colorVal != null) {
+                    final base = Color(colorVal);
+                    bgColor = Color.lerp(base, Colors.white, 0.75)!;
+                    // Use dark variant of the color for text
+                    final hsl = HSLColor.fromColor(base);
+                    textColor = hsl.withLightness((hsl.lightness * 0.4).clamp(0.0, 0.5)).toColor();
+                  } else {
+                    bgColor = const Color(0xFFE3F2FD);
+                    textColor = const Color(0xFF1565C0);
+                  }
+                  return GestureDetector(
+                    onTap: onFolderTap != null ? () => onFolderTap!(name) : null,
+                    child: _LabelChip(
+                      icon: Icons.folder_rounded,
+                      label: name,
+                      bgColor: bgColor,
+                      textColor: textColor,
+                    ),
+                  );
+                }),
                 ...projectNames.map((name) => GestureDetector(
                       onTap: onProjectTap != null ? () => onProjectTap!(name) : null,
                       child: _LabelChip(
@@ -250,44 +263,42 @@ class NoteCard extends StatelessWidget {
                         textColor: theme.colorScheme.onSecondaryContainer,
                       ),
                     )),
+                // Shared note indicator
+                if (note.sourceType == 'shared')
+                  _TagChip(
+                    label: note.sharedFrom ?? 'Shared',
+                    bg: const Color(0xFFFFF8E1),
+                    color: const Color(0xFFF57F17),
+                    icon: Icons.call_received_rounded,
+                  ),
+                // Task/content indicator capsules (inline)
+                if (note.todos.isNotEmpty)
+                  _TagChip(
+                    label: 'Todo',
+                    bg: const Color(0xFFE3F2FD),
+                    color: const Color(0xFF1976D2),
+                  ),
+                if (note.actions.isNotEmpty)
+                  _TagChip(
+                    label: 'Action',
+                    bg: const Color(0xFFE8F5E9),
+                    color: const Color(0xFF2E7D32),
+                  ),
+                if (note.reminders.isNotEmpty)
+                  _TagChip(
+                    label: 'Reminder',
+                    bg: const Color(0xFFFFF3E0),
+                    color: const Color(0xFFEF6C00),
+                  ),
+                if (note.imageAttachmentIds.isNotEmpty)
+                  _TagChip(
+                    label: '${note.imageAttachmentIds.length} photo${note.imageAttachmentIds.length > 1 ? 's' : ''}',
+                    bg: const Color(0xFFFCE4EC),
+                    color: const Color(0xFFC62828),
+                    icon: Icons.photo_rounded,
+                  ),
               ],
             ),
-
-            // Row 5: Tags (Todo, Action, Reminder, Photos)
-            if (hasTags) ...[
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  if (note.todos.isNotEmpty)
-                    _TagChip(
-                      label: 'Todo',
-                      bg: const Color(0xFFE3F2FD),
-                      color: const Color(0xFF1976D2),
-                    ),
-                  if (note.actions.isNotEmpty)
-                    _TagChip(
-                      label: 'Action',
-                      bg: const Color(0xFFE8F5E9),
-                      color: const Color(0xFF2E7D32),
-                    ),
-                  if (note.reminders.isNotEmpty)
-                    _TagChip(
-                      label: 'Reminder',
-                      bg: const Color(0xFFFFF3E0),
-                      color: const Color(0xFFEF6C00),
-                    ),
-                  if (note.imageAttachmentIds.isNotEmpty)
-                    _TagChip(
-                      label: '${note.imageAttachmentIds.length} photo${note.imageAttachmentIds.length > 1 ? 's' : ''}',
-                      bg: const Color(0xFFFCE4EC),
-                      color: const Color(0xFFC62828),
-                      icon: Icons.photo_rounded,
-                    ),
-                ],
-              ),
-            ],
           ],
         ),
       ),

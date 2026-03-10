@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../nav.dart';
-import '../providers/notes_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/whisper_service.dart';
 import '../widgets/settings_widgets.dart';
@@ -63,120 +62,6 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     setState(() => _showHighlight = false);
-  }
-
-  Future<void> _showBulkRetranscribe(BuildContext context, WidgetRef ref) async {
-    final eligibleNotes =
-        await ref.read(notesProvider.notifier).getRetranscribableNotes();
-
-    if (!context.mounted) return;
-
-    if (eligibleNotes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No notes with audio files found for re-transcription.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    // Check model is ready
-    if (!await WhisperService.instance.isModelDownloaded()) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Whisper model not downloaded. Download it first.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    final currentModel = WhisperService.instance.currentModelName;
-    final modelLabel = currentModel == 'small' ? 'Enhanced' : 'Standard';
-
-    if (!context.mounted) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Re-transcribe Notes'),
-        content: Text(
-          'Found ${eligibleNotes.length} note(s) with audio files.\n\n'
-          'Re-transcribe all using the $modelLabel model?\n\n'
-          'Previous transcriptions will be saved in version history. '
-          'This may take a while.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Re-transcribe ${eligibleNotes.length} Notes'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !context.mounted) return;
-
-    await WhisperService.instance.ensureModelReady();
-
-    final noteIds = eligibleNotes.map((n) => n.id).toList();
-    final progressNotifier = ValueNotifier<int>(0);
-
-    if (!context.mounted) return;
-
-    // Show progress dialog and run bulk operation
-    final resultFuture = ref.read(notesProvider.notifier).bulkRetranscribe(
-      noteIds: noteIds,
-      onProgress: (done, total) => progressNotifier.value = done,
-    );
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => ValueListenableBuilder<int>(
-        valueListenable: progressNotifier,
-        builder: (ctx, completed, _) {
-          // Auto-close when done
-          if (completed >= noteIds.length) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (ctx.mounted) Navigator.of(ctx).pop();
-            });
-          }
-          return AlertDialog(
-            title: const Text('Re-transcribing...'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                LinearProgressIndicator(
-                  value: noteIds.isEmpty ? 0 : completed / noteIds.length,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(height: 16),
-                Text('$completed / ${noteIds.length} notes processed'),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-
-    final successCount = await resultFuture;
-    progressNotifier.dispose();
-
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Re-transcription complete. $successCount / ${noteIds.length} notes processed ($modelLabel model).'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   Future<void> _showModelPicker(
@@ -945,7 +830,7 @@ class _AudioSettingsPageState extends ConsumerState<AudioSettingsPage> {
                       type: SettingsType.value,
                       valueText: '',
                       hasSublabel: true,
-                      onTap: () => _showBulkRetranscribe(context, ref),
+                      onTap: () => context.push(AppRoutes.retranscribe),
                     ),
                   ],
                   // Speaking Language — shown for ALL transcription modes

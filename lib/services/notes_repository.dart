@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:uuid/uuid.dart';
 import '../models/action_item.dart';
 import '../models/note.dart';
+import '../models/reminder_item.dart';
 import '../models/todo_item.dart';
 import '../models/transcript_version.dart';
 import 'hive_service.dart';
@@ -49,6 +50,9 @@ class NotesRepository {
     String detectedLanguage = 'en',
     String? folderId,
     bool isProcessed = true,
+    String sourceType = 'in_app',
+    String? sharedFrom,
+    String? originalFilename,
   }) async {
     final note = Note(
       id: _uuid.v4(),
@@ -59,6 +63,9 @@ class NotesRepository {
       audioDurationSeconds: audioDurationSeconds,
       folderId: folderId,
       isProcessed: isProcessed,
+      sourceType: sourceType,
+      sharedFrom: sharedFrom,
+      originalFilename: originalFilename,
     );
     await HiveService.notesBox.put(note.id, note);
     return note;
@@ -267,6 +274,16 @@ class NotesRepository {
     }
   }
 
+  /// Delete specific transcript versions by their IDs.
+  Future<void> deleteTranscriptVersions(
+      String noteId, Set<String> versionIds) async {
+    final note = getNoteById(noteId);
+    if (note == null) return;
+    note.transcriptVersions.removeWhere((v) => versionIds.contains(v.id));
+    note.updatedAt = DateTime.now();
+    await HiveService.notesBox.put(note.id, note);
+  }
+
   /// Ensure a note has at least one transcript version (migration helper).
   Future<void> ensureTranscriptVersion(Note note) async {
     if (note.transcriptVersions.isEmpty && note.rawTranscription.isNotEmpty) {
@@ -415,8 +432,19 @@ class NotesRepository {
     if (note == null) return;
     final idx = note.reminders.indexWhere((r) => r.id == reminderId);
     if (idx == -1) return;
-    note.reminders[idx].reminderTime = newTime;
-    note.reminders[idx].isCompleted = false;
+    final old = note.reminders[idx];
+    final updated = ReminderItem(
+      id: old.id,
+      text: old.text,
+      reminderTime: newTime,
+      isCompleted: false,
+      notificationId: old.notificationId,
+      createdAt: old.createdAt,
+    );
+    note.reminders = [
+      for (int i = 0; i < note.reminders.length; i++)
+        if (i == idx) updated else note.reminders[i],
+    ];
     note.updatedAt = DateTime.now();
     await HiveService.notesBox.put(note.id, note);
   }

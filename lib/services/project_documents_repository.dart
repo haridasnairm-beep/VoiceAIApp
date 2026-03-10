@@ -198,6 +198,25 @@ class ProjectDocumentsRepository {
     return block;
   }
 
+  /// Add a task_block to a document.
+  /// [content] is a JSON-encoded list of task references:
+  /// `[{"noteId":"...", "taskId":"...", "taskType":"action"|"todo"}]`
+  Future<ProjectBlock> addTaskBlock(
+      String documentId, String content) async {
+    final doc = getProjectDocument(documentId);
+    if (doc == null) throw Exception('Document not found');
+
+    final block = ProjectBlock(
+      id: _uuid.v4(),
+      type: BlockType.taskBlock,
+      sortOrder: doc.blocks.length,
+      content: content,
+    );
+    doc.blocks.add(block);
+    await updateProjectDocument(doc);
+    return block;
+  }
+
   /// Update content format of a free_text block (for rich text).
   Future<void> updateBlockContentFormat(
       String documentId, String blockId, String content, String format) async {

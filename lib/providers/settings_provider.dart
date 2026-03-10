@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/home_widget_service.dart';
 import '../services/notification_service.dart';
 import '../services/settings_repository.dart';
 
@@ -31,7 +32,6 @@ class SettingsState {
   final bool blockOffensiveWords; // Filter offensive words from transcription
   final bool isAmoled; // True when user selected AMOLED dark theme
   final bool appLockEnabled;
-  final String? appLockPinHash;
   final bool biometricEnabled;
   final int autoLockTimeoutSeconds;
   final String widgetPrivacyLevel; // 'full', 'record_only', 'minimal'
@@ -53,6 +53,11 @@ class SettingsState {
   final String autoBackupFrequency; // 'daily', 'every3days', 'weekly'
   final int autoBackupMaxCount; // Max auto-backup files to keep
   final DateTime? autoBackupLastRun; // Last auto-backup timestamp
+  final int currentTipIndex; // Home tip tile current index
+  final bool tipTileDismissed; // Home tip tile dismissed
+  final int failedPinAttempts; // Persistent failed PIN attempts
+  final DateTime? pinLockoutUntil; // Persistent lockout deadline
+  final int pinLength; // PIN digit count (4-6) for auto-verify
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -76,7 +81,6 @@ class SettingsState {
     this.blockOffensiveWords = false,
     this.isAmoled = false,
     this.appLockEnabled = false,
-    this.appLockPinHash,
     this.biometricEnabled = false,
     this.autoLockTimeoutSeconds = 0,
     this.widgetPrivacyLevel = 'record_only',
@@ -98,6 +102,11 @@ class SettingsState {
     this.autoBackupFrequency = 'weekly',
     this.autoBackupMaxCount = 5,
     this.autoBackupLastRun,
+    this.currentTipIndex = 0,
+    this.tipTileDismissed = false,
+    this.failedPinAttempts = 0,
+    this.pinLockoutUntil,
+    this.pinLength = 4,
   });
 
   SettingsState copyWith({
@@ -122,7 +131,6 @@ class SettingsState {
     bool? blockOffensiveWords,
     bool? isAmoled,
     bool? appLockEnabled,
-    String? Function()? appLockPinHash,
     bool? biometricEnabled,
     int? autoLockTimeoutSeconds,
     String? widgetPrivacyLevel,
@@ -144,6 +152,11 @@ class SettingsState {
     String? autoBackupFrequency,
     int? autoBackupMaxCount,
     DateTime? Function()? autoBackupLastRun,
+    int? currentTipIndex,
+    bool? tipTileDismissed,
+    int? failedPinAttempts,
+    DateTime? Function()? pinLockoutUntil,
+    int? pinLength,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -170,7 +183,6 @@ class SettingsState {
       blockOffensiveWords: blockOffensiveWords ?? this.blockOffensiveWords,
       isAmoled: isAmoled ?? this.isAmoled,
       appLockEnabled: appLockEnabled ?? this.appLockEnabled,
-      appLockPinHash: appLockPinHash != null ? appLockPinHash() : this.appLockPinHash,
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
       autoLockTimeoutSeconds: autoLockTimeoutSeconds ?? this.autoLockTimeoutSeconds,
       widgetPrivacyLevel: widgetPrivacyLevel ?? this.widgetPrivacyLevel,
@@ -192,6 +204,11 @@ class SettingsState {
       autoBackupFrequency: autoBackupFrequency ?? this.autoBackupFrequency,
       autoBackupMaxCount: autoBackupMaxCount ?? this.autoBackupMaxCount,
       autoBackupLastRun: autoBackupLastRun != null ? autoBackupLastRun() : this.autoBackupLastRun,
+      currentTipIndex: currentTipIndex ?? this.currentTipIndex,
+      tipTileDismissed: tipTileDismissed ?? this.tipTileDismissed,
+      failedPinAttempts: failedPinAttempts ?? this.failedPinAttempts,
+      pinLockoutUntil: pinLockoutUntil != null ? pinLockoutUntil() : this.pinLockoutUntil,
+      pinLength: pinLength ?? this.pinLength,
     );
   }
 
@@ -263,7 +280,6 @@ class SettingsNotifier extends Notifier<SettingsState> {
       blockOffensiveWords: settings.blockOffensiveWords,
       isAmoled: settings.themeMode == 'amoled',
       appLockEnabled: settings.appLockEnabled,
-      appLockPinHash: settings.appLockPinHash,
       biometricEnabled: settings.biometricEnabled,
       autoLockTimeoutSeconds: settings.autoLockTimeoutSeconds,
       widgetPrivacyLevel: settings.widgetPrivacyLevel,
@@ -285,6 +301,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
       autoBackupFrequency: settings.autoBackupFrequency,
       autoBackupMaxCount: settings.autoBackupMaxCount,
       autoBackupLastRun: settings.autoBackupLastRun,
+      currentTipIndex: settings.currentTipIndex,
+      tipTileDismissed: settings.tipTileDismissed,
+      failedPinAttempts: settings.failedPinAttempts,
+      pinLockoutUntil: settings.pinLockoutUntil,
+      pinLength: settings.pinLength,
     );
   }
 
@@ -396,11 +417,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setAppLockEnabled(bool enabled) async {
     await ref.read(settingsRepositoryProvider).setAppLockEnabled(enabled);
     state = state.copyWith(appLockEnabled: enabled);
-  }
-
-  Future<void> setAppLockPinHash(String? hash) async {
-    await ref.read(settingsRepositoryProvider).setAppLockPinHash(hash);
-    state = state.copyWith(appLockPinHash: () => hash);
+    // Refresh widget to reflect lock state change
+    HomeWidgetService.updateWidgetData(
+      appLockEnabled: enabled,
+      widgetPrivacyLevel: state.widgetPrivacyLevel,
+    );
   }
 
   Future<void> setBiometricEnabled(bool enabled) async {
@@ -416,6 +437,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setWidgetPrivacyLevel(String level) async {
     await ref.read(settingsRepositoryProvider).setWidgetPrivacyLevel(level);
     state = state.copyWith(widgetPrivacyLevel: level);
+    // Immediately push updated privacy level to home screen widgets
+    HomeWidgetService.updateWidgetData(
+      appLockEnabled: state.appLockEnabled,
+      widgetPrivacyLevel: level,
+    );
   }
 
   Future<void> setLastBackupDate(DateTime? date) async {
@@ -489,6 +515,50 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setAutoBackupLastRun(DateTime? date) async {
     await ref.read(settingsRepositoryProvider).setAutoBackupLastRun(date);
     state = state.copyWith(autoBackupLastRun: () => date);
+  }
+
+  Future<void> setCurrentTipIndex(int index) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.currentTipIndex = index;
+    await repo.saveSettings(settings);
+    state = state.copyWith(currentTipIndex: index);
+  }
+
+  Future<void> setTipTileDismissed(bool dismissed) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.tipTileDismissed = dismissed;
+    if (!dismissed) settings.currentTipIndex = 0;
+    await repo.saveSettings(settings);
+    state = state.copyWith(
+      tipTileDismissed: dismissed,
+      currentTipIndex: dismissed ? state.currentTipIndex : 0,
+    );
+  }
+
+  Future<void> setFailedPinAttempts(int count) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.failedPinAttempts = count;
+    await repo.saveSettings(settings);
+    state = state.copyWith(failedPinAttempts: count);
+  }
+
+  Future<void> setPinLength(int length) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.pinLength = length;
+    await repo.saveSettings(settings);
+    state = state.copyWith(pinLength: length);
+  }
+
+  Future<void> setPinLockoutUntil(DateTime? deadline) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.pinLockoutUntil = deadline;
+    await repo.saveSettings(settings);
+    state = state.copyWith(pinLockoutUntil: () => deadline);
   }
 
   /// Increment voice note counter and return the new value.

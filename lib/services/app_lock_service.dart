@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'settings_repository.dart';
 
 /// Manages app lock state, PIN hashing, and auto-lock timeout tracking.
 class AppLockService {
@@ -14,15 +17,34 @@ class AppLockService {
   DateTime? _lastBackgroundedAt;
   int _failedAttempts = 0;
   DateTime? _lockoutUntil;
+  bool _widgetRecordingSession = false;
 
   bool get isLocked => _isLocked;
   int get failedAttempts => _failedAttempts;
+
+  /// True when the user is recording via widget without authentication.
+  /// The recording page is accessible but no other pages are.
+  bool get isInWidgetRecordingSession => _widgetRecordingSession;
+
+  void startWidgetRecordingSession() => _widgetRecordingSession = true;
+  void endWidgetRecordingSession() => _widgetRecordingSession = false;
 
   /// Check if currently in lockout period.
   Duration? get lockoutRemaining {
     if (_lockoutUntil == null) return null;
     final remaining = _lockoutUntil!.difference(DateTime.now());
     return remaining.isNegative ? null : remaining;
+  }
+
+  /// Restore persisted lockout state on app startup.
+  void initFromSettings(int failedAttempts, DateTime? lockoutUntil) {
+    _failedAttempts = failedAttempts;
+    // Only restore lockout if it's still in the future
+    if (lockoutUntil != null && lockoutUntil.isAfter(DateTime.now())) {
+      _lockoutUntil = lockoutUntil;
+    } else {
+      _lockoutUntil = null;
+    }
   }
 
   void lock() => _isLocked = true;
@@ -75,13 +97,25 @@ class AppLockService {
     return inputHash == storedHash;
   }
 
+  /// Read the stored PIN hash directly from the settings repository.
+  /// This avoids exposing the hash through Riverpod state.
+  static String? getStoredPinHash() {
+    return SettingsRepository().getSettings().appLockPinHash;
+  }
+
+  /// Write the PIN hash directly to the settings repository.
+  static Future<void> setStoredPinHash(String? hash) async {
+    await SettingsRepository().setAppLockPinHash(hash);
+  }
+
   /// Get or create a per-device salt for PIN hashing.
   static Future<String> _getOrCreateSalt() async {
     var salt = await _secureStorage.read(key: _saltKey);
     if (salt == null) {
-      // Generate a random salt from current time + hash
-      final raw = '${DateTime.now().microsecondsSinceEpoch}';
-      salt = sha256.convert(utf8.encode(raw)).toString().substring(0, 32);
+      // Generate cryptographically secure random salt
+      final random = Random.secure();
+      final saltBytes = List<int>.generate(16, (_) => random.nextInt(256));
+      salt = base64Encode(saltBytes);
       await _secureStorage.write(key: _saltKey, value: salt);
     }
     return salt;
