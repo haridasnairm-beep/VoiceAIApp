@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:io' show Platform;
+import 'package:in_app_review/in_app_review.dart';
 import '../main.dart';
 import '../nav.dart';
 import '../theme.dart';
@@ -20,8 +22,11 @@ import '../constants/note_templates.dart';
 import '../widgets/empty_state_illustrated.dart';
 import '../widgets/backup_reminder_banner.dart';
 import '../widgets/home_tip_tile.dart';
+import '../widgets/update_banner.dart';
 import '../providers/settings_provider.dart';
 import '../services/haptic_service.dart';
+import '../services/update_check_service.dart';
+import 'splash_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -34,6 +39,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   int _selectedTab = 0; // 0 = Notes, 1 = Tasks
   bool _selectionMode = false;
 
+  bool _reviewChecked = false;
+
   @override
   void initState() {
     super.initState();
@@ -44,8 +51,152 @@ class _HomePageState extends ConsumerState<HomePage> {
       VaanixApp.pendingHomeTab = null;
     }
   }
+
+  /// Check if conditions are met to show the review prompt.
+  /// Called once per home page build after notes are loaded.
+  void _maybeShowReviewPrompt(int noteCount, SettingsState settings) {
+    if (_reviewChecked) return;
+    _reviewChecked = true;
+
+    // Gate 1: Max 2 custom prompts ever
+    if (settings.reviewPromptCount >= 2) return;
+
+    // Gate 2: At least 10 notes
+    if (noteCount < 10) return;
+
+    // Gate 3: At least 7 days since first launch
+    final firstLaunch = settings.firstLaunchDate;
+    if (firstLaunch == null ||
+        DateTime.now().difference(firstLaunch).inDays < 7) return;
+
+    // Gate 4: If prompted before, need 15 more notes since last prompt
+    if (settings.reviewPromptCount > 0) {
+      final notesSinceLastPrompt =
+          noteCount - settings.noteCountAtLastReviewPrompt;
+      if (notesSinceLastPrompt < 15) return;
+    }
+
+    // Gate 5: At least 14 days since last prompt
+    final lastPrompt = settings.lastReviewPromptDate;
+    if (lastPrompt != null &&
+        DateTime.now().difference(lastPrompt).inDays < 14) return;
+
+    // All gates passed — show after a short delay
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showReviewPrompt(noteCount);
+    });
+  }
+
+  Future<void> _showReviewPrompt(int noteCount) async {
+    // Try native in-app review first
+    final inAppReview = InAppReview.instance;
+    if (await inAppReview.isAvailable()) {
+      await inAppReview.requestReview();
+      // Record that we prompted (even though Google may suppress the dialog)
+      ref.read(settingsProvider.notifier).recordReviewPrompt(noteCount);
+      return;
+    }
+
+    // Fallback: custom bottom sheet
+    if (!mounted) return;
+    _showCustomReviewSheet(noteCount);
+  }
+
+  void _showCustomReviewSheet(int noteCount) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Icon(
+              Icons.rate_review_rounded,
+              size: 48,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Enjoying Vaanix?',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You\'ve captured $noteCount notes! If Vaanix has been helpful, '
+              'a quick review on the ${Platform.isIOS ? 'App Store' : 'Play Store'} would mean a lot to us.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  ref
+                      .read(settingsProvider.notifier)
+                      .recordReviewPrompt(noteCount);
+                  final inAppReview = InAppReview.instance;
+                  await inAppReview.openStoreListing(
+                    appStoreId: 'com.vaanix.app',
+                  );
+                },
+                icon: const Icon(Icons.star_rounded),
+                label: const Text('Rate Vaanix'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                ref
+                    .read(settingsProvider.notifier)
+                    .recordReviewPrompt(noteCount);
+              },
+              child: Text(
+                'Maybe Later',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   final Set<String> _selectedNoteIds = {};
+  final Set<String> _emptyBannerDismissedIds = {};
   bool _backupReminderDismissed = false;
+  UpdateCheckResult? _optionalUpdate = SplashPage.pendingOptionalUpdate;
+  bool _updateBannerDismissed = false;
   bool _isDialOpen = false;
   final GlobalKey<GestureFabState> _gestureFabKey = GlobalKey<GestureFabState>();
 
@@ -103,6 +254,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         ref.read(settingsProvider.notifier).setGuidedRecordingCompleted(true);
       });
     }
+
+    // Check if we should show the review prompt (once per session)
+    _maybeShowReviewPrompt(notes.length, settings);
 
     return PopScope(
       canPop: !_selectionMode && !_isDialOpen && _selectedTab == 0,
@@ -388,6 +542,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                     // Guided first-recording banner
                     if (showGuidedBanner)
                       _buildGuidedBanner(context, ref),
+
+                    // Optional app update banner
+                    if (_optionalUpdate != null && !_updateBannerDismissed)
+                      UpdateBanner(
+                        latestVersion: _optionalUpdate!.latestVersion,
+                        downloadUrl: _optionalUpdate!.downloadUrl,
+                        onDismiss: () {
+                          ref.read(settingsProvider.notifier)
+                              .setDismissedUpdateVersion(
+                                  _optionalUpdate!.latestVersion);
+                          SplashPage.pendingOptionalUpdate = null;
+                          setState(() => _updateBannerDismissed = true);
+                        },
+                      ),
 
                     // Backup reminder banner
                     if (showBackupReminder && !showGuidedBanner)
@@ -1338,6 +1506,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       onTagTap: _selectionMode
           ? null
           : (_) => _showTagManager(context, ref, note),
+      showEmptyBanner: !_emptyBannerDismissedIds.contains(note.id) &&
+          note.isProcessed &&
+          _isEmptyTranscription(note),
+      onDismissEmptyBanner: () => setState(() => _emptyBannerDismissedIds.add(note.id)),
     );
 
     if (_selectionMode) return card;
@@ -1436,6 +1608,13 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
     );
     return result ?? false;
+  }
+
+  bool _isEmptyTranscription(Note note) {
+    final raw = note.rawTranscription.trim();
+    return raw.isEmpty ||
+        raw == 'No speech detected' ||
+        raw == 'Transcription failed';
   }
 
   void _confirmAndDelete(

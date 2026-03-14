@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/user_settings.dart';
 import '../services/home_widget_service.dart';
 import '../services/notification_service.dart';
 import '../services/settings_repository.dart';
@@ -58,6 +59,12 @@ class SettingsState {
   final int failedPinAttempts; // Persistent failed PIN attempts
   final DateTime? pinLockoutUntil; // Persistent lockout deadline
   final int pinLength; // PIN digit count (4-6) for auto-verify
+  final DateTime? firstLaunchDate; // When the app was first launched
+  final int reviewPromptCount; // Times review prompt shown (max 2)
+  final DateTime? lastReviewPromptDate; // When review was last prompted
+  final int noteCountAtLastReviewPrompt; // Note count at last prompt
+  final DateTime? lastUpdateCheckDate; // When update check was last run
+  final String? dismissedUpdateVersion; // Version user dismissed
 
   const SettingsState({
     this.defaultLanguage = 'en',
@@ -107,6 +114,12 @@ class SettingsState {
     this.failedPinAttempts = 0,
     this.pinLockoutUntil,
     this.pinLength = 4,
+    this.firstLaunchDate,
+    this.reviewPromptCount = 0,
+    this.lastReviewPromptDate,
+    this.noteCountAtLastReviewPrompt = 0,
+    this.lastUpdateCheckDate,
+    this.dismissedUpdateVersion,
   });
 
   SettingsState copyWith({
@@ -157,6 +170,12 @@ class SettingsState {
     int? failedPinAttempts,
     DateTime? Function()? pinLockoutUntil,
     int? pinLength,
+    DateTime? Function()? firstLaunchDate,
+    int? reviewPromptCount,
+    DateTime? Function()? lastReviewPromptDate,
+    int? noteCountAtLastReviewPrompt,
+    DateTime? Function()? lastUpdateCheckDate,
+    String? Function()? dismissedUpdateVersion,
   }) {
     return SettingsState(
       defaultLanguage:
@@ -209,6 +228,12 @@ class SettingsState {
       failedPinAttempts: failedPinAttempts ?? this.failedPinAttempts,
       pinLockoutUntil: pinLockoutUntil != null ? pinLockoutUntil() : this.pinLockoutUntil,
       pinLength: pinLength ?? this.pinLength,
+      firstLaunchDate: firstLaunchDate != null ? firstLaunchDate() : this.firstLaunchDate,
+      reviewPromptCount: reviewPromptCount ?? this.reviewPromptCount,
+      lastReviewPromptDate: lastReviewPromptDate != null ? lastReviewPromptDate() : this.lastReviewPromptDate,
+      noteCountAtLastReviewPrompt: noteCountAtLastReviewPrompt ?? this.noteCountAtLastReviewPrompt,
+      lastUpdateCheckDate: lastUpdateCheckDate != null ? lastUpdateCheckDate() : this.lastUpdateCheckDate,
+      dismissedUpdateVersion: dismissedUpdateVersion != null ? dismissedUpdateVersion() : this.dismissedUpdateVersion,
     );
   }
 
@@ -306,7 +331,22 @@ class SettingsNotifier extends Notifier<SettingsState> {
       failedPinAttempts: settings.failedPinAttempts,
       pinLockoutUntil: settings.pinLockoutUntil,
       pinLength: settings.pinLength,
+      firstLaunchDate: _ensureFirstLaunchDate(settings),
+      reviewPromptCount: settings.reviewPromptCount,
+      lastReviewPromptDate: settings.lastReviewPromptDate,
+      noteCountAtLastReviewPrompt: settings.noteCountAtLastReviewPrompt,
+      lastUpdateCheckDate: settings.lastUpdateCheckDate,
+      dismissedUpdateVersion: settings.dismissedUpdateVersion,
     );
+  }
+
+  /// Sets firstLaunchDate on first launch and returns it.
+  DateTime _ensureFirstLaunchDate(UserSettings settings) {
+    if (settings.firstLaunchDate != null) return settings.firstLaunchDate!;
+    final now = DateTime.now();
+    settings.firstLaunchDate = now;
+    settings.save();
+    return now;
   }
 
   Future<void> setDefaultLanguage(String? language) async {
@@ -559,6 +599,37 @@ class SettingsNotifier extends Notifier<SettingsState> {
     settings.pinLockoutUntil = deadline;
     await repo.saveSettings(settings);
     state = state.copyWith(pinLockoutUntil: () => deadline);
+  }
+
+  /// Record that the review prompt was shown. Increments count and stores current note count.
+  Future<void> recordReviewPrompt(int currentNoteCount) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.reviewPromptCount = state.reviewPromptCount + 1;
+    settings.lastReviewPromptDate = DateTime.now();
+    settings.noteCountAtLastReviewPrompt = currentNoteCount;
+    await repo.saveSettings(settings);
+    state = state.copyWith(
+      reviewPromptCount: settings.reviewPromptCount,
+      lastReviewPromptDate: () => settings.lastReviewPromptDate,
+      noteCountAtLastReviewPrompt: currentNoteCount,
+    );
+  }
+
+  Future<void> setLastUpdateCheckDate(DateTime date) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.lastUpdateCheckDate = date;
+    await repo.saveSettings(settings);
+    state = state.copyWith(lastUpdateCheckDate: () => date);
+  }
+
+  Future<void> setDismissedUpdateVersion(String? version) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final settings = repo.getSettings();
+    settings.dismissedUpdateVersion = version;
+    await repo.saveSettings(settings);
+    state = state.copyWith(dismissedUpdateVersion: () => version);
   }
 
   /// Increment voice note counter and return the new value.

@@ -47,3 +47,16 @@
 -dontwarn com.google.android.play.core.splitcompat.**
 -dontwarn com.google.android.play.core.splitinstall.**
 -dontwarn com.google.android.play.core.tasks.**
+
+# Sentry — keep native crash handler classes
+-keep class io.sentry.** { *; }
+-dontwarn io.sentry.**
+
+# flutter_secure_storage
+-keep class com.it_nomads.fluttersecurestorage.** { *; }
+
+# local_auth
+-keep class io.flutter.plugins.localauth.** { *; }
+
+# home_widget
+-keep class es.antonborri.home_widget.** { *; }

@@ -87,6 +87,19 @@ class NotesNotifier extends Notifier<List<Note>> {
     ref.read(foldersProvider.notifier).refresh();
   }
 
+  /// Remove Whisper noise markers: [VIDEO PLAYBACK], (music), [BLANK_AUDIO], etc.
+  /// Strips any text inside square brackets or parentheses that looks like a
+  /// non-speech annotation, then collapses leftover whitespace.
+  String _stripWhisperNoise(String text) {
+    // Remove [...] and (...) blocks (Whisper non-speech annotations)
+    final cleaned = text
+        .replaceAll(RegExp(r'\[.*?\]'), '')
+        .replaceAll(RegExp(r'\(.*?\)'), '')
+        .replaceAll(RegExp(r'\s{2,}'), ' ')
+        .trim();
+    return cleaned;
+  }
+
   /// Apply auto-generated title based on the user's naming style preference.
   void _applyAutoTitle(Note note, String autoTitle) {
     final style = ref.read(settingsProvider).noteNamingStyle;
@@ -244,6 +257,9 @@ class NotesNotifier extends Notifier<List<Note>> {
         isTranslate: isTranslate,
       );
       debugPrint('TranscribeBG: result length=${transcription.length}, isEmpty=${transcription.isEmpty}');
+
+      // Strip Whisper noise markers like [VIDEO PLAYBACK], (music), [BLANK_AUDIO]
+      transcription = _stripWhisperNoise(transcription);
 
       // Apply profanity filter if enabled
       if (settings.blockOffensiveWords) {
@@ -507,11 +523,12 @@ class NotesNotifier extends Notifier<List<Note>> {
       final isTranslate =
           (language != 'en' && settings.noteOutputMode == 'english');
 
-      final transcription = await WhisperService.instance.transcribe(
+      var transcription = await WhisperService.instance.transcribe(
         note.audioFilePath,
         language: language,
         isTranslate: isTranslate,
       );
+      transcription = _stripWhisperNoise(transcription);
 
       note.rawTranscription =
           transcription.isNotEmpty ? transcription : 'No speech detected';

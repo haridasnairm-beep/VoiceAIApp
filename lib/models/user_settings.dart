@@ -145,6 +145,24 @@ class UserSettings extends HiveObject {
   @HiveField(46, defaultValue: 4)
   int pinLength; // Length of the PIN (4-6 digits) — needed for auto-verify
 
+  @HiveField(47)
+  DateTime? firstLaunchDate; // When the app was first launched (for time-limited features like tips)
+
+  @HiveField(48, defaultValue: 0)
+  int reviewPromptCount; // How many times the review prompt has been shown (max 2)
+
+  @HiveField(49)
+  DateTime? lastReviewPromptDate; // When the review prompt was last shown
+
+  @HiveField(50, defaultValue: 0)
+  int noteCountAtLastReviewPrompt; // Note count when review was last shown (for "15 more notes" gate)
+
+  @HiveField(51)
+  DateTime? lastUpdateCheckDate; // When the last update check was performed (throttle to 24h)
+
+  @HiveField(52)
+  String? dismissedUpdateVersion; // Version string the user dismissed (don't re-show)
+
   UserSettings({
     this.defaultLanguage = 'en',
     this.audioQuality = 'standard',
@@ -193,6 +211,12 @@ class UserSettings extends HiveObject {
     this.failedPinAttempts = 0,
     this.pinLockoutUntil,
     this.pinLength = 4,
+    this.firstLaunchDate,
+    this.reviewPromptCount = 0,
+    this.lastReviewPromptDate,
+    this.noteCountAtLastReviewPrompt = 0,
+    this.lastUpdateCheckDate,
+    this.dismissedUpdateVersion,
   })  : dismissedTips = dismissedTips ?? [];
 
   Map<String, dynamic> toMap() => {
@@ -243,6 +267,12 @@ class UserSettings extends HiveObject {
         'failedPinAttempts': failedPinAttempts,
         'pinLockoutUntil': pinLockoutUntil?.toIso8601String(),
         'pinLength': pinLength,
+        'firstLaunchDate': firstLaunchDate?.toIso8601String(),
+        'reviewPromptCount': reviewPromptCount,
+        'lastReviewPromptDate': lastReviewPromptDate?.toIso8601String(),
+        'noteCountAtLastReviewPrompt': noteCountAtLastReviewPrompt,
+        'lastUpdateCheckDate': lastUpdateCheckDate?.toIso8601String(),
+        'dismissedUpdateVersion': dismissedUpdateVersion,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -299,5 +329,17 @@ class UserSettings extends HiveObject {
             ? DateTime.parse(m['pinLockoutUntil'] as String)
             : null,
         pinLength: m['pinLength'] as int? ?? 4,
+        firstLaunchDate: m['firstLaunchDate'] != null
+            ? DateTime.parse(m['firstLaunchDate'] as String)
+            : null,
+        reviewPromptCount: m['reviewPromptCount'] as int? ?? 0,
+        lastReviewPromptDate: m['lastReviewPromptDate'] != null
+            ? DateTime.parse(m['lastReviewPromptDate'] as String)
+            : null,
+        noteCountAtLastReviewPrompt: m['noteCountAtLastReviewPrompt'] as int? ?? 0,
+        lastUpdateCheckDate: m['lastUpdateCheckDate'] != null
+            ? DateTime.parse(m['lastUpdateCheckDate'] as String)
+            : null,
+        dismissedUpdateVersion: m['dismissedUpdateVersion'] as String?,
       );
 }

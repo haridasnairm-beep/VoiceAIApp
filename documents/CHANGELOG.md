@@ -4,7 +4,50 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.0.5] - 2026-03-10 - Widget UX, App Lock Hardening & Tips Polish
+## [1.0.0] - 2026-03-14 - APK Size Optimization, iOS Readiness, Privacy & Platform Fixes
+
+### APK Size Optimization
+- **R8 code shrinking enabled** — `minifyEnabled true` and `shrinkResources true` in `android/app/build.gradle` release buildType
+- **ProGuard keep rules added** — `android/app/proguard-rules.pro` updated with keep rules for Sentry, flutter_secure_storage, local_auth, and home_widget
+- **arm64-only release build** — using `flutter build apk --release --target-platform android-arm64` targets modern phones only (eliminates armv7 + x86_64 ABIs)
+- **APK size reduced 58%** — from 76 MB to 31.5 MB
+- **Play Store note:** use `flutter build appbundle` for automatic per-device ABI splitting
+
+### Changed (APK Optimization)
+- `android/app/build.gradle` — R8 minification + resource shrinking enabled in release buildType
+- `android/app/proguard-rules.pro` — added keep rules for Sentry, flutter_secure_storage, local_auth, home_widget
+
+### iOS Readiness Assessment
+- **iOS readiness documented** — comprehensive assessment added to PROJECT_SPECIFICATION.md (score ~45/100); 5 critical blockers, 3 high priority, 3 medium priority issues identified covering platform channels, WidgetKit, Info.plist, PrivacyInfo.xcprivacy, and audio format conversion
+
+### Privacy & Platform Fixes
+- **Privacy policy updated** — Section 11C added disclosing GitHub API update check (public API, no user data sent, version string only); Section 6 bullet updated to list update check alongside Whisper model download
+- **Platform-aware store URLs** — `update_check_service.dart` now uses `Platform.isIOS` to select App Store vs Play Store URL; App Store URL uses placeholder pending iOS publication
+- **Review prompt platform-aware** — `home_page.dart` review bottom sheet text now says "App Store" on iOS and "Play Store" on Android
+- **Tags page back button** — added back button to tags page AppBar for consistent navigation
+
+### Changed
+- `lib/pages/home_page.dart` — platform-aware review prompt text
+- `lib/services/update_check_service.dart` — platform-aware store URL selection
+- `lib/pages/tags_page.dart` — back button added
+- `documents/PROJECT_SPECIFICATION.md` — Section 13 (iOS Readiness Assessment) added
+- `documents/PROJECT_STATUS.md` — iOS readiness note added
+- `documents/IMPLEMENTATION_PLAN.md` — iOS readiness step added
+- Privacy policy page — Section 11C (GitHub API update check), Section 6 bullet update
+
+---
+
+## [1.0.0] - 2026-03-14 - Widget UX, App Lock Hardening, Tips, Review Prompt, Quick Guide & App Update Check
+
+### App Update Check
+- **GitHub Releases API update check** — checks for new app versions on launch using the public GitHub Releases API (no user data sent); runs during splash animation with zero added latency
+- **Two criticality levels** — Force update (blocks app with full-screen non-dismissible page) and Optional update (dismissible banner on home page above backup reminder)
+- **24-hour throttle** — update checks throttled to once per 24 hours via `lastUpdateCheckDate` (HiveField 51)
+- **Dismissed version tracking** — optional updates can be dismissed per version; tracked via `dismissedUpdateVersion` (HiveField 52); re-prompts only when a newer version is available
+- **New dependencies:** `http: ^1.2.1` (HTTP client for API calls), `package_info_plus: ^8.0.0` (read installed app version), `url_launcher: ^6.2.5` (open Play Store link)
+- **New files:** `lib/services/update_check_service.dart`, `lib/widgets/update_banner.dart`, `lib/pages/force_update_page.dart`
+- **New route:** `/force_update` — full-screen force update page (non-dismissible)
+- **Modified:** `lib/models/user_settings.dart` (HiveFields 51-52), `lib/providers/settings_provider.dart` (lastUpdateCheckDate + dismissedUpdateVersion state/setters), `lib/pages/splash_page.dart` (parallel update check during splash), `lib/pages/home_page.dart` (optional update banner), `lib/nav.dart` (/force_update route + AppRoutes.forceUpdate), `pubspec.yaml` (3 new dependencies)
 
 ### Widget Enhancements
 - **Dashboard widget redesign** — background image with scrim overlay; tappable Notes and Tasks cells with cell-background finish; cells deep-link to Home Notes/Tasks tabs respectively; larger REC button with more tap area; minimal mode layout with centered REC when privacy is set to Minimal
@@ -51,6 +94,18 @@ All notable changes to this project will be documented in this file.
 - `android/app/src/main/res/xml/widget_small_info.xml` — added `previewLayout`
 - `android/app/src/main/res/xml/widget_dashboard_info.xml` — added `previewLayout`
 
+### In-App Review Prompt
+- **Play Store review prompt** — milestone-based, non-intrusive prompt using Google's `in_app_review` API with custom bottom sheet fallback
+- **Gate logic:** 10+ notes AND 7+ days from install AND max 2 prompts AND 15+ new notes since last prompt AND 14+ days between prompts
+- **UI:** Bottom sheet with "Rate Vaanix" (opens Play Store) and "Maybe Later" buttons; personalized note count in message
+- **Tracking:** HiveFields 48-50 (`reviewPromptCount`, `lastReviewPromptDate`, `noteCountAtLastReviewPrompt`)
+- **New dependency:** `in_app_review: ^2.0.10`
+
+### Tips & Onboarding Updates
+- **Tips dismiss silently** — close button hides for session only, no snackbar shown
+- **Tips 30-day expiry** — tips auto-stop after 30 days from first launch (`firstLaunchDate` HiveField 47)
+- **Quick Guide expanded to 7 pages** — added "Tasks & Reminders" (page 4) and "Stay Secure" (page 5) covering app lock, backup, and widgets; updated "Organize Your Way" to mention tags and projects
+
 ### New Android Resources
 - `android/app/src/main/res/drawable/widget_scrim.xml` — semi-transparent black overlay
 - `android/app/src/main/res/drawable/widget_divider.xml` — translucent white divider
@@ -58,7 +113,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.0.4] - 2026-03-09 - Security Hardening & Privacy Policy Updates
+## [1.0.0-dev.4] - 2026-03-09 - Security Hardening & Privacy Policy Updates
 
 ### Security Fixes
 - **PIN salt hardened (A1)** — replaced predictable timestamp-based salt with `Random.secure()` generating 16 cryptographically random bytes (base64-encoded); existing users keep their stored salt, only new PINs use secure salt
@@ -89,7 +144,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.0.3] - 2026-03-09 - GitHub Issues #21–#25, UX Enhancements, Share & Re-transcribe
+## [1.0.0-dev.3] - 2026-03-09 - GitHub Issues #21–#25, UX Enhancements, Share & Re-transcribe
 
 ### Added
 - **User Guide & Home Tip Tile (Step 20P)** — full User Guide page (`/user_guide`) with 14 collapsible sections covering all features (Getting Started, Recording, Notes, Folders, Projects, Tasks, Search, Tags, Calendar, Widgets, App Lock, Backup, Settings, Tips & Privacy); deep-link support via `openSectionIndex` extra; dismissible Home Tip Tile on the home page with 12 rotating tips, left/right navigation, action deep-links, dismiss with undo; "User Guide" tile and "Home Tips" toggle added to Help & Support page; `UserSettings` extended with `currentTipIndex` (HiveField 42) and `tipTileDismissed` (HiveField 43)
@@ -124,7 +179,7 @@ All notable changes to this project will be documented in this file.
 - **Restore kills all app instances (Issue #21)** — replaced `SystemNavigator.pop()` with platform channel `finishAffinity()` + `Process.killProcess()` to close all windows/instances after backup restore
 - **Back button navigates Tasks→Notes before minimize (Issue #22)** — pressing back on Tasks tab now switches to Notes tab first; only on Notes tab does back minimize the app
 - **Reminder toggle corrupts state (Issue #23)** — `toggleReminderCompleted` was mutating HiveObject nested items in-place; fixed to create new `ReminderItem` objects and reassign the entire list (same pattern as reschedule fix)
-- **Backup version compatibility warning (Issue #24)** — manifest card now shows a version mismatch warning when backup was created with a different app version; app version synced to `1.0.3`; warns user that restoring old backups may revert bug fixes
+- **Backup version compatibility warning (Issue #24)** — manifest card now shows a version mismatch warning when backup was created with a different app version; app version synced to `1.0.0`; warns user that restoring old backups may revert bug fixes
 - **Smart filter shows raw Quill JSON (Issue #25)** — `_showFilteredNotes()` in Library page was displaying `rawTranscription` directly; now parses Quill delta format to plain text before showing preview
 - **Note picker voice/text classification** — live STT voice notes (no audio file) were incorrectly shown as text notes in project document pickers; fixed by also checking V-prefix title pattern (`V\d+`) in addition to `audioFilePath`
 - **Media resume during live recording pauses** — music from other apps (Spotify, etc.) briefly resumed during natural speech pauses because `speech_to_text`'s internal SpeechRecognizer released audio focus on silence timeout; fixed by re-requesting native audio focus in `_onStatusChanged` callback
@@ -185,7 +240,7 @@ All notable changes to this project will be documented in this file.
 - `lib/widgets/share_receive_sheet.dart` — pre-selects default folder from settings; 48px buttons; nav bar safe padding
 - `lib/nav.dart` — added `/retranscribe` route (31 routes total)
 - `backup_restore_page.dart` — auto-collapse Create Backup and expand Restore section when opened via file intent; added version mismatch warning in manifest card
-- `backup_service.dart` — `_appVersion` → `currentAppVersion` (public static const) set to `1.0.3`
+- `backup_service.dart` — `_appVersion` → `currentAppVersion` (public static const) set to `1.0.0`
 - `note_card.dart` — added `folderColors` parameter; folder capsules use color-tinted backgrounds with HSL-derived dark text
 - `sharing_service.dart` — removed `{{color:...}}` pseudo-markup and all inline formatting (`***`, `**`, `*`) from `_deltaToMarkdown`; added `_pdfSafe()` static helper applied to all dynamic text in PDF generation; checkbox symbols changed to ASCII `[x]`/`[ ]`
 - `values/styles.xml` — added `UCropTheme` style with opaque black system bars and `fitsSystemWindows: true`

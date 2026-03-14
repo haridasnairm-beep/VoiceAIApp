@@ -1,7 +1,7 @@
 # Vaanix - Project Specification
 
-**Version:** 3.0
-**Last Updated:** 2026-03-03
+**Version:** 3.1
+**Last Updated:** 2026-03-14
 **Platform:** Cross-platform (iOS + Android) via Flutter
 **Dart SDK:** ^3.6.0
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
@@ -56,7 +56,7 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 > **No login required.** App is fully functional without account creation.
 
 ### 4.1 Onboarding Screen (Quick Guide)
-- 5-page swipeable Quick Guide: Welcome, Record & Transcribe, Organize Your Way, Prepare Your App (Whisper setup), Privacy First
+- 7-page swipeable Quick Guide: Welcome, Record & Transcribe, Organize Your Way, Tasks & Reminders, Stay Secure, Prepare Your App (Whisper setup), Privacy First
 - Skip button on first run, dot page indicators
 - Accessible again from Settings
 - "Prepare Your App" page checks Whisper model status and offers a "Let's Set It Up" button that navigates to Settings with auto-scroll + highlight on the download section
@@ -424,17 +424,42 @@ Auto-detection and transcription support for: English, Spanish, French, German, 
 **B. Home Tip Tile** — dismissible card on Home page cycling through helpful tips:
 - **Position:** Above pinned section in Notes tab feed (not in Tasks tab)
 - **Styling:** Same card elevation/radius as note cards; amber/gold accent (`#F59E0B`); lightbulb icon (`tips_and_updates_rounded`); left border accent bar
-- **Content:** 12 tips in fixed rotation order (not random), each with one-sentence insight + action hint that deep-links to relevant screen or User Guide section
+- **Content:** 14 tips in shuffled order per session, each with one-sentence insight + action hint that deep-links to relevant screen; tapping tip body opens User Guide at relevant section
 - **Navigation:** Left/right chevron buttons advance tips; `currentTipIndex` persisted in UserSettings (HiveField 42)
-- **Dismissal:** × button permanently hides tile; confirmation snackbar with "Re-enable in Settings → Help & Support"; `tipTileDismissed` persisted (HiveField 43)
+- **Dismissal:** × button hides tile for current session (no snackbar); `tipTileDismissed` persisted (HiveField 43) for permanent disable via Help & Support toggle
 - **Re-enable:** "Home Tips" switch in Settings → Help & Support; always visible; toggling on resets tip index to 0
-- **Tips do not auto-advance** — user controls pacing
+- **Auto-expiry:** Tips automatically stop showing 30 days after first app launch (`firstLaunchDate` HiveField 47)
+- **Tips shuffle per session** — randomized order on each app launch; auto-hide after 1 minute of inactivity
 
 ### 4.26 Backup & Restore
 - **Auto-backup** — scheduled automatic encrypted backups stored on-device; passphrase in flutter_secure_storage; frequency (daily/every 3 days/weekly); retention (3/5/10 files); runs silently on app launch; auto-rotates old files
 - **Create backup** — AES-256 encrypted with user passphrase; includes all data + optionally audio; shares as .vnbak file
 - **Restore** — select file → enter passphrase → preview manifest → confirm → restore
 - **Smart backup reminder** — prompts after 10 notes if no backup exists; reminds every 30 days; hidden when auto-backup is enabled
+
+### 4.27 In-App Review Prompt
+Non-intrusive Play Store review prompt using a milestone + time gate:
+- **Gate 1:** At least 10 notes created
+- **Gate 2:** At least 7 days since first app launch (`firstLaunchDate` HiveField 47)
+- **Gate 3:** Max 2 prompts ever (`reviewPromptCount` HiveField 48); after 2 prompts, never ask again
+- **Gate 4:** If prompted before, must have created 15+ more notes since last prompt (`noteCountAtLastReviewPrompt` HiveField 50)
+- **Gate 5:** At least 14 days since last prompt (`lastReviewPromptDate` HiveField 49)
+- **Implementation:** First tries Google's native `in_app_review` API (seamless, Google-managed); if unavailable, falls back to a custom bottom sheet with "Rate Vaanix" (opens Play Store) and "Maybe Later" buttons
+- **"Maybe Later"** still counts as a prompt shown (increments count) — ensures re-trigger after 15 more notes, not immediately
+- **Trigger point:** Checked once per session on Home page build
+
+### 4.28 App Update Check
+Checks for new app versions on launch using the public GitHub Releases API. Privacy-safe: no user data is sent; only fetches the latest release tag from the public repository.
+
+- **Check trigger:** Runs during splash animation in parallel (zero added latency)
+- **Throttle:** Once every 24 hours (`lastUpdateCheckDate` HiveField 51); skipped if checked within 24h
+- **Criticality levels:**
+  - **Force:** Critical updates (e.g., security fixes). Redirects to full-screen `ForceUpdatePage` — non-dismissible, user must update via Play Store
+  - **Optional:** Non-critical updates. Shows a dismissible `UpdateBanner` on the home page above the backup reminder
+- **Dismissed version tracking:** When user dismisses an optional update, the version is stored (`dismissedUpdateVersion` HiveField 52). Banner does not reappear for that version; re-prompts only when a newer version becomes available
+- **Play Store link:** "Update Now" opens the Play Store listing via `url_launcher`
+- **Offline behavior:** Silently skipped if no network connectivity (no error shown)
+- **Dependencies:** `http` (API calls), `package_info_plus` (read installed version), `url_launcher` (open Play Store)
 
 ---
 
@@ -629,8 +654,15 @@ UserSettings
 ├── autoBackupFrequency: String (daily / every3days / weekly; default: weekly)
 ├── autoBackupMaxCount: int (3, 5, or 10; default: 5)
 ├── autoBackupLastRun: DateTime? (last auto-backup timestamp)
-├── currentTipIndex: int (0–11, index of displayed home tip; default: 0)
-└── tipTileDismissed: bool (whether home tip tile has been dismissed; default: false)
+├── currentTipIndex: int (0–13, index of displayed home tip; default: 0)
+├── tipTileDismissed: bool (whether home tip tile has been dismissed; default: false)
+├── failedPinAttempts: int (persistent failed PIN counter; default: 0)
+├── pinLockoutUntil: DateTime? (persistent lockout deadline)
+├── pinLength: int (4–6 digit PIN length for auto-verify; default: 4)
+├── firstLaunchDate: DateTime? (first app launch timestamp for time-gated features)
+├── reviewPromptCount: int (times review shown, max 2; default: 0)
+├── lastReviewPromptDate: DateTime? (when review was last prompted)
+└── noteCountAtLastReviewPrompt: int (note count at last review prompt; default: 0)
 
 ProjectDocument
 ├── id: String (UUID)
@@ -853,5 +885,43 @@ Folders organize. Tags cross-reference. Projects compose.
 | permission_handler | Runtime permission management | Active |
 | receive_sharing_intent | Handle OS Share Sheet audio intents | Planned (Share to Vaanix) |
 | ffmpeg_kit_flutter_audio | iOS Opus/OGG transcoding (audio-only variant) | Planned (Share to Vaanix, iOS only) |
+| http | HTTP client for GitHub Releases API update check | Active |
+| package_info_plus | Read installed app version for update comparison | Active |
+| url_launcher | Open Play Store link for app updates | Active |
+| in_app_review | Google Play In-App Review API | Active |
 | sentry_flutter | Opt-in crash reporting | Planned |
+
+---
+
+## 13. iOS Readiness Assessment
+
+**Score:** ~45/100 | **Status:** Not App Store ready | **Date:** 2026-03-14
+
+The app is built with Flutter (cross-platform), but several Android-specific implementations and missing iOS configurations block App Store submission. This section tracks all identified issues.
+
+### Critical (Blocking for App Store Submission)
+
+| # | Issue | Details |
+|---|---|---|
+| iOS-C1 | No iOS platform channel implementations | File intent handling (receiving shared audio), audio focus management, and WAV conversion all use Android-specific MediaCodec/platform channels with no iOS counterpart |
+| iOS-C2 | whisper_flutter_new iOS compatibility uncertain | May not support iOS or may require additional native setup (CocoaPods, xcframeworks); needs investigation and testing |
+| iOS-C3 | Missing Info.plist permission descriptions | `NSPhotoLibraryUsageDescription` and `NSCameraUsageDescription` required for image_picker/image_cropper but not present |
+| iOS-C4 | No PrivacyInfo.xcprivacy manifest | Required by Apple for App Store submissions since Spring 2024; must declare data collection and API usage |
+| iOS-C5 | Audio format conversion unavailable on iOS | MediaCodec is Android-only; iOS needs AVFoundation-based conversion for shared audio files (.opus/.ogg/.mp3/.aac → WAV) |
+
+### High Priority
+
+| # | Issue | Details |
+|---|---|---|
+| iOS-H1 | Home screen widgets need WidgetKit | Current implementation is Android-only (AppWidgetProvider); iOS requires WidgetKit extension with SwiftUI |
+| iOS-H2 | iOS notification permission flow may be incomplete | iOS requires explicit permission request before first notification; flow differs from Android and needs verification |
+| iOS-H3 | Platform-aware store URLs | Play Store URLs were hardcoded; now fixed to be platform-aware with App Store URL placeholder (`_appStoreUrl` in update_check_service.dart) |
+
+### Medium Priority
+
+| # | Issue | Details |
+|---|---|---|
+| iOS-M1 | App Store ID placeholder | `_appStoreUrl` in update_check_service.dart needs real App Store ID when iOS app is published |
+| iOS-M2 | in_app_review appStoreId placeholder | `home_page.dart` uses placeholder 'com.vaanix.app'; needs real App Store ID |
+| iOS-M3 | iOS-specific UI testing needed | Safe areas, notch handling, Dynamic Island compatibility require testing on physical iOS devices |
 | hive_generator + build_runner | Hive model code generation (dev) | Active |

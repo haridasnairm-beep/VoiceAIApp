@@ -66,13 +66,19 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       failedPinAttempts: fields[44] == null ? 0 : fields[44] as int,
       pinLockoutUntil: fields[45] as DateTime?,
       pinLength: fields[46] == null ? 4 : fields[46] as int,
+      firstLaunchDate: fields[47] as DateTime?,
+      reviewPromptCount: fields[48] == null ? 0 : fields[48] as int,
+      lastReviewPromptDate: fields[49] as DateTime?,
+      noteCountAtLastReviewPrompt: fields[50] == null ? 0 : fields[50] as int,
+      lastUpdateCheckDate: fields[51] as DateTime?,
+      dismissedUpdateVersion: fields[52] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(47)
+      ..writeByte(53)
       ..writeByte(0)
       ..write(obj.defaultLanguage)
       ..writeByte(1)
@@ -166,7 +172,19 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(45)
       ..write(obj.pinLockoutUntil)
       ..writeByte(46)
-      ..write(obj.pinLength);
+      ..write(obj.pinLength)
+      ..writeByte(47)
+      ..write(obj.firstLaunchDate)
+      ..writeByte(48)
+      ..write(obj.reviewPromptCount)
+      ..writeByte(49)
+      ..write(obj.lastReviewPromptDate)
+      ..writeByte(50)
+      ..write(obj.noteCountAtLastReviewPrompt)
+      ..writeByte(51)
+      ..write(obj.lastUpdateCheckDate)
+      ..writeByte(52)
+      ..write(obj.dismissedUpdateVersion);
   }
 
   @override

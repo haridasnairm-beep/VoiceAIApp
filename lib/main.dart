@@ -205,10 +205,12 @@ class _VaanixAppState extends ConsumerState<VaanixApp>
     // Store for splash page to consume on cold start
     VaanixApp.pendingDeepLink = route;
 
-    // Widget recording bypass: if app is locked and user tapped record widget,
-    // start a widget recording session so the lock check in
-    // didChangeAppLifecycleState doesn't override navigation to splash.
+    // Widget recording bypass: if app lock is enabled and locked, and user
+    // tapped record widget, start a widget recording session so the lock check
+    // in didChangeAppLifecycleState doesn't override navigation to splash.
+    final settings = ref.read(settingsProvider);
     if (route == AppRoutes.recording &&
+        settings.appLockEnabled &&
         AppLockService.instance.isLocked) {
       AppLockService.instance.startWidgetRecordingSession();
       // Dismiss any active biometric dialog from the lock screen —
@@ -216,9 +218,10 @@ class _VaanixAppState extends ConsumerState<VaanixApp>
       LocalAuthentication().stopAuthentication();
     }
 
-    // If app is locked and this is NOT a recording bypass, route through
-    // splash → lock screen so user must authenticate first.
-    final targetRoute = (AppLockService.instance.isLocked &&
+    // If app lock is enabled and locked, and this is NOT a recording bypass,
+    // route through splash → lock screen so user must authenticate first.
+    final targetRoute = (settings.appLockEnabled &&
+            AppLockService.instance.isLocked &&
             route != AppRoutes.recording)
         ? AppRoutes.splash
         : route;

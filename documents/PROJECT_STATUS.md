@@ -1,8 +1,8 @@
 # Vaanix - Project Status
 
-**Last Updated:** 2026-03-10
-**Current Version:** 1.0.5 (Phase 1 — Release)
-**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). **All 7 Phase 1.5 waves complete** (Steps 11–17). Post-wave: Permission Management (Issue #13) + Gesture FAB (Issue #14) + Auto-Naming Preference + Persistent Counters + UX Fixes + Auto-Backup + Collapsible Backup Sections + Download Pause/Resume + Transcription Mode Redesign + Note Organize Section + GestureFab Library/Folder + Stats Projects Card + Folder Unified Timeline + Splash Timing + Ready Page Go Back + Media Resume After Recording + Note Card Capsules + Project GestureFab + Note Picker Filtering + Live V-Prefix Fix + Transcription Duplication Fix + Version History Fix + Calendar Page Redesign (Issue #15) + Audio Focus Hardening + Version History Deletion + Live Recording Info Banner + Pinned Projects + Project Swipe/Long Press Actions + Smart Filters Functional + Project Search + Voice Commands in Live Mode + Calendar New Project Dialog + Support Page Legal Section + Find & Replace in Project Documents + Task Capsule Layout (Issue #16) + Reminder Delete Fix (Issue #17) + Photo Upload Fix (Issue #18) + Backup Restore UX (Issue #19) + Reminder Reschedule Fix (Issue #20) + Share-to-Vaanix (Step 19P) + User Guide & Home Tip Tile (Step 20P) + Native Audio Conversion + Re-transcribe Page + Tip Tile Session Behavior + Widget UX Redesign + App Lock Widget Bypass Fix + PIN Length Storage + Widget Live Updates + Widget Deep Link Pre-check + Tips User Guide Navigation + Support Page Highlight done. **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
+**Last Updated:** 2026-03-14
+**Current Version:** 1.0.0 (Phase 1 — Release)
+**Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). **All 7 Phase 1.5 waves complete** (Steps 11–17). Post-wave: Permission Management (Issue #13) + Gesture FAB (Issue #14) + Auto-Naming Preference + Persistent Counters + UX Fixes + Auto-Backup + Collapsible Backup Sections + Download Pause/Resume + Transcription Mode Redesign + Note Organize Section + GestureFab Library/Folder + Stats Projects Card + Folder Unified Timeline + Splash Timing + Ready Page Go Back + Media Resume After Recording + Note Card Capsules + Project GestureFab + Note Picker Filtering + Live V-Prefix Fix + Transcription Duplication Fix + Version History Fix + Calendar Page Redesign (Issue #15) + Audio Focus Hardening + Version History Deletion + Live Recording Info Banner + Pinned Projects + Project Swipe/Long Press Actions + Smart Filters Functional + Project Search + Voice Commands in Live Mode + Calendar New Project Dialog + Support Page Legal Section + Find & Replace in Project Documents + Task Capsule Layout (Issue #16) + Reminder Delete Fix (Issue #17) + Photo Upload Fix (Issue #18) + Backup Restore UX (Issue #19) + Reminder Reschedule Fix (Issue #20) + Share-to-Vaanix (Step 19P) + User Guide & Home Tip Tile (Step 20P) + Native Audio Conversion + Re-transcribe Page + Tip Tile Session Behavior + Widget UX Redesign + App Lock Widget Bypass Fix + PIN Length Storage + Widget Live Updates + Widget Deep Link Pre-check + Tips User Guide Navigation + Support Page Highlight + Tips Silent Dismiss + Tips 30-Day Expiry + Quick Guide 7 Pages + In-App Review Prompt + App Update Check (GitHub Releases API) done. **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
 ---
@@ -208,6 +208,15 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 - **Voice command feedback** — `voiceCommandFeedbackProvider` notifies UI of parsed commands
 - **Smart Filters** — "This Week", "Open Tasks", "Unorganized" auto-computed filter chips in Library
 
+### App Update Check (GitHub Releases API) ✅
+- Checks for new app versions on launch using public GitHub Releases API (no user data sent)
+- Two criticality levels: Force (blocks app with full-screen non-dismissible page) and Optional (dismissible banner on home)
+- 24-hour check throttle (`lastUpdateCheckDate` HiveField 51), dismissed version tracking (`dismissedUpdateVersion` HiveField 52)
+- Runs during splash animation (zero added latency)
+- New dependencies: `http`, `package_info_plus`, `url_launcher`
+- New files: `update_check_service.dart`, `update_banner.dart`, `force_update_page.dart`
+- New route: `/force_update`
+
 ### Step 16 (Wave 6): Power User Features ✅
 - **Android app shortcuts** — long-press icon shows Record + Search; deep-links to recording/search screens
 - **Note sorting** — 5 sort options (Newest/Oldest/A-Z/Z-A/Longest) on home feed; `noteSortOrder` (HiveField 30) persisted
@@ -314,7 +323,7 @@ Phase 1 core is fully complete and production-ready. All 7 implementation steps 
 
 ---
 
-## Security Hardening (v1.0.4) ✅ COMPLETED
+## Security Hardening (v1.0.0-dev.4) ✅ COMPLETED
 
 Comprehensive security audit and fix wave addressing 6 security issues, 2 privacy policy gaps, and 3 code quality items:
 
@@ -336,7 +345,7 @@ Comprehensive security audit and fix wave addressing 6 security issues, 2 privac
 |---|---|---|
 | Project Setup | ✅ Done | Flutter project, branding aligned |
 | Theme System | ✅ Done | Light/dark mode, Material 3, Google Fonts |
-| Navigation | ✅ Done | 31 routes via go_router with extras, onboarding redirect |
+| Navigation | ✅ Done | 34 routes via go_router with extras, onboarding redirect |
 | Audio Recording Service | ✅ Done | Record, pause, resume, stop, cancel |
 | Audio Player Service | ✅ Done | Play, pause, seek via just_audio |
 | Transcription Service | ✅ Done | On-device STT via speech_to_text |
@@ -488,6 +497,33 @@ Comprehensive security audit and fix wave addressing 6 security issues, 2 privac
 103. Home tip tile: shuffled tips per session, auto-hide after 1 minute, session-only dismiss, snackbar with permanent disable link
 104. Re-transcribe page: multi-select bulk re-transcription with progress, confirmation dialog, rich text warnings, version history preservation
 105. Share receive sheet: default folder pre-selected from user preferences; nav bar safe button sizing
+106. App update check via GitHub Releases API — runs during splash, zero added latency, 24-hour throttle
+107. Force update page — full-screen non-dismissible blocker when critical update is required
+108. Optional update banner — dismissible banner on home page; dismissed version tracked to avoid repeat prompts
+
+---
+
+## APK Size Optimization (2026-03-14) ✅
+
+- Enabled R8 code shrinking (`minifyEnabled true`) and resource shrinking (`shrinkResources true`) in `android/app/build.gradle` release buildType
+- Added ProGuard keep rules for Sentry, flutter_secure_storage, local_auth, and home_widget in `android/app/proguard-rules.pro`
+- Optimized build command: `flutter build apk --release --target-platform android-arm64` (arm64-only, eliminates armv7 + x86_64)
+- **Result: APK size reduced from 76 MB to 31.5 MB (58% reduction)**
+- For Play Store distribution: use `flutter build appbundle` for automatic per-device ABI splitting
+
+---
+
+## iOS Readiness Assessment (2026-03-14)
+
+**Score:** ~45/100 | **Status:** Not App Store ready | **Critical blockers:** 5
+
+The app targets cross-platform via Flutter but currently has Android-specific platform channel implementations (audio conversion, file intents), missing iOS configurations (Info.plist permissions, PrivacyInfo.xcprivacy), uncertain whisper_flutter_new iOS support, and Android-only home screen widgets (needs WidgetKit). Full assessment documented in [PROJECT_SPECIFICATION.md Section 13](PROJECT_SPECIFICATION.md).
+
+**Fixes applied (2026-03-14):**
+1. Privacy policy updated — Section 11C added for GitHub API update check disclosure; Section 6 bullet updated
+2. Platform-aware store URLs in `update_check_service.dart` (iOS App Store + Android Play Store)
+3. Review prompt text in `home_page.dart` now platform-aware ("App Store" on iOS, "Play Store" on Android)
+4. Tags page back button added for consistent navigation
 
 ---
 

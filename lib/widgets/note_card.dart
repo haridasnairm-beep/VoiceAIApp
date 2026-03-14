@@ -21,6 +21,9 @@ class NoteCard extends StatelessWidget {
   final void Function(String name)? onFolderTap;
   final void Function(String name)? onProjectTap;
   final void Function(String tag)? onTagTap;
+  /// Show empty transcription banner with Delete/Dismiss actions.
+  final bool showEmptyBanner;
+  final VoidCallback? onDismissEmptyBanner;
 
   const NoteCard({
     super.key,
@@ -37,6 +40,8 @@ class NoteCard extends StatelessWidget {
     this.onFolderTap,
     this.onProjectTap,
     this.onTagTap,
+    this.showEmptyBanner = false,
+    this.onDismissEmptyBanner,
   });
 
   int get _overdueCount {
@@ -299,6 +304,60 @@ class NoteCard extends StatelessWidget {
                   ),
               ],
             ),
+
+            // Empty transcription banner
+            if (showEmptyBanner) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.errorContainer.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.mic_off_rounded, size: 18, color: theme.colorScheme.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'No speech detected',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onErrorContainer,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 30,
+                      child: TextButton(
+                        onPressed: onDismissEmptyBanner,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text('Keep', style: TextStyle(fontSize: 12, color: theme.hintColor)),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      height: 30,
+                      child: FilledButton(
+                        onPressed: onDelete,
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          backgroundColor: theme.colorScheme.error,
+                          foregroundColor: theme.colorScheme.onError,
+                        ),
+                        child: const Text('Delete', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

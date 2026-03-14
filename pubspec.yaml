@@ -1,7 +1,7 @@
 name: vaanix
 description: "Transform your spoken ideas into perfectly organized notes and tasks with Vaanix, the smart cross-platform app that listens, transcribes in any language, and intuitively structures your thoughts so you never miss a beat."
 publish_to: "none"
-version: 1.0.3
+version: 1.0.0+1
 
 environment:
   sdk: ^3.6.0
@@ -25,6 +25,7 @@ dependencies:
   whisper_flutter_new: ^1.0.1
   add_2_calendar: ^3.0.1
   share_plus: ^10.1.4
+  in_app_review: ^2.0.10
   pdf: ^3.11.1
   flutter_quill: ^11.5.0
   image_picker: ^1.1.2
@@ -41,6 +42,9 @@ dependencies:
   file_picker: ^8.0.0
   sentry_flutter: ^9.14.0
   permission_handler: ^11.3.1
+  http: ^1.2.1
+  package_info_plus: ^8.0.0
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:

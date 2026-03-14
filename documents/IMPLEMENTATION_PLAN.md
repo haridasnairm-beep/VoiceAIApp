@@ -1,7 +1,7 @@
 # Vaanix - Implementation Plan
 
-**Version:** 4.3
-**Last Updated:** 2026-03-10
+**Version:** 4.4
+**Last Updated:** 2026-03-14
 **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Specification](PROJECT_SPECIFICATION.md) | [UX Audit](UX_PRODUCT_AUDIT.md)
 
@@ -913,6 +913,36 @@ PHASE 1.5 — UX & Launch Readiness
 │       ├── Audio Settings "Re-transcribe Notes" navigates to /retranscribe
 │       └── Removed inline _showBulkRetranscribe dialog from audio_settings_page
 │                                            │
+├── Step 22P: App Update Check ─────────────── [Small]   ✅
+│   ├── 22P.A Update Check Service ✅
+│   │   ├── UpdateCheckService: GitHub Releases API (public, no user data)
+│   │   ├── Version comparison (semver parsing)
+│   │   ├── Force vs Optional criticality detection
+│   │   └── 24-hour check throttle
+│   ├── 22P.B Data Model & Provider ✅
+│   │   ├── UserSettings: lastUpdateCheckDate (HiveField 51), dismissedUpdateVersion (HiveField 52)
+│   │   ├── SettingsNotifier: setLastUpdateCheckDate, setDismissedUpdateVersion
+│   │   └── SettingsState: lastUpdateCheckDate, dismissedUpdateVersion
+│   ├── 22P.C Force Update Page ✅
+│   │   ├── ForceUpdatePage: full-screen non-dismissible blocker
+│   │   ├── "Update Now" button opens Play Store via url_launcher
+│   │   └── Route /force_update in go_router
+│   ├── 22P.D Optional Update Banner ✅
+│   │   ├── UpdateBanner widget: dismissible banner on home page
+│   │   ├── Positioned above backup reminder in home page
+│   │   └── Dismissed version tracked to avoid repeat prompts
+│   └── 22P.E Splash Integration ✅
+│       ├── Update check runs in parallel with splash animation
+│       ├── Zero added latency (non-blocking)
+│       └── Redirects to /force_update if critical update detected
+│                                            │
+│
+├── Step 23P: APK Size Optimization ──────────── [Small]   ✅
+│   ├── R8 code shrinking (minifyEnabled + shrinkResources) in build.gradle
+│   ├── ProGuard keep rules for Sentry, flutter_secure_storage, local_auth, home_widget
+│   ├── arm64-only build: flutter build apk --release --target-platform android-arm64
+│   └── Result: 76 MB → 31.5 MB (58% reduction)
+│
 │                                     PHASE 1.5 COMPLETE
 
 PHASE 2 — AI-Powered
@@ -1129,7 +1159,7 @@ PHASE 2 — AI-Powered
 
 ---
 
-## Security Hardening (v1.0.4) ✅ COMPLETE
+## Security Hardening (v1.0.0-dev.4) ✅ COMPLETE
 
 Comprehensive security audit and remediation. All items completed in a single pass.
 
@@ -1157,7 +1187,7 @@ Comprehensive security audit and remediation. All items completed in a single pa
 
 ---
 
-## Widget UX & App Lock Hardening (v1.0.5) ✅ COMPLETE
+## Widget UX & App Lock Hardening (v1.0.0-dev.5) ✅ COMPLETE
 
 Post-security polish pass addressing widget usability, app lock edge cases, and tips discoverability.
 
@@ -1184,8 +1214,37 @@ Post-security polish pass addressing widget usability, app lock edge cases, and 
 |---|---|---|---|
 | T1 | Tip body tap opens User Guide at relevant section | ✅ Done | `home_tip_tile.dart` |
 | T2 | Widget tip (#14) added | ✅ Done | `home_tip_tile.dart` |
-| T3 | Dismiss snackbar wording + "Help & Support" action with highlight | ✅ Done | `home_tip_tile.dart`, `support_page.dart`, `nav.dart` |
+| T3 | Dismiss snackbar removed (silent session dismiss) | ✅ Done | `home_tip_tile.dart` |
 | T4 | User Guide sections updated (Widgets, App Lock) | ✅ Done | `user_guide_page.dart` |
+| T5 | Tips 30-day auto-expiry (`firstLaunchDate` HiveField 47) | ✅ Done | `home_tip_tile.dart`, `user_settings.dart`, `settings_provider.dart` |
+| T6 | Quick Guide expanded to 7 pages (Tasks & Reminders, Stay Secure) | ✅ Done | `onboarding_page.dart` |
+
+### In-App Review Prompt
+| # | Change | Status | Files |
+|---|---|---|---|
+| R1 | `in_app_review` dependency added | ✅ Done | `pubspec.yaml` |
+| R2 | HiveFields 48-50 (reviewPromptCount, lastReviewPromptDate, noteCountAtLastReviewPrompt) | ✅ Done | `user_settings.dart`, `settings_provider.dart` |
+| R3 | Milestone + time gate logic (10 notes, 7 days, 15-note gap, 14-day gap, max 2) | ✅ Done | `home_page.dart` |
+| R4 | Native in-app review with custom bottom sheet fallback | ✅ Done | `home_page.dart` |
+
+---
+
+## Future: iOS App Store Readiness
+
+**Priority:** High (required before iOS launch) | **Effort:** Large | **Dependencies:** None
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| iOS-1 | Add iOS platform channel implementations (audio conversion via AVFoundation, file intent handling, audio focus) | Critical | Replace Android-only MediaCodec calls |
+| iOS-2 | Verify and configure whisper_flutter_new for iOS (CocoaPods, xcframeworks, on-device model) | Critical | May require alternative package if unsupported |
+| iOS-3 | Add Info.plist permission descriptions (NSPhotoLibraryUsageDescription, NSCameraUsageDescription) | Critical | Required for image_picker / image_cropper |
+| iOS-4 | Create PrivacyInfo.xcprivacy manifest | Critical | Required by Apple since Spring 2024 |
+| iOS-5 | Implement WidgetKit extension for iOS home screen widgets (SwiftUI) | High | Quick Record + Dashboard equivalents |
+| iOS-6 | Verify iOS notification permission flow (explicit request before first notification) | High | May need iOS-specific prompt timing |
+| iOS-7 | Update App Store ID placeholders (update_check_service.dart, home_page.dart) | Medium | After iOS app is published |
+| iOS-8 | iOS-specific UI testing (safe areas, notch, Dynamic Island) | Medium | Physical device testing required |
+
+Full assessment: [PROJECT_SPECIFICATION.md Section 13](PROJECT_SPECIFICATION.md)
 
 ---
 

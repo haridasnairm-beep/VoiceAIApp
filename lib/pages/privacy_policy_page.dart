@@ -155,7 +155,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               _dontItem('We don\'t use cookies, tracking pixels, or device fingerprinting.', bulletStyle),
               _dontItem('We don\'t require an internet connection to function.', bulletStyle),
               _dontItem('We don\'t have ads and never will.', bulletStyle),
-              _dontItem('We don\'t make any network calls except for (a) the one-time Whisper model download over HTTPS, and (b) optional anonymous crash reports if you enable crash reporting in Settings.', bulletStyle),
+              _dontItem('We don\'t make any network calls except for (a) the one-time Whisper model download over HTTPS, (b) optional anonymous crash reports if you enable crash reporting in Settings, and (c) a periodic update check against the public GitHub Releases API (no user data is sent — only a version number is compared).', bulletStyle),
               const SizedBox(height: 20),
 
               // 6A. OPTIONAL CRASH REPORTING
@@ -251,6 +251,19 @@ class PrivacyPolicyPage extends StatelessWidget {
                 'Widget data (note counts, preview text) is sent to the OS widget framework for display. '
                 'This data never leaves your device. You can control what information appears on widgets '
                 'using the Widget Privacy setting in Settings > Security.',
+                style: bodyStyle,
+              ),
+              const SizedBox(height: 20),
+
+              // 11C. APP UPDATE CHECK
+              _sectionHeader('11C. APP UPDATE CHECK', headingStyle),
+              Text(
+                'Vaanix periodically checks for new versions by querying the public GitHub Releases API '
+                '(api.github.com). This request contains no user data — it is a simple GET request to a '
+                'public endpoint. The only information processed is the version number returned by GitHub, '
+                'which is compared against your installed version. No personal information, device '
+                'identifiers, or usage data is sent. This check is throttled to once every 24 hours and '
+                'runs silently during app startup.',
                 style: bodyStyle,
               ),
               const SizedBox(height: 20),

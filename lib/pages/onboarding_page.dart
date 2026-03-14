@@ -189,13 +189,40 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         iconBg: const Color(0xFFF3E5F5),
         iconColor: const Color(0xFF7B1FA2),
         title: 'Organize Your Way',
-        subtitle: 'Folders that work for you.',
+        subtitle: 'Folders, tags, and projects.',
         description:
-            'Create custom folders to organize your notes by project, topic, or '
-            'however you like. Search across all your notes instantly.',
+            'Create folders and add tags to organize notes by topic. '
+            'Build Project Documents that combine notes, text, images, and tasks '
+            'into one canvas. Search across everything instantly.',
       ),
 
-      // Page 4: Prepare Your App
+      // Page 4: Tasks & Reminders
+      _GuidePage(
+        icon: Icons.task_alt_rounded,
+        iconBg: const Color(0xFFFFF3E0),
+        iconColor: const Color(0xFFE65100),
+        title: 'Tasks & Reminders',
+        subtitle: 'Turn voice into action.',
+        description:
+            'Add action items and to-dos directly inside your notes. '
+            'Set reminders with date and time — see all tasks across notes '
+            'in one place from the Tasks tab on your home screen.',
+      ),
+
+      // Page 5: Stay Secure
+      _GuidePage(
+        icon: Icons.lock_rounded,
+        iconBg: const Color(0xFFE8EAF6),
+        iconColor: const Color(0xFF283593),
+        title: 'Stay Secure',
+        subtitle: 'Lock, backup, and quick access.',
+        description:
+            'Protect notes with PIN or fingerprint lock. '
+            'Create encrypted backups to keep your data safe. '
+            'Add home screen widgets for quick recording and stats at a glance.',
+      ),
+
+      // Page 6: Prepare Your App
       _WhisperSetupPage(
         onSetupTap: () {
           // Navigate to settings with highlight

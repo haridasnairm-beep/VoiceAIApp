@@ -153,6 +153,13 @@ class _HomeTipTileState extends ConsumerState<HomeTipTile> {
     // Permanently disabled via settings
     if (settings.tipTileDismissed) return const SizedBox.shrink();
 
+    // Hide tips after 1 month from first launch
+    final firstLaunch = settings.firstLaunchDate;
+    if (firstLaunch != null &&
+        DateTime.now().difference(firstLaunch).inDays >= 30) {
+      return const SizedBox.shrink();
+    }
+
     // Session-only dismiss or auto-hidden after 1 min
     if (_sessionDismissed || _autoHidden) return const SizedBox.shrink();
 
@@ -264,21 +271,6 @@ class _HomeTipTileState extends ConsumerState<HomeTipTile> {
                     icon: Icon(Icons.close_rounded, color: theme.hintColor),
                     onPressed: () {
                       setState(() => _sessionDismissed = true);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text(
-                            'Tips appear briefly at launch to help you discover features. To turn them off, use the toggle in Help & Support.',
-                          ),
-                          duration: const Duration(seconds: 5),
-                          action: SnackBarAction(
-                            label: 'Help & Support',
-                            onPressed: () {
-                              context.push(AppRoutes.support,
-                                  extra: {'highlightHomeTips': true});
-                            },
-                          ),
-                        ),
-                      );
                     },
                   ),
                 ),

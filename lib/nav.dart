@@ -30,6 +30,7 @@ import 'pages/calendar_page.dart';
 import 'pages/permission_page.dart';
 import 'pages/user_guide_page.dart';
 import 'pages/retranscribe_page.dart';
+import 'pages/force_update_page.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -382,6 +383,28 @@ class AppRouter {
           child: RetranscribePage(),
         ),
       ),
+      GoRoute(
+        path: AppRoutes.forceUpdate,
+        name: 'force_update',
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          String version = '';
+          String? releaseNotes;
+          String downloadUrl = '';
+          if (extra is Map) {
+            version = extra['version'] as String? ?? '';
+            releaseNotes = extra['releaseNotes'] as String?;
+            downloadUrl = extra['downloadUrl'] as String? ?? '';
+          }
+          return NoTransitionPage(
+            child: ForceUpdatePage(
+              version: version,
+              releaseNotes: releaseNotes,
+              downloadUrl: downloadUrl,
+            ),
+          );
+        },
+      ),
     ],
   );
 }
@@ -418,4 +441,5 @@ class AppRoutes {
   static const String permissions = '/permissions';
   static const String userGuide = '/user_guide';
   static const String retranscribe = '/retranscribe';
+  static const String forceUpdate = '/force_update';
 }

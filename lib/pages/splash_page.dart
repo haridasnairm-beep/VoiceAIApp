@@ -4,14 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../main.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../providers/settings_provider.dart';
 import '../services/app_lock_service.dart';
+import '../services/update_check_service.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
+
+  /// Cached optional update result for home page to display.
+  static UpdateCheckResult? pendingOptionalUpdate;
 
   @override
   ConsumerState<SplashPage> createState() => _SplashPageState();
@@ -34,6 +39,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
   Timer? _lockoutTimer;
   Duration? _lockoutRemaining;
   bool _unlockSuccess = false;
+  Future<UpdateCheckResult?>? _updateCheckFuture;
 
   String? _pinHash;
   bool _biometricEnabled = false;
@@ -56,6 +62,9 @@ class _SplashPageState extends ConsumerState<SplashPage>
     _pinHash = AppLockService.getStoredPinHash();
     _biometricEnabled = settings.biometricEnabled;
     _pinLength = settings.pinLength;
+
+    // Start update check in parallel with splash animation
+    _updateCheckFuture = _runUpdateCheck(settings);
 
     if (settings.appLockEnabled &&
         _pinHash != null &&
@@ -108,7 +117,26 @@ class _SplashPageState extends ConsumerState<SplashPage>
     super.dispose();
   }
 
-  void _navigateForward() {
+  Future<UpdateCheckResult?> _runUpdateCheck(SettingsState settings) async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final result = await UpdateCheckService.checkForUpdate(
+        currentVersion: packageInfo.version,
+        lastCheckDate: settings.lastUpdateCheckDate,
+        dismissedVersion: settings.dismissedUpdateVersion,
+      );
+      // Persist check timestamp
+      if (result != null || settings.lastUpdateCheckDate == null ||
+          DateTime.now().difference(settings.lastUpdateCheckDate!).inHours >= 24) {
+        ref.read(settingsProvider.notifier).setLastUpdateCheckDate(DateTime.now());
+      }
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _navigateForward() async {
     // Check for pending widget deep-link (cold start from widget tap)
     final deepLink = VaanixApp.pendingDeepLink;
     if (deepLink != null) {
@@ -117,6 +145,23 @@ class _SplashPageState extends ConsumerState<SplashPage>
       return;
     }
 
+    // Check for force update
+    final updateResult = await _updateCheckFuture;
+    if (updateResult != null && updateResult.isForceUpdate && mounted) {
+      context.go(AppRoutes.forceUpdate, extra: {
+        'version': updateResult.latestVersion,
+        'releaseNotes': updateResult.releaseNotes,
+        'downloadUrl': updateResult.downloadUrl,
+      });
+      return;
+    }
+
+    // Cache optional update for home page
+    if (updateResult != null && !updateResult.isForceUpdate) {
+      SplashPage.pendingOptionalUpdate = updateResult;
+    }
+
+    if (!mounted) return;
     final settings = ref.read(settingsProvider);
     if (!settings.onboardingCompleted) {
       context.go(AppRoutes.onboarding);

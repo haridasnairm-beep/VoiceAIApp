@@ -86,7 +86,7 @@ class BackupManifest {
 class BackupService {
   static const List<int> _magic = [0x56, 0x4E, 0x42, 0x4B]; // VNBK
   static const int _schemaVersion = 2;
-  static const String currentAppVersion = '1.0.3';
+  static const String currentAppVersion = '1.0.0';
   static const int _kdfIterationsNew = 100000;
   static const int _kdfIterationsLegacy = 10000;
 

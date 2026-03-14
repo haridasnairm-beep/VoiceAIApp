@@ -17,6 +17,7 @@ class TagsPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Tags'),
         centerTitle: false,
+        leading: const BackButton(),
       ),
       body: tags.isEmpty
           ? const EmptyStateIllustrated(

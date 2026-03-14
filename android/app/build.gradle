@@ -51,6 +51,11 @@ android {
         release {
             // Use release signing if key.properties exists, otherwise fall back to debug
             signingConfig = keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+
+            // R8 code shrinking & resource shrinking
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }

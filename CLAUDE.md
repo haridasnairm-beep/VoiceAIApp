@@ -11,7 +11,7 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 
 **Vaanix** is a privacy-first, voice-driven note-taking and task management mobile app built with Flutter. Users record voice notes, the app transcribes audio on-device, and organizes content into folders with manual categorization.
 
-**Current Phase:** Phase 1 (Release) — 100% complete. All 7 core steps + Steps 4.5/4.6/4.7 + post-release enhancements (Issues #7–#12) + all 8 value proposition gap features (Steps 8–10.7) + Steps 19P–21P. Version 1.0.5. **Next:** Phase 2 (AI-powered features).
+**Current Phase:** Phase 1 (Release) — 100% complete. All 7 core steps + Steps 4.5/4.6/4.7 + post-release enhancements (Issues #7–#12) + all 8 value proposition gap features (Steps 8–10.7) + Steps 19P–21P. Version 1.0.0. **Next:** Phase 2 (AI-powered features).
 
 ---
 
@@ -105,6 +105,10 @@ These fields in `lib/models/note.dart` should **remain in the model** (for Phase
 | Backup encryption | encrypt (Step 10.7 — AES-256-CBC) |
 | Backup file picker | file_picker (Step 10.7 — restore file selection) |
 | Permission management | permission_handler (runtime permission checks + app settings) |
+| In-app review | in_app_review (Google Play In-App Review API) |
+| HTTP client | http (GitHub Releases API update check) |
+| App version info | package_info_plus (read installed version for update comparison) |
+| URL launcher | url_launcher (open Play Store for app updates) |
 | Typography | Google Fonts (Plus Jakarta Sans, Inter) |
 | App icon | `assets/icons/logo.png` (used for launcher icon + in-app branding) |
 
@@ -115,7 +119,7 @@ These fields in `lib/models/note.dart` should **remain in the model** (for Phase
 ```
 lib/
 ├── main.dart                         # App entry point (Hive init + ProviderScope + widget/lock init)
-├── nav.dart                          # GoRouter routes (31 routes) and AppRoutes constants
+├── nav.dart                          # GoRouter routes (34 routes) and AppRoutes constants
 ├── theme.dart                        # Material 3 theme (light + dark + AMOLED)
 ├── models/
 │   ├── note.dart                     # Hive model (typeId: 0) — includes isPinned, isDeleted, toMap/fromMap
@@ -123,7 +127,7 @@ lib/
 │   ├── todo_item.dart                # Hive model (typeId: 2) — toMap/fromMap
 │   ├── reminder_item.dart            # Hive model (typeId: 3) — toMap/fromMap
 │   ├── folder.dart                   # Hive model (typeId: 4) — includes isDeleted, toMap/fromMap
-│   ├── user_settings.dart            # Hive model (typeId: 5) — HiveFields 0–46, toMap/fromMap
+│   ├── user_settings.dart            # Hive model (typeId: 5) — HiveFields 0–52, toMap/fromMap
 │   ├── project_document.dart         # Hive model (typeId: 6) — toMap/fromMap
 │   ├── project_block.dart            # Hive model (typeId: 7) + BlockType enum (typeId: 9) — toMap/fromMap
 │   ├── transcript_version.dart       # Hive model (typeId: 8) — toMap/fromMap
@@ -148,7 +152,8 @@ lib/
 │   ├── app_lock_service.dart         # PIN hash verify + biometric auth (Step 10.5)
 │   ├── home_widget_service.dart      # Home screen widget data push + privacy (Step 10.6)
 │   ├── backup_service.dart           # AES-256 encrypted ZIP backup/restore (Step 10.7)
-│   └── title_generator_service.dart  # Auto-title generation from transcription (Step 8)
+│   ├── title_generator_service.dart  # Auto-title generation from transcription (Step 8)
+│   └── update_check_service.dart     # GitHub Releases API update check + version comparison
 ├── providers/
 │   ├── notes_provider.dart           # NotesNotifier + notesProvider
 │   ├── folders_provider.dart         # FoldersNotifier + foldersProvider
@@ -157,7 +162,7 @@ lib/
 │   └── tasks_provider.dart           # Derived provider: aggregated tasks view
 ├── pages/
 │   ├── splash_page.dart              # Animated splash → lock screen / onboarding / home
-│   ├── onboarding_page.dart          # 5-page Quick Guide (swipeable)
+│   ├── onboarding_page.dart          # 7-page Quick Guide (swipeable)
 │   ├── login_page.dart               # NOT IN USE (Phase 2)
 │   ├── home_page.dart                # Dashboard: Notes/Tasks tabs, stats, SpeedDialFab
 │   ├── recording_page.dart           # Voice recording UI + live STT / Whisper
@@ -182,6 +187,7 @@ lib/
 │   ├── permission_page.dart         # Post-onboarding permission request (mic + notifications)
 │   ├── user_guide_page.dart          # Full User Guide with 14 collapsible sections (Step 20P)
 │   ├── retranscribe_page.dart        # Bulk re-transcription: multi-select, progress, confirm (Step 21P)
+│   ├── force_update_page.dart        # Full-screen non-dismissible force update page
 │   ├── about_page.dart               # App info, credits, legal
 │   ├── feedback_page.dart            # User feedback form
 │   ├── support_us_page.dart          # Buy Me a Coffee
@@ -204,7 +210,8 @@ lib/
 │   ├── reminder_destination_sheet.dart  # "Keep in-app / Also add to OS" choice
 │   ├── template_picker_sheet.dart    # Note template selection bottom sheet (Step 9)
 │   ├── share_receive_sheet.dart      # Share-to-Vaanix bottom sheet (Step 19P)
-│   └── home_tip_tile.dart            # Dismissible tip card for home page (14 tips, Step 20P)
+│   ├── home_tip_tile.dart            # Dismissible tip card for home page (14 tips, Step 20P)
+│   └── update_banner.dart            # Dismissible optional update banner for home page
 └── utils/
     ├── voice_command_parser.dart      # Voice command keyword parsing
     └── profanity_filter.dart          # Offline profanity filter (whole-word regex)
@@ -243,6 +250,7 @@ lib/
 - **Permission Management (Issue #13)** ✅ Done (post-onboarding permission page, permissions section in audio settings, permission_handler)
 - **Gesture FAB (Issue #14)** ✅ Done (swipe-up to record, icon crossfade, pulse animation, haptic feedback, subtitle hint label, session count tracking)
 - **Auto-Backup** ✅ Done (scheduled encrypted backups, frequency/retention settings, passphrase in flutter_secure_storage, silent on-launch execution, auto-rotation)
+- **App Update Check** ✅ Done (GitHub Releases API, force/optional criticality, 24h throttle, dismissed version tracking, zero-latency splash integration)
 
 **Phase 2 Steps (future, not in scope):**
 - Whisper API Transcription (cloud-based, higher accuracy)
@@ -251,7 +259,7 @@ lib/
 
 ---
 
-## Routes (go_router) — 33 routes
+## Routes (go_router) — 34 routes
 
 | Path | Screen | Status |
 |---|---|---|
@@ -286,6 +294,7 @@ lib/
 | `/retranscribe` | Re-transcribe | Active (bulk re-transcription with multi-select) |
 | `/calendar` | Calendar | Active (calendar view of notes by date) |
 | `/tags` | Tags | Active (tags management) |
+| `/force_update` | Force Update | Active (full-screen non-dismissible force update page) |
 
 ---
 
@@ -308,8 +317,11 @@ lib/
 # Run the app
 flutter run
 
-# Build for Android
-flutter build apk
+# Build for Android (optimized arm64-only, ~31.5 MB)
+flutter build apk --release --target-platform android-arm64
+
+# Build for Play Store (auto-splits per device ABI)
+flutter build appbundle
 
 # Run tests
 flutter test
@@ -336,7 +348,8 @@ flutter analyze
 9. **Privacy is non-negotiable** — local-first, no telemetry, no tracking.
 10. **Use speech_to_text** (live mode) or **whisper_flutter_new** (record & transcribe mode) for transcription — both on-device, no cloud API.
 11. **Read the feature specs** in `documents/` before modifying related features.
-12. **Always update documentation** after every change:
+12. **R8 is enabled** for release builds — `minifyEnabled true` and `shrinkResources true` in `build.gradle`. ProGuard keep rules are in `android/app/proguard-rules.pro`. When adding new dependencies that use reflection, add corresponding keep rules.
+13. **Always update documentation** after every change:
     - `documents/CHANGELOG.md` — log all changes
     - `documents/PROJECT_STATUS.md` — update after major updates
     - `documents/IMPLEMENTATION_PLAN.md` — update when major changes are implemented
