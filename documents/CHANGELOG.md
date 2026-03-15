@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.0.0] - 2026-03-15 - Tablet & Landscape Responsive Layout
+
+### Responsive Layout Support
+- **Responsive utility created** — `lib/utils/responsive.dart` with breakpoints (mobile < 600dp, tablet < 1200dp), adaptive grid columns, horizontal padding scaling, and `ResponsiveCenter` widget
+- **Max content width** — pages constrain content to 720dp on tablets, 840dp on large screens; phones unchanged (full width)
+- **Adaptive grid columns** — image attachments: 2/3/4 columns, calendar month picker: 3/4 columns based on screen width
+- **Responsive padding** — horizontal padding scales from 20dp (phone) to 32dp (tablet) to 48dp (large)
+- **Zero impact on mobile portrait** — all responsive logic is a no-op below 600dp width
+
+### Pages Updated
+- `home_page.dart` — ResponsiveCenter wrapper + responsive padding
+- `folders_page.dart` — ResponsiveCenter wrapper + responsive padding
+- `folder_detail_page.dart` — ResponsiveCenter wrapper
+- `search_page.dart` — responsive padding on result lists
+- `note_detail_page.dart` — adaptive image grid columns (2→3→4)
+- `calendar_page.dart` — adaptive month picker columns (3→4)
+
+### New Files
+- `lib/utils/responsive.dart` — `Responsive` utility class + `ResponsiveCenter` widget
+
+---
+
 ## [1.0.0] - 2026-03-14 - APK Size Optimization, iOS Readiness, Privacy & Platform Fixes
 
 ### APK Size Optimization

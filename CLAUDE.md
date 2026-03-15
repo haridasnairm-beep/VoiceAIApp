@@ -213,6 +213,7 @@ lib/
 │   ├── home_tip_tile.dart            # Dismissible tip card for home page (14 tips, Step 20P)
 │   └── update_banner.dart            # Dismissible optional update banner for home page
 └── utils/
+    ├── responsive.dart               # Responsive layout: breakpoints, adaptive grids, ResponsiveCenter
     ├── voice_command_parser.dart      # Voice command keyword parsing
     └── profanity_filter.dart          # Offline profanity filter (whole-word regex)
 ```

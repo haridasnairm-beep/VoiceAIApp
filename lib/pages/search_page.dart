@@ -13,6 +13,7 @@ import '../models/note.dart';
 import '../models/project_document.dart';
 import '../models/project_block.dart';
 import '../widgets/settings_widgets.dart' show friendlyLanguageName;
+import '../utils/responsive.dart';
 import '../widgets/empty_state_illustrated.dart';
 
 class SearchPage extends ConsumerStatefulWidget {
@@ -371,7 +372,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     // When no query, show flat note + project list (no sectioning needed)
     if (_query.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.symmetric(
+          horizontal: Responsive.horizontalPadding(context),
+          vertical: 20,
+        ),
         children: [
           Text(
             "${results.length} notes · ${projects.length} projects",
@@ -479,7 +483,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         reminderMatches.length;
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.symmetric(
+        horizontal: Responsive.horizontalPadding(context),
+        vertical: 20,
+      ),
       children: [
         Text(
           "$totalCount results for '$_query'",

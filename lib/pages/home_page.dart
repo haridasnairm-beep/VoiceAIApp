@@ -26,6 +26,7 @@ import '../widgets/update_banner.dart';
 import '../providers/settings_provider.dart';
 import '../services/haptic_service.dart';
 import '../services/update_check_service.dart';
+import '../utils/responsive.dart';
 import 'splash_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -440,7 +441,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         child: Stack(
           children: [
             SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+              padding: EdgeInsets.fromLTRB(
+                Responsive.horizontalPadding(context), 8,
+                Responsive.horizontalPadding(context), 120),
+              child: ResponsiveCenter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -586,6 +590,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
                   const SizedBox(height: 40),
                 ],
+              ),
               ),
             ),
 

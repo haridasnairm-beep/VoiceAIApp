@@ -16,6 +16,7 @@ import '../widgets/speed_dial_fab.dart';
 import '../widgets/note_card.dart';
 import '../widgets/template_picker_sheet.dart';
 import '../constants/note_templates.dart';
+import '../utils/responsive.dart';
 
 enum _SortOption { newest, oldest, titleAZ, titleZA }
 enum _FilterOption { all, notes, projects }
@@ -221,6 +222,7 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
       body: Stack(
         children: [
           SingleChildScrollView(
+        child: ResponsiveCenter(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -556,6 +558,7 @@ class _FolderDetailPageState extends ConsumerState<FolderDetailPage> {
               const SizedBox(height: 100),
             ],
           ),
+        ),
         ),
           // Gesture FAB
           Align(

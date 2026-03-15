@@ -12,6 +12,7 @@ import '../models/note.dart';
 import '../widgets/speed_dial_fab.dart';
 import '../widgets/gesture_fab.dart';
 import '../providers/settings_provider.dart';
+import '../utils/responsive.dart';
 import '../widgets/empty_state_illustrated.dart';
 import '../widgets/folder_color_picker.dart';
 
@@ -101,7 +102,9 @@ class FoldersPage extends ConsumerWidget {
                     onCreateFolder: () => _showNewFolderDialog(context, ref),
                   )
                 : SingleChildScrollView(
-                    padding: const EdgeInsets.all(20.0),
+                    padding: EdgeInsets.all(
+                        Responsive.horizontalPadding(context)),
+                    child: ResponsiveCenter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -285,6 +288,7 @@ class FoldersPage extends ConsumerWidget {
 
                         const SizedBox(height: 80),
                       ],
+                    ),
                     ),
                   ),
 

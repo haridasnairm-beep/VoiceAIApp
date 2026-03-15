@@ -13,6 +13,7 @@ import '../constants/note_templates.dart';
 import '../widgets/note_card.dart';
 import '../widgets/gesture_fab.dart';
 import '../widgets/speed_dial_fab.dart';
+import '../utils/responsive.dart';
 import '../widgets/template_picker_sheet.dart';
 
 enum _CalendarFilter { all, tasks, projects }
@@ -161,7 +162,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage>
                 const SizedBox(height: 12),
                 // Month grid
                 GridView.count(
-                  crossAxisCount: 3,
+                  crossAxisCount: Responsive.monthPickerColumns(context),
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   childAspectRatio: 2.2,

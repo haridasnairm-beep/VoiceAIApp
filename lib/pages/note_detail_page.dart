@@ -31,6 +31,7 @@ import '../widgets/share_preview_sheet.dart';
 import '../widgets/folder_picker_sheet.dart';
 import '../widgets/folder_color_picker.dart';
 import '../services/haptic_service.dart';
+import '../utils/responsive.dart';
 import '../widgets/tag_pills.dart';
 
 class NoteDetailPage extends ConsumerStatefulWidget {
@@ -890,8 +891,8 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: Responsive.imageGridColumns(context),
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
                 childAspectRatio: 1.0,
