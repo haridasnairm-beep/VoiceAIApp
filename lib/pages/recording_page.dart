@@ -19,6 +19,7 @@ import 'package:vaanix/utils/profanity_filter.dart';
 import '../services/app_lock_service.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
+import '../utils/responsive.dart';
 
 const _audioFocusChannel = MethodChannel('com.vaanix.app/audio_focus');
 
@@ -616,6 +617,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                      child: ResponsiveCenter(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -811,11 +813,13 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
                           const SizedBox(height: 16),
                         ],
                       ),
+                      ),
                     ),
                   ),
 
                   // Fixed bottom controls
-                  Padding(
+                  ResponsiveCenter(
+                  child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -931,6 +935,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage>
                         ),
                       ],
                     ),
+                  ),
                   ),
                 ],
               ),

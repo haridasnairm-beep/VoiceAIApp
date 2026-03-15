@@ -811,7 +811,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage>
             crossAxisCount: 7,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: Responsive.isWide(context) ? 1.1 : 0.75,
+            childAspectRatio: Responsive.isWide(context) ? 1.8 : 0.75,
             children: [
               // Empty cells before first day
               for (var i = 0; i < startOffset; i++) const SizedBox(),

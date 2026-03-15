@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.0.1] - 2026-03-15 - Play Store Closed Testing, Responsive Polish
+
+### Play Store Fixes
+- **Removed `USE_EXACT_ALARM` permission** — Google Play flagged it; app is not alarm/calendar. `SCHEDULE_EXACT_ALARM` retained for reminder notifications.
+- **Version bumped to 1.0.1+2** for Play Store closed testing release
+
+### Additional Responsive Fixes
+- **Recording page** — ResponsiveCenter applied to content area and bottom controls (Pause/Save/Discard)
+- **Calendar page** — adaptive day cell aspect ratio increased to 1.8 on tablet (reduces grid height, shows notes below)
+- **Note detail page** — ResponsiveCenter wrapper for centered content
+- **Onboarding page** — constrained Next/Get Started button width
+- **Permission page** — ResponsiveCenter for centered layout
+- **Force update page** — ResponsiveCenter for centered layout
+- **Lock screen page** — ResponsiveCenter for centered layout
+
+---
+
 ## [1.0.0] - 2026-03-15 - Tablet & Landscape Responsive Layout
 
 ### Responsive Layout Support

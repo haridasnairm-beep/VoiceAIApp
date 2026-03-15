@@ -1,7 +1,7 @@
 name: vaanix
 description: "Transform your spoken ideas into perfectly organized notes and tasks with Vaanix, the smart cross-platform app that listens, transcribes in any language, and intuitively structures your thoughts so you never miss a beat."
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.6.0
