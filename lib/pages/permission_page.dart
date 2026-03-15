@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../providers/settings_provider.dart';
+import '../utils/responsive.dart';
 
 /// One-time permission request screen shown after onboarding completes.
 class PermissionPage extends ConsumerStatefulWidget {
@@ -104,6 +105,7 @@ class _PermissionPageState extends ConsumerState<PermissionPage> {
       canPop: false,
       child: Scaffold(
         body: SafeArea(
+          child: ResponsiveCenter(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
@@ -212,6 +214,7 @@ class _PermissionPageState extends ConsumerState<PermissionPage> {
                 const SizedBox(height: 32),
               ],
             ),
+          ),
           ),
         ),
       ),

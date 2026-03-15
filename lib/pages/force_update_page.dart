@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme.dart';
+import '../utils/responsive.dart';
 
 /// Full-screen blocking page shown when a force/critical update is required.
 /// The user cannot dismiss or navigate away — they must update.
@@ -46,6 +47,7 @@ class ForceUpdatePage extends StatelessWidget {
             ),
           ),
           child: SafeArea(
+            child: ResponsiveCenter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
@@ -137,6 +139,7 @@ class ForceUpdatePage extends StatelessWidget {
                   const SizedBox(height: 48),
                 ],
               ),
+            ),
             ),
           ),
         ),

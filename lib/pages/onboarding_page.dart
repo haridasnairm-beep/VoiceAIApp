@@ -5,6 +5,7 @@ import '../nav.dart';
 import '../theme.dart';
 import '../providers/settings_provider.dart';
 import '../services/whisper_service.dart';
+import '../utils/responsive.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -119,6 +120,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             // Bottom button
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: ResponsiveCenter(
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -149,6 +151,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                       ? (_isFromSettings ? 'Got It' : 'Get Started')
                       : 'Next'),
                 ),
+              ),
               ),
             ),
           ],

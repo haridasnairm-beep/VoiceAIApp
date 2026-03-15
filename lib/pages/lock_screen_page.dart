@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import '../services/app_lock_service.dart';
+import '../utils/responsive.dart';
 
 /// Full-screen lock overlay. Must authenticate to dismiss.
 class LockScreenPage extends StatefulWidget {
@@ -182,6 +183,7 @@ class _LockScreenPageState extends State<LockScreenPage>
       canPop: false,
       child: Scaffold(
         body: SafeArea(
+          child: ResponsiveCenter(
           child: Column(
             children: [
               const Spacer(flex: 2),
@@ -274,6 +276,7 @@ class _LockScreenPageState extends State<LockScreenPage>
               ],
               const Spacer(),
             ],
+          ),
           ),
         ),
       ),

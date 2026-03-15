@@ -1482,6 +1482,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
             ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 40),
+        child: ResponsiveCenter(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -2325,6 +2326,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
             ),
             const SizedBox(height: 40),
           ],
+        ),
         ),
       ),
       floatingActionButton: _isEditingTitle || _versionSelectionMode

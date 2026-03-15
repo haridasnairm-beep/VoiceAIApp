@@ -355,7 +355,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage>
         body: Stack(
           children: [
             // Main content column
-            Column(
+            ResponsiveCenter(
+            child: Column(
               children: [
                 // Month/Year header (tappable for picker)
                 if (!_selectionMode) _buildMonthHeader(context),
@@ -469,6 +470,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage>
                         ),
                 ),
               ],
+            ),
             ),
 
             // Selection action bar (overlays bottom of screen)
@@ -809,7 +811,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage>
             crossAxisCount: 7,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 0.75,
+            childAspectRatio: Responsive.isWide(context) ? 1.1 : 0.75,
             children: [
               // Empty cells before first day
               for (var i = 0; i < startOffset; i++) const SizedBox(),
