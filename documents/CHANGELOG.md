@@ -4,7 +4,48 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.0.1] - 2026-03-15 - Play Store Closed Testing, Responsive Polish
+## Versioning Convention
+
+| Field | Meaning | Example |
+|---|---|---|
+| `versionName` | User-facing version shown on Play Store | `1.0.3` |
+| `versionCode` | Integer, must increment every Play Store upload | `4` |
+| `pubspec.yaml` | Format: `versionName+versionCode` | `1.0.3+4` |
+| Play Console | Displays as `versionCode (versionName)` | `4 (1.0.3)` |
+
+**Rules:**
+- `versionCode` MUST increment by 1 for every build uploaded to Play Store (closed, open, or production)
+- `versionName` increments based on change scope: patch (1.0.x) for fixes, minor (1.x.0) for features, major (x.0.0) for breaking changes
+- Always update `pubspec.yaml` `version:` field before building
+- Build command: `flutter build appbundle` (Play Store) or `flutter build apk --release --target-platform android-arm64` (direct APK)
+
+**Version History:**
+
+| Version | versionCode | Release | Channel |
+|---|---|---|---|
+| 1.0.0+1 | 1 | 2026-03-15 | Internal |
+| 1.0.1+2 | 2 | 2026-03-15 | Closed Testing |
+| 1.0.1+3 | 3 | 2026-04-03 | Production (first release) |
+| 1.0.3+4 | 4 | — | Next release (ready in pubspec) |
+
+---
+
+## [1.0.1+3] - 2026-04-03 - Production Release
+
+### Milestone
+- **Google Play Production Release** — App approved from closed testing, first production release published
+- **Testers Community feedback reviewed** — All 3 suggestions (dynamic walkthrough, Play Store screenshots, in-app rating) were already implemented
+
+### Build Changes
+- **16 KB page size packaging** — Added `jniLibs { useLegacyPackaging = false }` to `build.gradle` for Android 15+ compatibility (Flutter engine limitation, proceeded with Google Play warning)
+- **Version bumped to 1.0.1+3** (versionCode 3) for production upload
+
+### Notes
+- 16 KB memory page size warning from Play Console is a known Flutter engine limitation — not fixable in app-level config. Used "Proceed anyway" as permitted by Google.
+
+---
+
+## [1.0.1+2] - 2026-03-15 - Play Store Closed Testing, Responsive Polish
 
 ### Play Store Fixes
 - **Removed `USE_EXACT_ALARM` permission** — Google Play flagged it; app is not alarm/calendar. `SCHEDULE_EXACT_ALARM` retained for reminder notifications.

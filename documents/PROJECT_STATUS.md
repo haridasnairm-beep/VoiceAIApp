@@ -1,7 +1,7 @@
 # Vaanix - Project Status
 
-**Last Updated:** 2026-03-15
-**Current Version:** 1.0.1 (Phase 1 — Play Store Closed Testing)
+**Last Updated:** 2026-04-03
+**Current Version:** 1.0.1+3 (Phase 1 — Google Play Production Release)
 **Overall Progress:** Phase 1 core complete (100%). Value gap features: Steps 8–10.7 done (8/8). **All 7 Phase 1.5 waves complete** (Steps 11–17). Post-wave: Permission Management (Issue #13) + Gesture FAB (Issue #14) + Auto-Naming Preference + Persistent Counters + UX Fixes + Auto-Backup + Collapsible Backup Sections + Download Pause/Resume + Transcription Mode Redesign + Note Organize Section + GestureFab Library/Folder + Stats Projects Card + Folder Unified Timeline + Splash Timing + Ready Page Go Back + Media Resume After Recording + Note Card Capsules + Project GestureFab + Note Picker Filtering + Live V-Prefix Fix + Transcription Duplication Fix + Version History Fix + Calendar Page Redesign (Issue #15) + Audio Focus Hardening + Version History Deletion + Live Recording Info Banner + Pinned Projects + Project Swipe/Long Press Actions + Smart Filters Functional + Project Search + Voice Commands in Live Mode + Calendar New Project Dialog + Support Page Legal Section + Find & Replace in Project Documents + Task Capsule Layout (Issue #16) + Reminder Delete Fix (Issue #17) + Photo Upload Fix (Issue #18) + Backup Restore UX (Issue #19) + Reminder Reschedule Fix (Issue #20) + Share-to-Vaanix (Step 19P) + User Guide & Home Tip Tile (Step 20P) + Native Audio Conversion + Re-transcribe Page + Tip Tile Session Behavior + Widget UX Redesign + App Lock Widget Bypass Fix + PIN Length Storage + Widget Live Updates + Widget Deep Link Pre-check + Tips User Guide Navigation + Support Page Highlight + Tips Silent Dismiss + Tips 30-Day Expiry + Quick Guide 7 Pages + In-App Review Prompt + App Update Check (GitHub Releases API) + Tablet/Landscape Responsive Layout done. **Repository:** https://github.com/haridasnairm-beep/VoiceAIApp
 **Reference:** [Specification](PROJECT_SPECIFICATION.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
@@ -9,11 +9,19 @@
 
 ## Status Summary
 
-Phase 1 core is fully complete and production-ready. All 7 implementation steps are done: branding, Riverpod state management, Hive encrypted database, UI wired to data, on-device speech-to-text, audio playback + reminder notifications, and testing/polish. Additional features: splash screen with animated branding, multi-page quick guide (onboarding), interactive settings, compact AppBar headers, HDMPixels branding, project documents, interactive tasks, sharing/export with PDF, rich text editing, photo attachments, voice commands for task creation, and post-release UI polish.
+Phase 1 core is fully complete and **live on Google Play (Production)**. All 7 implementation steps are done: branding, Riverpod state management, Hive encrypted database, UI wired to data, on-device speech-to-text, audio playback + reminder notifications, and testing/polish. Additional features: splash screen with animated branding, multi-page quick guide (onboarding), interactive settings, compact AppBar headers, HDMPixels branding, project documents, interactive tasks, sharing/export with PDF, rich text editing, photo attachments, voice commands for task creation, and post-release UI polish.
 
 **Phase 1 = No AI.** All AI-related UI elements have been removed or replaced. See the AI exclusion table in CLAUDE.md.
 
-**All 8 value proposition gap features (Steps 8–10.7) are complete.** **All 7 Phase 1.5 waves (Steps 11–17) are complete.** App is **Play Store ready**. Next: Phase 2 (AI-powered features). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+**All 8 value proposition gap features (Steps 8–10.7) are complete.** **All 7 Phase 1.5 waves (Steps 11–17) are complete.** App is **live on Google Play Production** (published 2026-04-03). Next: Phase 2 (AI-powered features). See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+
+### Release History
+
+| Version | versionCode | Date | Channel |
+|---|---|---|---|
+| 1.0.0+1 | 1 | 2026-03-15 | Internal |
+| 1.0.1+2 | 2 | 2026-03-15 | Closed Testing |
+| 1.0.1+3 | 3 | 2026-04-03 | Production (first release) |
 
 ---
 

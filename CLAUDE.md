@@ -11,7 +11,7 @@ This file provides context for AI agents (Claude Code, Copilot, etc.) working on
 
 **Vaanix** is a privacy-first, voice-driven note-taking and task management mobile app built with Flutter. Users record voice notes, the app transcribes audio on-device, and organizes content into folders with manual categorization.
 
-**Current Phase:** Phase 1 (Release) — 100% complete. All 7 core steps + Steps 4.5/4.6/4.7 + post-release enhancements (Issues #7–#12) + all 8 value proposition gap features (Steps 8–10.7) + Steps 19P–21P. Version 1.0.0. **Next:** Phase 2 (AI-powered features).
+**Current Phase:** Phase 1 — **Live on Google Play Production** (v1.0.1+3, published 2026-04-03). All 7 core steps + Steps 4.5/4.6/4.7 + post-release enhancements (Issues #7–#12) + all 8 value proposition gap features (Steps 8–10.7) + Steps 19P–21P. **Next:** Phase 2 (AI-powered features).
 
 ---
 
@@ -309,6 +309,31 @@ lib/
 - **Error handling:** Graceful fallbacks, show user-friendly messages
 - **Privacy:** Never send user-identifying data to external services. Never log sensitive content.
 - **No AI in Phase 1:** All features must function without any cloud API dependency
+
+---
+
+## Versioning Convention
+
+| Field | Format | Example |
+|---|---|---|
+| `pubspec.yaml` | `versionName+versionCode` | `1.0.3+4` |
+| Play Console display | `versionCode (versionName)` | `4 (1.0.3)` |
+
+**Rules for agents:**
+1. `versionCode` MUST increment by 1 for **every** build uploaded to Play Store (any track)
+2. `versionName` follows semver: patch (`1.0.x`) for fixes, minor (`1.x.0`) for features, major (`x.0.0`) for breaking changes
+3. Always update `pubspec.yaml` `version:` field before building
+4. After bumping version, update the Version History table in `documents/CHANGELOG.md`
+
+**Current version in pubspec.yaml:** `1.0.3+4` (next release, ready to build)
+
+**Release History:**
+
+| Version | versionCode | Date | Channel |
+|---|---|---|---|
+| 1.0.0+1 | 1 | 2026-03-15 | Internal |
+| 1.0.1+2 | 2 | 2026-03-15 | Closed Testing |
+| 1.0.1+3 | 3 | 2026-04-03 | Production (first release) |
 
 ---
 
